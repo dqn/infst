@@ -9,6 +9,66 @@ use tracing::{error, info, warn};
 
 use crate::config::Config;
 use crate::error::Result;
+
+/// Memory layout constants for JudgeData structure
+mod judge_offsets {
+    /// Word size (4 bytes / 32-bit integer)
+    pub const WORD: u64 = 4;
+
+    // Player 1 judge data (offsets 0-4)
+    pub const P1_PGREAT: u64 = 0;
+    pub const P1_GREAT: u64 = WORD;
+    pub const P1_GOOD: u64 = WORD * 2;
+    pub const P1_BAD: u64 = WORD * 3;
+    pub const P1_POOR: u64 = WORD * 4;
+
+    // Player 2 judge data (offsets 5-9)
+    pub const P2_PGREAT: u64 = WORD * 5;
+    pub const P2_GREAT: u64 = WORD * 6;
+    pub const P2_GOOD: u64 = WORD * 7;
+    pub const P2_BAD: u64 = WORD * 8;
+    pub const P2_POOR: u64 = WORD * 9;
+
+    // Combo break data (offsets 10-11)
+    pub const P1_COMBO_BREAK: u64 = WORD * 10;
+    pub const P2_COMBO_BREAK: u64 = WORD * 11;
+
+    // Fast/Slow data (offsets 12-15)
+    pub const P1_FAST: u64 = WORD * 12;
+    pub const P2_FAST: u64 = WORD * 13;
+    pub const P1_SLOW: u64 = WORD * 14;
+    pub const P2_SLOW: u64 = WORD * 15;
+
+    // Measure end markers (offsets 16-17)
+    pub const P1_MEASURE_END: u64 = WORD * 16;
+    pub const P2_MEASURE_END: u64 = WORD * 17;
+
+    // Game state detection markers (offsets 54-55)
+    pub const STATE_MARKER_1: u64 = WORD * 54;
+    pub const STATE_MARKER_2: u64 = WORD * 55;
+
+    // Gauge percentage (offsets 81-82)
+    pub const P1_GAUGE: u64 = WORD * 81;
+    pub const P2_GAUGE: u64 = WORD * 82;
+}
+
+/// Memory layout constants for PlayData structure
+mod play_offsets {
+    pub const WORD: u64 = 4;
+
+    pub const SONG_ID: u64 = 0;
+    pub const DIFFICULTY: u64 = WORD;
+    pub const LAMP: u64 = WORD * 6;
+}
+
+/// Memory layout constants for PlaySettings structure
+mod settings_offsets {
+    pub const WORD: u64 = 4;
+
+    // Song select marker (negative offset from PlaySettings)
+    pub const SONG_SELECT_MARKER: u64 = WORD * 6;
+}
+
 use crate::game::{
     ChartInfo, Difficulty, GameState, GameStateDetector, Grade, Judge, Lamp, PlayData, PlayType,
     Settings, SongInfo, UnlockData, UnlockType, calculate_dj_points, check_version_match,
@@ -184,22 +244,20 @@ impl Reflux {
     }
 
     fn detect_game_state(&mut self, reader: &MemoryReader) -> Result<GameState> {
-        let word: u64 = 4;
-
         // Read markers for state detection
-        let judge_marker_54 = reader
-            .read_i32(self.offsets.judge_data + word * 54)
+        let state_marker_1 = reader
+            .read_i32(self.offsets.judge_data + judge_offsets::STATE_MARKER_1)
             .unwrap_or(0);
-        let judge_marker_55 = reader
-            .read_i32(self.offsets.judge_data + word * 55)
+        let state_marker_2 = reader
+            .read_i32(self.offsets.judge_data + judge_offsets::STATE_MARKER_2)
             .unwrap_or(0);
         let song_select_marker = reader
-            .read_i32(self.offsets.play_settings - word * 6)
+            .read_i32(self.offsets.play_settings - settings_offsets::SONG_SELECT_MARKER)
             .unwrap_or(0);
 
         Ok(self
             .state_detector
-            .detect(judge_marker_54, judge_marker_55, song_select_marker))
+            .detect(state_marker_1, state_marker_2, song_select_marker))
     }
 
     fn handle_state_change(
@@ -412,12 +470,11 @@ impl Reflux {
     }
 
     fn fetch_play_data(&self, reader: &MemoryReader) -> Result<PlayData> {
-        let word: u64 = 4;
-
         // Read basic play data
-        let song_id = reader.read_i32(self.offsets.play_data)?;
-        let difficulty_val = reader.read_i32(self.offsets.play_data + word)?;
-        let lamp_val = reader.read_i32(self.offsets.play_data + word * 6)?;
+        let song_id = reader.read_i32(self.offsets.play_data + play_offsets::SONG_ID)?;
+        let difficulty_val =
+            reader.read_i32(self.offsets.play_data + play_offsets::DIFFICULTY)?;
+        let lamp_val = reader.read_i32(self.offsets.play_data + play_offsets::LAMP)?;
 
         let song_id_str = format!("{:05}", song_id);
         let difficulty = Difficulty::from_u8(difficulty_val as u8).unwrap_or(Difficulty::SpN);
@@ -463,12 +520,12 @@ impl Reflux {
             Grade::NoPlay
         };
 
-        // Read gauge
+        // Read gauge (P1 + P2 combined)
         let gauge_p1 = reader
-            .read_i32(self.offsets.judge_data + word * 81)
+            .read_i32(self.offsets.judge_data + judge_offsets::P1_GAUGE)
             .unwrap_or(0);
         let gauge_p2 = reader
-            .read_i32(self.offsets.judge_data + word * 82)
+            .read_i32(self.offsets.judge_data + judge_offsets::P2_GAUGE)
             .unwrap_or(0);
         let gauge = (gauge_p1 + gauge_p2) as u8;
 
@@ -486,32 +543,35 @@ impl Reflux {
     }
 
     fn fetch_judge_data(&self, reader: &MemoryReader) -> Result<Judge> {
-        let word: u64 = 4;
         let base = self.offsets.judge_data;
 
-        let p1_pgreat = reader.read_u32(base)?;
-        let p1_great = reader.read_u32(base + word)?;
-        let p1_good = reader.read_u32(base + word * 2)?;
-        let p1_bad = reader.read_u32(base + word * 3)?;
-        let p1_poor = reader.read_u32(base + word * 4)?;
+        // Player 1 judge counts
+        let p1_pgreat = reader.read_u32(base + judge_offsets::P1_PGREAT)?;
+        let p1_great = reader.read_u32(base + judge_offsets::P1_GREAT)?;
+        let p1_good = reader.read_u32(base + judge_offsets::P1_GOOD)?;
+        let p1_bad = reader.read_u32(base + judge_offsets::P1_BAD)?;
+        let p1_poor = reader.read_u32(base + judge_offsets::P1_POOR)?;
 
-        let p2_pgreat = reader.read_u32(base + word * 5)?;
-        let p2_great = reader.read_u32(base + word * 6)?;
-        let p2_good = reader.read_u32(base + word * 7)?;
-        let p2_bad = reader.read_u32(base + word * 8)?;
-        let p2_poor = reader.read_u32(base + word * 9)?;
+        // Player 2 judge counts
+        let p2_pgreat = reader.read_u32(base + judge_offsets::P2_PGREAT)?;
+        let p2_great = reader.read_u32(base + judge_offsets::P2_GREAT)?;
+        let p2_good = reader.read_u32(base + judge_offsets::P2_GOOD)?;
+        let p2_bad = reader.read_u32(base + judge_offsets::P2_BAD)?;
+        let p2_poor = reader.read_u32(base + judge_offsets::P2_POOR)?;
 
-        let p1_cb = reader.read_u32(base + word * 10)?;
-        let p2_cb = reader.read_u32(base + word * 11)?;
+        // Combo break counts
+        let p1_cb = reader.read_u32(base + judge_offsets::P1_COMBO_BREAK)?;
+        let p2_cb = reader.read_u32(base + judge_offsets::P2_COMBO_BREAK)?;
 
-        let p1_fast = reader.read_u32(base + word * 12)?;
-        let p2_fast = reader.read_u32(base + word * 13)?;
+        // Fast/Slow counts
+        let p1_fast = reader.read_u32(base + judge_offsets::P1_FAST)?;
+        let p2_fast = reader.read_u32(base + judge_offsets::P2_FAST)?;
+        let p1_slow = reader.read_u32(base + judge_offsets::P1_SLOW)?;
+        let p2_slow = reader.read_u32(base + judge_offsets::P2_SLOW)?;
 
-        let p1_slow = reader.read_u32(base + word * 14)?;
-        let p2_slow = reader.read_u32(base + word * 15)?;
-
-        let p1_measure_end = reader.read_u32(base + word * 16)?;
-        let p2_measure_end = reader.read_u32(base + word * 17)?;
+        // Measure end markers (for premature end detection)
+        let p1_measure_end = reader.read_u32(base + judge_offsets::P1_MEASURE_END)?;
+        let p2_measure_end = reader.read_u32(base + judge_offsets::P2_MEASURE_END)?;
 
         Ok(Judge::from_raw_values(
             p1_pgreat,
