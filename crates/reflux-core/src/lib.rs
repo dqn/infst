@@ -9,9 +9,12 @@ pub mod stream;
 
 pub use config::Config;
 pub use error::{Error, Result};
-pub use game::{Difficulty, GameState, Grade, Lamp, PlayType, UnlockType};
+pub use game::{
+    AssistType, Chart, ChartInfo, Difficulty, GameState, GameStateDetector, GaugeType, Grade,
+    Judge, Lamp, PlayData, PlayType, RangeType, Settings, SongInfo, Style, UnlockData, UnlockType,
+};
 pub use memory::{MemoryReader, ProcessHandle};
 pub use network::{HttpClient, KamaitachiClient, RefluxApi};
-pub use offset::{load_offsets, save_offsets, OffsetsCollection, OffsetSearcher};
-pub use storage::{ScoreData, ScoreMap, SessionManager, Tracker, TrackerInfo};
+pub use offset::{load_offsets, save_offsets, OffsetSearcher, OffsetsCollection};
+pub use storage::{ScoreData, ScoreMap, SessionManager, Tracker, TrackerInfo, TsvRowData};
 pub use stream::StreamOutput;
