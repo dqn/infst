@@ -16,7 +16,7 @@ use crate::game::{
 use crate::memory::{MemoryReader, ProcessHandle};
 use crate::network::{AddSongParams, RefluxApi};
 use crate::offset::OffsetsCollection;
-use crate::storage::{format_post_form, SessionManager, Tracker, TrackerInfo, UnlockDb};
+use crate::storage::{export_tracker_tsv, format_play_data_console, format_post_form, ScoreMap, SessionManager, Tracker, TrackerInfo, UnlockDb};
 use crate::stream::StreamOutput;
 
 /// Main Reflux application
@@ -33,6 +33,10 @@ pub struct Reflux {
     unlock_db: UnlockDb,
     /// Current unlock state from memory
     unlock_state: HashMap<String, UnlockData>,
+    /// Score map from game memory
+    score_map: ScoreMap,
+    /// Custom unlock types from customtypes.txt
+    custom_types: HashMap<String, String>,
 }
 
 impl Reflux {
@@ -66,7 +70,19 @@ impl Reflux {
             api,
             unlock_db: UnlockDb::new(),
             unlock_state: HashMap::new(),
+            score_map: ScoreMap::new(),
+            custom_types: HashMap::new(),
         }
+    }
+
+    /// Set score map
+    pub fn set_score_map(&mut self, score_map: ScoreMap) {
+        self.score_map = score_map;
+    }
+
+    /// Set custom types
+    pub fn set_custom_types(&mut self, custom_types: HashMap<String, String>) {
+        self.custom_types = custom_types;
     }
 
     /// Load tracker data from file
@@ -190,13 +206,8 @@ impl Reflux {
                 // Fetch play data
                 match self.fetch_play_data(reader) {
                     Ok(play_data) => {
-                        info!(
-                            "Play data: {} {} - {} {}",
-                            play_data.chart.title,
-                            play_data.chart.difficulty.short_name(),
-                            play_data.grade.short_name(),
-                            play_data.lamp.short_name()
-                        );
+                        // Print detailed play data to console
+                        println!("{}", format_play_data_console(&play_data));
 
                         // Update tracker
                         self.update_tracker(&play_data);
@@ -287,6 +298,20 @@ impl Reflux {
 
                 // Poll unlock state changes and report to server
                 self.poll_unlock_changes(reader);
+
+                // Export tracker.tsv if save_local is enabled
+                if self.config.record.save_local {
+                    if let Err(e) = export_tracker_tsv(
+                        "tracker.tsv",
+                        &self.tracker,
+                        &self.song_db,
+                        &self.unlock_state,
+                        &self.score_map,
+                        &self.custom_types,
+                    ) {
+                        error!("Failed to export tracker.tsv: {}", e);
+                    }
+                }
             }
             GameState::Playing => {
                 // Fetch current chart info

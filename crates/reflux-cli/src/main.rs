@@ -1,7 +1,8 @@
 use anyhow::Result;
 use clap::Parser;
 use reflux_core::{
-    fetch_song_database, load_offsets, Config, MemoryReader, ProcessHandle, Reflux, ScoreMap,
+    export_song_list, fetch_song_database, load_offsets, Config, CustomTypes, MemoryReader,
+    ProcessHandle, Reflux, ScoreMap,
 };
 use std::path::PathBuf;
 use std::thread;
@@ -120,9 +121,17 @@ async fn main() -> Result<()> {
                 };
                 reflux.set_song_db(song_db.clone());
 
+                // Output song list for debugging if configured
+                if reflux.config().debug.output_db {
+                    info!("Outputting song list to songs.tsv...");
+                    if let Err(e) = export_song_list("songs.tsv", &song_db) {
+                        warn!("Failed to export song list: {}", e);
+                    }
+                }
+
                 // Load score map from game memory
                 info!("Loading score map...");
-                let _score_map =
+                let score_map =
                     match ScoreMap::load_from_memory(&reader, reflux.offsets().data_map, &song_db) {
                         Ok(map) => {
                             info!("Loaded {} score entries", map.len());
@@ -133,6 +142,22 @@ async fn main() -> Result<()> {
                             ScoreMap::new()
                         }
                     };
+                reflux.set_score_map(score_map);
+
+                // Load custom types
+                match CustomTypes::load("customtypes.txt") {
+                    Ok(ct) => {
+                        let types: std::collections::HashMap<String, String> = ct
+                            .iter()
+                            .map(|(k, v): (&String, &String)| (k.clone(), v.clone()))
+                            .collect();
+                        info!("Loaded {} custom types", types.len());
+                        reflux.set_custom_types(types);
+                    }
+                    Err(e) => {
+                        warn!("Failed to load custom types: {}", e);
+                    }
+                }
 
                 // Load unlock database
                 if let Err(e) = reflux.load_unlock_db("unlockdb") {

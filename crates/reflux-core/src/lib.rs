@@ -12,9 +12,9 @@ pub use config::Config;
 pub use error::{Error, Result};
 pub use game::{
     calculate_dj_points, calculate_dj_points_from_score, fetch_song_database,
-    get_unlock_state_for_difficulty, get_unlock_states, AssistType, Chart, ChartInfo, Difficulty,
-    EncodingFixes, GameState, GameStateDetector, GaugeType, Grade, Judge, Lamp, PlayData, PlayType,
-    RangeType, Settings, SongInfo, Style, UnlockData, UnlockType,
+    get_unlock_state_for_difficulty, get_unlock_states, AssistType, Chart, ChartInfo, CustomTypes,
+    Difficulty, EncodingFixes, GameState, GameStateDetector, GaugeType, Grade, Judge, Lamp,
+    PlayData, PlayType, RangeType, Settings, SongInfo, Style, UnlockData, UnlockType,
 };
 pub use memory::{MemoryReader, ProcessHandle};
 pub use network::{HttpClient, KamaitachiClient, RefluxApi};
