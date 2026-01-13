@@ -4,6 +4,7 @@ use std::thread;
 use std::time::Duration;
 
 use chrono::Utc;
+use tokio::runtime::Handle;
 use tracing::{error, info, warn};
 
 use crate::config::Config;
@@ -40,6 +41,8 @@ pub struct Reflux {
     score_map: ScoreMap,
     /// Custom unlock types from customtypes.txt
     custom_types: HashMap<String, String>,
+    /// Tokio runtime handle for spawning async tasks
+    runtime_handle: Option<Handle>,
 }
 
 impl Reflux {
@@ -62,6 +65,9 @@ impl Reflux {
             None
         };
 
+        // Try to get the current tokio runtime handle if one exists
+        let runtime_handle = Handle::try_current().ok();
+
         Self {
             config,
             offsets,
@@ -75,6 +81,7 @@ impl Reflux {
             unlock_state: HashMap::new(),
             score_map: ScoreMap::new(),
             custom_types: HashMap::new(),
+            runtime_handle,
         }
     }
 
@@ -236,13 +243,13 @@ impl Reflux {
                         // Send to remote server
                         if self.config.record.save_remote
                             && let Some(api) = self.api.clone()
+                            && let Some(handle) = &self.runtime_handle
                         {
                             let form =
                                 format_post_form(&play_data, &self.config.remote_record.api_key);
-                            // Non-blocking send (fire and forget for now)
-                            std::thread::spawn(move || {
-                                let rt = tokio::runtime::Runtime::new().unwrap();
-                                if let Err(e) = rt.block_on(api.report_play(form)) {
+                            // Non-blocking send using tokio spawn
+                            handle.spawn(async move {
+                                if let Err(e) = api.report_play(form).await {
                                     tracing::error!("Failed to report play to remote: {}", e);
                                 }
                             });
@@ -370,20 +377,16 @@ impl Reflux {
         if !changes.is_empty() {
             info!("Detected {} unlock state changes", changes.len());
 
-            // Clone api before the loop to avoid borrow issues
-            let api_opt = self.api.clone();
-
             // Report changes to server
             for (song_id, unlock_data) in &changes {
-                if let Some(ref api) = api_opt {
+                if let Some(api) = &self.api
+                    && let Some(handle) = &self.runtime_handle
+                {
                     let api_clone = api.clone();
                     let song_id_clone = song_id.clone();
                     let unlocks = unlock_data.unlocks;
-                    std::thread::spawn(move || {
-                        let rt = tokio::runtime::Runtime::new().unwrap();
-                        if let Err(e) =
-                            rt.block_on(api_clone.report_unlock(&song_id_clone, unlocks))
-                        {
+                    handle.spawn(async move {
+                        if let Err(e) = api_clone.report_unlock(&song_id_clone, unlocks).await {
                             tracing::error!("Failed to report unlock for {}: {}", song_id_clone, e);
                         }
                     });
