@@ -38,7 +38,11 @@ pub struct Reflux {
 impl Reflux {
     pub fn new(config: Config, offsets: OffsetsCollection) -> Self {
         let stream_output = StreamOutput::new(
-            config.livestream.show_play_state || config.livestream.enable_marquee,
+            config.livestream.show_play_state
+                || config.livestream.enable_marquee
+                || config.livestream.enable_full_song_info
+                || config.record.save_latest_json
+                || config.record.save_latest_txt,
             ".".to_string(),
         );
 
@@ -91,6 +95,27 @@ impl Reflux {
         let mut last_state = GameState::Unknown;
 
         info!("Starting tracker loop...");
+
+        if self.config.record.save_local || self.config.record.save_json {
+            self.session_manager = SessionManager::new("sessions");
+
+            if self.config.record.save_local {
+                match self
+                    .session_manager
+                    .start_session_with_header(&self.config.local_record)
+                {
+                    Ok(path) => info!("Started TSV session at {:?}", path),
+                    Err(e) => warn!("Failed to start TSV session: {}", e),
+                }
+            }
+
+            if self.config.record.save_json {
+                match self.session_manager.start_json_session() {
+                    Ok(path) => info!("Started JSON session at {:?}", path),
+                    Err(e) => warn!("Failed to start JSON session: {}", e),
+                }
+            }
+        }
 
         // Initialize streaming files
         if self.config.livestream.show_play_state {
@@ -185,7 +210,9 @@ impl Reflux {
                             ) {
                                 error!("Failed to append TSV row: {}", e);
                             }
+                        }
 
+                        if self.config.record.save_json {
                             // Append JSON entry
                             if let Err(e) = self.session_manager.append_json_entry(&play_data) {
                                 error!("Failed to append JSON entry: {}", e);
@@ -193,30 +220,32 @@ impl Reflux {
                         }
 
                         // Send to remote server
-                        if self.config.record.save_remote {
-                            if let Some(api) = self.api.clone() {
-                                let form =
-                                    format_post_form(&play_data, &self.config.remote_record.api_key);
-                                // Non-blocking send (fire and forget for now)
-                                std::thread::spawn(move || {
-                                    let rt = tokio::runtime::Runtime::new().unwrap();
-                                    if let Err(e) = rt.block_on(api.report_play(form)) {
-                                        tracing::error!("Failed to report play to remote: {}", e);
-                                    }
-                                });
-                            }
+                        if self.config.record.save_remote
+                            && let Some(api) = self.api.clone()
+                        {
+                            let form =
+                                format_post_form(&play_data, &self.config.remote_record.api_key);
+                            // Non-blocking send (fire and forget for now)
+                            std::thread::spawn(move || {
+                                let rt = tokio::runtime::Runtime::new().unwrap();
+                                if let Err(e) = rt.block_on(api.report_play(form)) {
+                                    tracing::error!("Failed to report play to remote: {}", e);
+                                }
+                            });
                         }
 
                         // Write latest files for OBS/streaming
-                        if self.config.livestream.show_play_state
-                            || self.config.livestream.enable_marquee
-                        {
-                            if let Err(e) = self.stream_output.write_latest_files(
+                        let write_latest_json = self.config.record.save_latest_json;
+                        let write_latest_txt = self.config.record.save_latest_txt;
+                        if (write_latest_json || write_latest_txt)
+                            && let Err(e) = self.stream_output.write_latest_files(
                                 &play_data,
                                 &self.config.remote_record.api_key,
-                            ) {
-                                error!("Failed to write latest files: {}", e);
-                            }
+                                write_latest_json,
+                                write_latest_txt,
+                            )
+                        {
+                            error!("Failed to write latest files: {}", e);
                         }
 
                         // Update streaming files
@@ -252,7 +281,9 @@ impl Reflux {
                 }
 
                 // Clear full song info files
-                let _ = self.stream_output.clear_full_song_info();
+                if self.config.livestream.enable_full_song_info {
+                    let _ = self.stream_output.clear_full_song_info();
+                }
 
                 // Poll unlock state changes and report to server
                 self.poll_unlock_changes(reader);
@@ -272,7 +303,9 @@ impl Reflux {
                     }
 
                     // Write full song info files for OBS
-                    if let Err(e) = self.stream_output.write_full_song_info(song, difficulty) {
+                    if self.config.livestream.enable_full_song_info
+                        && let Err(e) = self.stream_output.write_full_song_info(song, difficulty)
+                    {
                         error!("Failed to write full song info: {}", e);
                     }
                 }

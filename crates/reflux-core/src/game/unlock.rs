@@ -199,10 +199,10 @@ pub fn detect_unlock_changes(
     let mut changes = HashMap::new();
 
     for (song_id, new_data) in new_state {
-        if let Some(old_data) = old_state.get(song_id) {
-            if new_data.unlocks != old_data.unlocks {
-                changes.insert(song_id.clone(), new_data.clone());
-            }
+        if let Some(old_data) = old_state.get(song_id)
+            && new_data.unlocks != old_data.unlocks
+        {
+            changes.insert(song_id.clone(), new_data.clone());
         }
     }
 

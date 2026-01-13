@@ -34,14 +34,20 @@ impl HttpClient {
         let mut form = form;
         form.insert("apikey".to_string(), self.api_key.clone());
 
-        let response = self.client.post(&url).form(&form).send().await?;
+        let response = self
+            .client
+            .post(&url)
+            .form(&form)
+            .send()
+            .await?
+            .error_for_status()?;
 
         let text = response.text().await?;
         Ok(text)
     }
 
     pub async fn get(&self, url: &str) -> Result<String> {
-        let response = self.client.get(url).send().await?;
+        let response = self.client.get(url).send().await?.error_for_status()?;
         let text = response.text().await?;
         Ok(text)
     }

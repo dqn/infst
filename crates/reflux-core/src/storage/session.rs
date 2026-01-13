@@ -99,10 +99,10 @@ impl SessionManager {
         {
             let entry = format_json_entry(play_data);
 
-            if let Some(body) = json_data.get_mut("body") {
-                if let Some(arr) = body.as_array_mut() {
-                    arr.push(entry);
-                }
+            if let Some(body) = json_data.get_mut("body")
+                && let Some(arr) = body.as_array_mut()
+            {
+                arr.push(entry);
             }
 
             fs::write(path, serde_json::to_string_pretty(json_data)?)?;

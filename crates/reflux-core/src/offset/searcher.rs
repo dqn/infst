@@ -332,8 +332,10 @@ impl<'a> OffsetSearcher<'a> {
     ) -> Result<InteractiveSearchResult> {
         prompter.prompt_continue("Starting offset search mode, press ENTER to continue");
 
-        let mut new_offsets = OffsetsCollection::default();
-        new_offsets.version = new_version.to_string();
+        let mut new_offsets = OffsetsCollection {
+            version: new_version.to_string(),
+            ..Default::default()
+        };
 
         // Phase 1: Static patterns
         prompter.display_message("Searching for SongList...");

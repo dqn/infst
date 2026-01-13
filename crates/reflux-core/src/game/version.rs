@@ -28,13 +28,11 @@ pub fn find_game_version(reader: &MemoryReader, base_address: u64) -> Result<Opt
     let mut last_found: Option<String> = None;
 
     for i in 0..text.len().saturating_sub(VERSION_LENGTH) {
-        if text[i..].starts_with(VERSION_PREFIX) {
-            if i + VERSION_LENGTH <= text.len() {
-                let version = &text[i..i + VERSION_LENGTH];
-                // Validate that the version looks correct (ends with digits)
-                if is_valid_version(version) {
-                    last_found = Some(version.to_string());
-                }
+        if text[i..].starts_with(VERSION_PREFIX) && i + VERSION_LENGTH <= text.len() {
+            let version = &text[i..i + VERSION_LENGTH];
+            // Validate that the version looks correct (ends with digits)
+            if is_valid_version(version) {
+                last_found = Some(version.to_string());
             }
         }
     }
