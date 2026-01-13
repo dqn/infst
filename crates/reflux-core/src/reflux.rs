@@ -70,8 +70,8 @@ mod settings_offsets {
 }
 
 use crate::game::{
-    ChartInfo, Difficulty, GameState, GameStateDetector, Grade, Judge, Lamp, PlayData, PlayType,
-    Settings, SongInfo, UnlockData, UnlockType, calculate_dj_points, check_version_match,
+    AssistType, ChartInfo, Difficulty, GameState, GameStateDetector, Grade, Judge, Lamp, PlayData,
+    PlayType, Settings, SongInfo, UnlockData, UnlockType, calculate_dj_points, check_version_match,
     find_game_version, get_unlock_state_for_difficulty, get_unlock_states,
 };
 use crate::memory::{MemoryReader, ProcessHandle};
@@ -267,7 +267,11 @@ impl Reflux {
             .read_i32(self.offsets.judge_data + judge_offsets::STATE_MARKER_2)
             .unwrap_or(0);
         let song_select_marker = reader
-            .read_i32(self.offsets.play_settings - settings_offsets::SONG_SELECT_MARKER)
+            .read_i32(
+                self.offsets
+                    .play_settings
+                    .wrapping_sub(settings_offsets::SONG_SELECT_MARKER),
+            )
             .unwrap_or(0);
 
         Ok(self
@@ -534,6 +538,8 @@ impl Reflux {
 
         // Fetch settings
         let settings = self.fetch_settings(reader, judge.play_type)?;
+        let data_available =
+            !settings.h_ran && !settings.battle && settings.assist == AssistType::Off;
 
         // Get or create chart info
         let chart = if let Some(song) = self.game_data.song_db.get(&song_id) {
@@ -579,7 +585,7 @@ impl Reflux {
             lamp,
             judge,
             settings,
-            data_available: true,
+            data_available,
         })
     }
 
