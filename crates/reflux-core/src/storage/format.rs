@@ -466,8 +466,8 @@ fn generate_tracker_entry(
     }
 
     // Add SP/DP DJ Points
-    columns.push(if sp_djp > 0.0 { format!("{:.8E}", sp_djp) } else { String::new() });
-    columns.push(if dp_djp > 0.0 { format!("{:.8E}", dp_djp) } else { String::new() });
+    columns.push(if sp_djp > 0.0 { format!("{}", sp_djp) } else { String::new() });
+    columns.push(if dp_djp > 0.0 { format!("{}", dp_djp) } else { String::new() });
 
     // Add chart data columns
     for (unlocked, level, lamp, grade, ex_score, miss_count, total_notes, djp) in chart_data {
@@ -478,7 +478,7 @@ fn generate_tracker_entry(
         columns.push(ex_score.to_string());
         columns.push(miss_count.map(|m| m.to_string()).unwrap_or_else(|| "-".to_string()));
         columns.push(total_notes.to_string());
-        columns.push(if djp > 0.0 { format!("{:.8E}", djp) } else { String::new() });
+        columns.push(if djp > 0.0 { format!("{}", djp) } else { String::new() });
     }
 
     Some(columns.join("\t"))
