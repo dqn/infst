@@ -83,11 +83,35 @@ use crate::storage::{
 };
 use crate::stream::StreamOutput;
 
+/// Game data loaded from memory and files
+pub struct GameData {
+    /// Song database loaded from game memory
+    pub song_db: HashMap<String, SongInfo>,
+    /// Score map from game memory
+    pub score_map: ScoreMap,
+    /// Current unlock state from memory
+    pub unlock_state: HashMap<String, UnlockData>,
+    /// Custom unlock types from customtypes.txt
+    pub custom_types: HashMap<String, String>,
+}
+
+impl GameData {
+    fn new() -> Self {
+        Self {
+            song_db: HashMap::new(),
+            score_map: ScoreMap::new(),
+            unlock_state: HashMap::new(),
+            custom_types: HashMap::new(),
+        }
+    }
+}
+
 /// Main Reflux application
 pub struct Reflux {
     config: Config,
     offsets: OffsetsCollection,
-    song_db: HashMap<String, SongInfo>,
+    /// Game data from memory
+    game_data: GameData,
     tracker: Tracker,
     state_detector: GameStateDetector,
     session_manager: SessionManager,
@@ -95,12 +119,6 @@ pub struct Reflux {
     api: Option<RefluxApi>,
     /// Persistent unlock state storage (from file)
     unlock_db: UnlockDb,
-    /// Current unlock state from memory
-    unlock_state: HashMap<String, UnlockData>,
-    /// Score map from game memory
-    score_map: ScoreMap,
-    /// Custom unlock types from customtypes.txt
-    custom_types: HashMap<String, String>,
     /// Tokio runtime handle for spawning async tasks
     runtime_handle: Option<Handle>,
 }
@@ -131,28 +149,25 @@ impl Reflux {
         Self {
             config,
             offsets,
-            song_db: HashMap::new(),
+            game_data: GameData::new(),
             tracker: Tracker::new(),
             state_detector: GameStateDetector::new(),
             session_manager: SessionManager::new("sessions"),
             stream_output,
             api,
             unlock_db: UnlockDb::new(),
-            unlock_state: HashMap::new(),
-            score_map: ScoreMap::new(),
-            custom_types: HashMap::new(),
             runtime_handle,
         }
     }
 
     /// Set score map
     pub fn set_score_map(&mut self, score_map: ScoreMap) {
-        self.score_map = score_map;
+        self.game_data.score_map = score_map;
     }
 
     /// Set custom types
     pub fn set_custom_types(&mut self, custom_types: HashMap<String, String>) {
-        self.custom_types = custom_types;
+        self.game_data.custom_types = custom_types;
     }
 
     /// Load tracker data from file
@@ -405,10 +420,10 @@ impl Reflux {
             && let Err(e) = export_tracker_tsv(
                 "tracker.tsv",
                 &self.tracker,
-                &self.song_db,
-                &self.unlock_state,
-                &self.score_map,
-                &self.custom_types,
+                &self.game_data.song_db,
+                &self.game_data.unlock_state,
+                &self.game_data.score_map,
+                &self.game_data.custom_types,
             )
         {
             error!("Failed to export tracker.tsv: {}", e);
@@ -418,7 +433,7 @@ impl Reflux {
     /// Handle transition to playing state
     fn handle_playing(&mut self, reader: &MemoryReader) {
         if let Ok((song_id, difficulty)) = self.fetch_current_chart(reader)
-            && let Some(song) = self.song_db.get(&song_id)
+            && let Some(song) = self.game_data.song_db.get(&song_id)
         {
             let chart_name = format!("{} {}", song.title_english, difficulty.short_name());
 
@@ -444,12 +459,12 @@ impl Reflux {
             return;
         }
 
-        if self.song_db.is_empty() {
+        if self.game_data.song_db.is_empty() {
             return;
         }
 
         // Read current unlock state
-        let current_state = match get_unlock_states(reader, self.offsets.unlock_data, &self.song_db)
+        let current_state = match get_unlock_states(reader, self.offsets.unlock_data, &self.game_data.song_db)
         {
             Ok(state) => state,
             Err(e) => {
@@ -459,7 +474,7 @@ impl Reflux {
         };
 
         // Detect changes
-        let changes = crate::game::detect_unlock_changes(&self.unlock_state, &current_state);
+        let changes = crate::game::detect_unlock_changes(&self.game_data.unlock_state, &current_state);
 
         if !changes.is_empty() {
             info!("Detected {} unlock state changes", changes.len());
@@ -485,7 +500,7 @@ impl Reflux {
         }
 
         // Update current unlock state
-        self.unlock_state = current_state;
+        self.game_data.unlock_state = current_state;
     }
 
     fn fetch_current_chart(&self, reader: &MemoryReader) -> Result<(String, Difficulty)> {
@@ -524,7 +539,7 @@ impl Reflux {
         let settings = self.fetch_settings(reader, judge.play_type)?;
 
         // Get or create chart info
-        let chart = if let Some(song) = self.song_db.get(&song_id_str) {
+        let chart = if let Some(song) = self.game_data.song_db.get(&song_id_str) {
             ChartInfo::from_song_info(song, difficulty, true)
         } else {
             // Create minimal chart info
@@ -690,7 +705,7 @@ impl Reflux {
 
     /// Set song database
     pub fn set_song_db(&mut self, song_db: HashMap<String, SongInfo>) {
-        self.song_db = song_db;
+        self.game_data.song_db = song_db;
     }
 
     /// Load unlock database from file
@@ -719,15 +734,15 @@ impl Reflux {
 
     /// Load current unlock state from memory
     pub fn load_unlock_state(&mut self, reader: &MemoryReader) -> Result<()> {
-        if self.song_db.is_empty() {
+        if self.game_data.song_db.is_empty() {
             warn!("Song database is empty, cannot load unlock state");
             return Ok(());
         }
 
-        self.unlock_state = get_unlock_states(reader, self.offsets.unlock_data, &self.song_db)?;
+        self.game_data.unlock_state = get_unlock_states(reader, self.offsets.unlock_data, &self.game_data.song_db)?;
         info!(
             "Loaded unlock state from memory ({} entries)",
-            self.unlock_state.len()
+            self.game_data.unlock_state.len()
         );
         Ok(())
     }
@@ -752,6 +767,7 @@ impl Reflux {
 
         // Count new songs (not in unlock_db)
         let new_songs: Vec<_> = self
+            .game_data
             .song_db
             .keys()
             .filter(|id| !self.unlock_db.contains(id))
@@ -762,14 +778,14 @@ impl Reflux {
             info!("Found {} songs to upload to remote", new_songs.len());
         }
 
-        for (i, song_id) in self.song_db.keys().enumerate() {
-            let Some(song) = self.song_db.get(song_id) else {
+        for (i, song_id) in self.game_data.song_db.keys().enumerate() {
+            let Some(song) = self.game_data.song_db.get(song_id) else {
                 continue;
             };
 
             // Report progress for new songs
-            if !new_songs.is_empty() && (i % 100 == 0 || i == self.song_db.len() - 1) {
-                let percent = (i as f64 / self.song_db.len() as f64) * 100.0;
+            if !new_songs.is_empty() && (i % 100 == 0 || i == self.game_data.song_db.len() - 1) {
+                let percent = (i as f64 / self.game_data.song_db.len() as f64) * 100.0;
                 info!("Sync progress: {:.1}%", percent);
             }
 
@@ -779,7 +795,7 @@ impl Reflux {
             }
 
             // Check for unlock type/state changes
-            if let Some(unlock_data) = self.unlock_state.get(song_id) {
+            if let Some(unlock_data) = self.game_data.unlock_state.get(song_id) {
                 let current_type = match unlock_data.unlock_type {
                     UnlockType::Base => 1,
                     UnlockType::Bits => 2,
@@ -828,6 +844,7 @@ impl Reflux {
         song: &SongInfo,
     ) -> Result<()> {
         let unlock_type = self
+            .game_data
             .unlock_state
             .get(song_id)
             .map(|u| match u.unlock_type {
@@ -867,8 +884,8 @@ impl Reflux {
 
             let total_notes = song.total_notes.get(diff_idx).copied().unwrap_or(0);
             let unlocked = get_unlock_state_for_difficulty(
-                &self.unlock_state,
-                &self.song_db,
+                &self.game_data.unlock_state,
+                &self.game_data.song_db,
                 song_id,
                 difficulty,
             );
@@ -886,7 +903,7 @@ impl Reflux {
             }
 
             // Post initial score from score map
-            if let Some(score_data) = self.score_map.get(song_id) {
+            if let Some(score_data) = self.game_data.score_map.get(song_id) {
                 let ex_score = score_data.score[diff_idx];
                 let miss_count = score_data.miss_count[diff_idx].unwrap_or(0);
                 let lamp = score_data.lamp[diff_idx];
