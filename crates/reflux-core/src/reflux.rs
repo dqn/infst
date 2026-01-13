@@ -267,146 +267,175 @@ impl Reflux {
         new_state: GameState,
     ) -> Result<()> {
         match new_state {
-            GameState::ResultScreen => {
-                // Wait a bit to avoid race condition
-                thread::sleep(Duration::from_secs(1));
-
-                // Fetch play data
-                match self.fetch_play_data(reader) {
-                    Ok(play_data) => {
-                        // Print detailed play data to console
-                        println!("{}", format_play_data_console(&play_data));
-
-                        // Update tracker
-                        self.update_tracker(&play_data);
-
-                        // Save to session file (TSV and JSON)
-                        if self.config.record.save_local {
-                            // Append TSV row
-                            if let Err(e) = self
-                                .session_manager
-                                .append_tsv_row(&play_data, &self.config.local_record)
-                            {
-                                error!("Failed to append TSV row: {}", e);
-                            }
-                        }
-
-                        if self.config.record.save_json {
-                            // Append JSON entry
-                            if let Err(e) = self.session_manager.append_json_entry(&play_data) {
-                                error!("Failed to append JSON entry: {}", e);
-                            }
-                        }
-
-                        // Send to remote server
-                        if self.config.record.save_remote
-                            && let Some(api) = self.api.clone()
-                            && let Some(handle) = &self.runtime_handle
-                        {
-                            let form =
-                                format_post_form(&play_data, &self.config.remote_record.api_key);
-                            // Non-blocking send using tokio spawn
-                            handle.spawn(async move {
-                                if let Err(e) = api.report_play(form).await {
-                                    tracing::error!("Failed to report play to remote: {}", e);
-                                }
-                            });
-                        }
-
-                        // Write latest files for OBS/streaming
-                        let write_latest_json = self.config.record.save_latest_json;
-                        let write_latest_txt = self.config.record.save_latest_txt;
-                        if (write_latest_json || write_latest_txt)
-                            && let Err(e) = self.stream_output.write_latest_files(
-                                &play_data,
-                                &self.config.remote_record.api_key,
-                                write_latest_json,
-                                write_latest_txt,
-                            )
-                        {
-                            error!("Failed to write latest files: {}", e);
-                        }
-
-                        // Update streaming files
-                        if self.config.livestream.show_play_state {
-                            let _ = self.stream_output.write_play_state(GameState::ResultScreen);
-                        }
-                        if self.config.livestream.enable_marquee {
-                            let status = if play_data.lamp == Lamp::Failed {
-                                "FAIL!"
-                            } else {
-                                "CLEAR!"
-                            };
-                            let _ = self.stream_output.write_marquee(&format!(
-                                "{} {}",
-                                play_data.chart.title_english, status
-                            ));
-                        }
-                    }
-                    Err(e) => {
-                        error!("Failed to fetch play data: {}", e);
-                    }
-                }
-            }
-            GameState::SongSelect => {
-                // Update streaming files
-                if self.config.livestream.show_play_state {
-                    let _ = self.stream_output.write_play_state(GameState::SongSelect);
-                }
-                if self.config.livestream.enable_marquee {
-                    let _ = self
-                        .stream_output
-                        .write_marquee(&self.config.livestream.marquee_idle_text);
-                }
-
-                // Clear full song info files
-                if self.config.livestream.enable_full_song_info {
-                    let _ = self.stream_output.clear_full_song_info();
-                }
-
-                // Poll unlock state changes and report to server
-                self.poll_unlock_changes(reader);
-
-                // Export tracker.tsv if save_local is enabled
-                if self.config.record.save_local
-                    && let Err(e) = export_tracker_tsv(
-                        "tracker.tsv",
-                        &self.tracker,
-                        &self.song_db,
-                        &self.unlock_state,
-                        &self.score_map,
-                        &self.custom_types,
-                    )
-                {
-                    error!("Failed to export tracker.tsv: {}", e);
-                }
-            }
-            GameState::Playing => {
-                // Fetch current chart info
-                if let Ok((song_id, difficulty)) = self.fetch_current_chart(reader)
-                    && let Some(song) = self.song_db.get(&song_id)
-                {
-                    let chart_name = format!("{} {}", song.title_english, difficulty.short_name());
-
-                    if self.config.livestream.show_play_state {
-                        let _ = self.stream_output.write_play_state(GameState::Playing);
-                    }
-                    if self.config.livestream.enable_marquee {
-                        let _ = self.stream_output.write_marquee(&chart_name.to_uppercase());
-                    }
-
-                    // Write full song info files for OBS
-                    if self.config.livestream.enable_full_song_info
-                        && let Err(e) = self.stream_output.write_full_song_info(song, difficulty)
-                    {
-                        error!("Failed to write full song info: {}", e);
-                    }
-                }
-            }
+            GameState::ResultScreen => self.handle_result_screen(reader),
+            GameState::SongSelect => self.handle_song_select(reader),
+            GameState::Playing => self.handle_playing(reader),
             GameState::Unknown => {}
         }
-
         Ok(())
+    }
+
+    /// Handle transition to result screen
+    fn handle_result_screen(&mut self, reader: &MemoryReader) {
+        // Wait a bit to avoid race condition
+        thread::sleep(Duration::from_secs(1));
+
+        match self.fetch_play_data(reader) {
+            Ok(play_data) => {
+                self.process_play_result(&play_data);
+            }
+            Err(e) => {
+                error!("Failed to fetch play data: {}", e);
+            }
+        }
+    }
+
+    /// Process and save play result data
+    fn process_play_result(&mut self, play_data: &PlayData) {
+        // Print detailed play data to console
+        println!("{}", format_play_data_console(play_data));
+
+        // Update tracker
+        self.update_tracker(play_data);
+
+        // Save to session files
+        self.save_session_data(play_data);
+
+        // Send to remote server
+        self.send_to_remote(play_data);
+
+        // Write latest files for OBS/streaming
+        self.write_latest_files(play_data);
+
+        // Update streaming files
+        self.update_result_stream_files(play_data);
+    }
+
+    /// Save play data to session files (TSV and JSON)
+    fn save_session_data(&mut self, play_data: &PlayData) {
+        if self.config.record.save_local {
+            if let Err(e) = self
+                .session_manager
+                .append_tsv_row(play_data, &self.config.local_record)
+            {
+                error!("Failed to append TSV row: {}", e);
+            }
+        }
+
+        if self.config.record.save_json {
+            if let Err(e) = self.session_manager.append_json_entry(play_data) {
+                error!("Failed to append JSON entry: {}", e);
+            }
+        }
+    }
+
+    /// Send play data to remote server
+    fn send_to_remote(&self, play_data: &PlayData) {
+        if self.config.record.save_remote
+            && let Some(api) = self.api.clone()
+            && let Some(handle) = &self.runtime_handle
+        {
+            let form = format_post_form(play_data, &self.config.remote_record.api_key);
+            handle.spawn(async move {
+                if let Err(e) = api.report_play(form).await {
+                    tracing::error!("Failed to report play to remote: {}", e);
+                }
+            });
+        }
+    }
+
+    /// Write latest play files for OBS
+    fn write_latest_files(&mut self, play_data: &PlayData) {
+        let write_json = self.config.record.save_latest_json;
+        let write_txt = self.config.record.save_latest_txt;
+
+        if (write_json || write_txt)
+            && let Err(e) = self.stream_output.write_latest_files(
+                play_data,
+                &self.config.remote_record.api_key,
+                write_json,
+                write_txt,
+            )
+        {
+            error!("Failed to write latest files: {}", e);
+        }
+    }
+
+    /// Update streaming files for result screen
+    fn update_result_stream_files(&mut self, play_data: &PlayData) {
+        if self.config.livestream.show_play_state {
+            let _ = self.stream_output.write_play_state(GameState::ResultScreen);
+        }
+
+        if self.config.livestream.enable_marquee {
+            let status = if play_data.lamp == Lamp::Failed {
+                "FAIL!"
+            } else {
+                "CLEAR!"
+            };
+            let _ = self.stream_output.write_marquee(&format!(
+                "{} {}",
+                play_data.chart.title_english, status
+            ));
+        }
+    }
+
+    /// Handle transition to song select screen
+    fn handle_song_select(&mut self, reader: &MemoryReader) {
+        // Update streaming files
+        if self.config.livestream.show_play_state {
+            let _ = self.stream_output.write_play_state(GameState::SongSelect);
+        }
+        if self.config.livestream.enable_marquee {
+            let _ = self
+                .stream_output
+                .write_marquee(&self.config.livestream.marquee_idle_text);
+        }
+
+        // Clear full song info files
+        if self.config.livestream.enable_full_song_info {
+            let _ = self.stream_output.clear_full_song_info();
+        }
+
+        // Poll unlock state changes and report to server
+        self.poll_unlock_changes(reader);
+
+        // Export tracker.tsv if save_local is enabled
+        if self.config.record.save_local
+            && let Err(e) = export_tracker_tsv(
+                "tracker.tsv",
+                &self.tracker,
+                &self.song_db,
+                &self.unlock_state,
+                &self.score_map,
+                &self.custom_types,
+            )
+        {
+            error!("Failed to export tracker.tsv: {}", e);
+        }
+    }
+
+    /// Handle transition to playing state
+    fn handle_playing(&mut self, reader: &MemoryReader) {
+        if let Ok((song_id, difficulty)) = self.fetch_current_chart(reader)
+            && let Some(song) = self.song_db.get(&song_id)
+        {
+            let chart_name = format!("{} {}", song.title_english, difficulty.short_name());
+
+            if self.config.livestream.show_play_state {
+                let _ = self.stream_output.write_play_state(GameState::Playing);
+            }
+            if self.config.livestream.enable_marquee {
+                let _ = self.stream_output.write_marquee(&chart_name.to_uppercase());
+            }
+
+            // Write full song info files for OBS
+            if self.config.livestream.enable_full_song_info
+                && let Err(e) = self.stream_output.write_full_song_info(song, difficulty)
+            {
+                error!("Failed to write full song info: {}", e);
+            }
+        }
     }
 
     /// Poll for unlock state changes and report to server
