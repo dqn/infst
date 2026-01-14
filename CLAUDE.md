@@ -46,6 +46,12 @@ cargo run            # CLI 実行（Windows のみ動作）
 
 本家 C# 実装は `.agent/Reflux/` にあり。機能追加・バグ修正時に参照。
 
+## リリース手順
+
+1. Cargo.toml のバージョンを更新（reflux-core, reflux-cli 両方）
+2. `git tag vX.Y.Z` でタグをつける
+3. `git push --tags` で push
+
 ## 注意事項
 
 - Windows 専用（INFINITAS のメモリを読み取るため）
