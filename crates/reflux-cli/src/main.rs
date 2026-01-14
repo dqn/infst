@@ -110,7 +110,11 @@ async fn main() -> Result<()> {
             c
         }
         Err(e) => {
-            warn!("Failed to load config: {}, using defaults", e);
+            if e.is_not_found() {
+                info!("Config file not found, using defaults");
+            } else {
+                warn!("Failed to load config: {}, using defaults", e);
+            }
             Config::default()
         }
     };
@@ -122,7 +126,11 @@ async fn main() -> Result<()> {
             o
         }
         Err(e) => {
-            warn!("Failed to load offsets: {}, using defaults", e);
+            if e.is_not_found() {
+                info!("Offsets file not found, using defaults");
+            } else {
+                warn!("Failed to load offsets: {}, using defaults", e);
+            }
             Default::default()
         }
     };

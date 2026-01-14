@@ -47,6 +47,13 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+impl Error {
+    /// Check if this error is a "file not found" error
+    pub fn is_not_found(&self) -> bool {
+        matches!(self, Error::Io(e) if e.kind() == std::io::ErrorKind::NotFound)
+    }
+}
+
 impl From<reqwest::Error> for Error {
     fn from(e: reqwest::Error) -> Self {
         let message = if e.is_timeout() {

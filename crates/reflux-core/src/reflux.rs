@@ -189,7 +189,11 @@ impl Reflux {
                 info!("Loaded tracker from {:?}", path.as_ref());
             }
             Err(e) => {
-                warn!("Failed to load tracker: {}, starting fresh", e);
+                if e.is_not_found() {
+                    info!("Tracker file not found, starting fresh");
+                } else {
+                    warn!("Failed to load tracker: {}, starting fresh", e);
+                }
             }
         }
         Ok(())
@@ -794,7 +798,11 @@ impl Reflux {
                 self.unlock_db = db;
             }
             Err(e) => {
-                warn!("Failed to load unlock db: {}, starting fresh", e);
+                if e.is_not_found() {
+                    info!("Unlock db file not found, starting fresh");
+                } else {
+                    warn!("Failed to load unlock db: {}, starting fresh", e);
+                }
             }
         }
         Ok(())

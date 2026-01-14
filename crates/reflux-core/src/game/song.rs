@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use tracing::warn;
+use tracing::debug;
 
 use crate::error::Result;
 use crate::game::UnlockType;
@@ -152,7 +152,7 @@ fn decode_shift_jis(bytes: &[u8]) -> String {
 
     let (decoded, _, had_errors) = SHIFT_JIS.decode(bytes);
     if had_errors {
-        warn!(
+        debug!(
             "Shift-JIS decoding had errors for bytes: {:?}",
             &bytes[..bytes.len().min(20)]
         );

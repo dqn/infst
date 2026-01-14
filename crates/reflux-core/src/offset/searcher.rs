@@ -367,7 +367,13 @@ impl<'a> OffsetSearcher<'a> {
         ));
 
         prompter.display_message("Searching for DataMap...");
-        new_offsets.data_map = self.search_data_map_offset(hint(old_offsets.data_map))?;
+        // Use SongList as hint for DataMap since they are in similar memory region
+        let data_map_hint = if old_offsets.data_map != 0 {
+            old_offsets.data_map
+        } else {
+            new_offsets.song_list
+        };
+        new_offsets.data_map = self.search_data_map_offset(data_map_hint)?;
         prompter.display_message(&format!("Found DataMap at 0x{:X}", new_offsets.data_map));
 
         // Phase 2: Judge data (requires playing a song)
