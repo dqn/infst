@@ -113,14 +113,21 @@ async fn main() -> Result<()> {
                 // Create memory reader
                 let reader = MemoryReader::new(&process);
 
-                // Check game version
+                // Check game version and update offsets if needed
+                let mut offsets_updated = false;
                 match reflux.check_game_version(&reader, process.base_address) {
                     Ok((Some(version), matches)) => {
                         info!("Game version: {}", version);
-                        if !matches {
-                            warn!("Offsets version mismatch, attempting update...");
+                        if !matches || !reflux.offsets().is_valid() {
+                            if !matches {
+                                warn!("Offsets version mismatch, attempting update...");
+                            } else {
+                                warn!("Invalid offsets, attempting update...");
+                            }
                             if let Err(e) = reflux.update_support_files(&version, ".").await {
                                 warn!("Failed to update support files: {}", e);
+                            } else {
+                                offsets_updated = true;
                             }
                         }
                     }
@@ -130,6 +137,28 @@ async fn main() -> Result<()> {
                     Err(e) => {
                         warn!("Failed to check game version: {}", e);
                     }
+                }
+
+                // Reload offsets if they were updated
+                if offsets_updated {
+                    match load_offsets(&args.offsets) {
+                        Ok(new_offsets) => {
+                            if new_offsets.is_valid() {
+                                info!("Reloaded valid offsets version: {}", new_offsets.version);
+                                reflux = Reflux::new(reflux.config().clone(), new_offsets);
+                            }
+                        }
+                        Err(e) => {
+                            warn!("Failed to reload offsets: {}", e);
+                        }
+                    }
+                }
+
+                // Check if offsets are valid before proceeding
+                if !reflux.offsets().is_valid() {
+                    error!("Cannot proceed with invalid offsets. Please provide valid offsets.txt or enable auto-update.");
+                    thread::sleep(Duration::from_secs(5));
+                    continue;
                 }
 
                 // Load song database from game memory

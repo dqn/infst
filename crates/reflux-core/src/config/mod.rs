@@ -13,10 +13,19 @@ pub struct Config {
     pub debug: DebugConfig,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct UpdateConfig {
     pub update_files: bool,
     pub update_server: String,
+}
+
+impl Default for UpdateConfig {
+    fn default() -> Self {
+        Self {
+            update_files: true,
+            update_server: String::from("https://reflux.nolife-cyborg.com"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]

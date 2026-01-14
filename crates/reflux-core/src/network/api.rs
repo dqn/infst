@@ -42,7 +42,7 @@ impl Drop for TempFile {
     }
 }
 
-const GITHUB_RELEASES_URL: &str = "https://github.com/olji/Reflux/releases/latest";
+const GITHUB_RELEASES_URL: &str = "https://github.com/dqn/reflux-rs/releases/latest";
 
 /// Parameters for adding a new song
 pub struct AddSongParams<'a> {
