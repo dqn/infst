@@ -179,22 +179,22 @@ impl<'a> OffsetSearcher<'a> {
     }
 
     /// Search for unlock data offset
+    ///
+    /// Uses last match to avoid false positives from earlier memory regions.
     pub fn search_unlock_data_offset(&mut self, base_hint: u64) -> Result<u64> {
-        self.load_buffer_around(base_hint, INITIAL_SEARCH_SIZE)?;
-
         // Pattern: 1000 (first song ID), 1 (type), 462 (unlocks)
         let pattern = merge_byte_representations(&[1000, 1, 462]);
-        self.fetch_and_search(base_hint, &pattern, 0, None)
+        self.fetch_and_search_last(base_hint, &pattern, 0)
     }
 
     /// Search for data map offset
+    ///
+    /// Uses last match to avoid false positives from earlier memory regions.
     pub fn search_data_map_offset(&mut self, base_hint: u64) -> Result<u64> {
-        self.load_buffer_around(base_hint, INITIAL_SEARCH_SIZE)?;
-
         // Pattern: 0x7FFF, 0 (markers for hash map)
         let pattern = merge_byte_representations(&[0x7FFF, 0]);
         // Offset back 3 steps in 8-byte address space
-        self.fetch_and_search(base_hint, &pattern, -24, None)
+        self.fetch_and_search_last(base_hint, &pattern, -24)
     }
 
     /// Search for judge data offset (requires play data)
@@ -289,6 +289,41 @@ impl<'a> OffsetSearcher<'a> {
             if let Some(pos) = self.find_pattern(pattern, ignore_address) {
                 let address =
                     (self.buffer_base + pos as u64).wrapping_add_signed(offset_from_match);
+                return Ok(address);
+            }
+
+            search_size *= 2;
+        }
+
+        Err(Error::OffsetSearchFailed(format!(
+            "Pattern not found within {} MB",
+            MAX_SEARCH_SIZE / 1024 / 1024
+        )))
+    }
+
+    /// Like fetch_and_search, but returns the LAST match instead of first.
+    /// This avoids false positives from earlier memory regions (e.g., 2016-build data).
+    fn fetch_and_search_last(
+        &mut self,
+        hint: u64,
+        pattern: &[u8],
+        offset_from_match: i64,
+    ) -> Result<u64> {
+        let mut search_size = INITIAL_SEARCH_SIZE;
+
+        while search_size <= MAX_SEARCH_SIZE {
+            self.load_buffer_around(hint, search_size)?;
+
+            let matches = self.find_all_matches(pattern);
+            if !matches.is_empty() {
+                // Use last match to avoid false positives from earlier regions
+                let last_match = *matches.last().unwrap();
+                let address = last_match.wrapping_add_signed(offset_from_match);
+                debug!(
+                    "  Found {} match(es), using last at 0x{:X}",
+                    matches.len(),
+                    address
+                );
                 return Ok(address);
             }
 
@@ -725,11 +760,13 @@ impl<'a> OffsetSearcher<'a> {
         debug!("Searching PlaySettings using song_select_marker...");
 
         let mut search_size = INITIAL_SEARCH_SIZE;
+        let mut best_candidate: Option<u64> = None;
 
         while search_size <= MAX_SEARCH_SIZE {
             self.load_buffer_around(judge_data_hint, search_size)?;
 
             // Search for song_select_marker == 1
+            // Note: This value is common in memory, so we validate thoroughly
             let marker_pattern = 1i32.to_le_bytes().to_vec();
             let candidates = self.find_all_matches(&marker_pattern);
             debug!(
@@ -746,15 +783,28 @@ impl<'a> OffsetSearcher<'a> {
                 let style = self.reader.read_i32(play_settings).unwrap_or(-1);
                 let gauge = self.reader.read_i32(play_settings + 4).unwrap_or(-1);
                 let assist = self.reader.read_i32(play_settings + 8).unwrap_or(-1);
+                let unknown = self.reader.read_i32(play_settings + 12).unwrap_or(-1);
+                let range = self.reader.read_i32(play_settings + 16).unwrap_or(-1);
 
-                // Valid ranges: style (0-7), gauge (0-5), assist (0-3)
-                if !(0..=10).contains(&style) {
+                // Valid ranges (matching actual game options):
+                // - style: 0-7 (OFF, RANDOM, R-RANDOM, S-RANDOM, MIRROR, etc.)
+                // - gauge: 0-5 (NORMAL, EASY, HARD, EX-HARD, ASSISTED-EASY, etc.)
+                // - assist: 0-3 (OFF, AUTO-SCRATCH, LEGACY-NOTE, A-SCR+LEGACY)
+                // - unknown: should be 0 in most cases
+                // - range: 0-4 (OFF, SUDDEN+, HIDDEN+, SUD+HID+, LIFT)
+                if !(0..=7).contains(&style) {
                     continue;
                 }
-                if !(0..=10).contains(&gauge) {
+                if !(0..=5).contains(&gauge) {
                     continue;
                 }
-                if !(0..=10).contains(&assist) {
+                if !(0..=3).contains(&assist) {
+                    continue;
+                }
+                if !(0..=1).contains(&unknown) {
+                    continue;
+                }
+                if !(0..=4).contains(&range) {
                     continue;
                 }
 
@@ -765,10 +815,17 @@ impl<'a> OffsetSearcher<'a> {
                 }
 
                 debug!(
-                    "    0x{:X} validated: style={}, gauge={}, assist={}, distance={}",
-                    play_settings, style, gauge, assist, distance
+                    "    0x{:X} validated: style={}, gauge={}, assist={}, range={}, distance={}",
+                    play_settings, style, gauge, assist, range, distance
                 );
-                return Ok(play_settings);
+
+                // Keep track of last valid match (similar to version string issue)
+                best_candidate = Some(play_settings);
+            }
+
+            // If we found candidates in this search size, return the last one
+            if let Some(addr) = best_candidate {
+                return Ok(addr);
             }
 
             search_size *= 2;
