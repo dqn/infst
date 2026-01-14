@@ -379,6 +379,10 @@ impl<'a> OffsetSearcher<'a> {
     }
 
     /// Search for version string and song list with expanding search area
+    ///
+    /// Note: C# implementation comment says "first two versions appearing are
+    /// referring to 2016-builds, actual version appears later". So we search
+    /// for ALL matches and use the LAST one.
     fn search_version_and_song_list(&mut self, base_hint: u64) -> Result<(String, u64)> {
         let pattern = b"P2D:J:B:A:";
         let mut search_size = INITIAL_SEARCH_SIZE;
@@ -390,10 +394,20 @@ impl<'a> OffsetSearcher<'a> {
             );
             self.load_buffer_around(base_hint, search_size)?;
 
-            if let Some(pos) = self.find_pattern(pattern, None) {
-                let song_list = self.buffer_base + pos as u64;
+            // Find ALL matches (first ones refer to 2016-builds, use last)
+            let matches = self.find_all_matches(pattern);
+
+            if !matches.is_empty() {
+                // Use the LAST match (actual current version)
+                let song_list = *matches.last().unwrap();
+                debug!(
+                    "  Found {} version string(s), using last at 0x{:X}",
+                    matches.len(),
+                    song_list
+                );
 
                 // Extract version string
+                let pos = (song_list - self.buffer_base) as usize;
                 let end = self.buffer[pos..]
                     .iter()
                     .position(|&b| b == 0)
