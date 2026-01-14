@@ -80,12 +80,12 @@ impl<'a> OffsetSearcher<'a> {
 
         // Phase 1: Static pattern search (high reliability)
         debug!("Phase 1: Searching static patterns...");
-        self.load_buffer_around(base, INITIAL_SEARCH_SIZE)?;
 
-        offsets.version = self.search_version()?;
+        // Search for version/song_list with expanding search area
+        let (version, song_list) = self.search_version_and_song_list(base)?;
+        offsets.version = version;
+        offsets.song_list = song_list;
         info!("  Version: {}", offsets.version);
-
-        offsets.song_list = self.search_song_list()?;
         info!("  SongList: 0x{:X}", offsets.song_list);
 
         offsets.unlock_data = self.search_unlock_data_offset(offsets.song_list)?;
@@ -378,34 +378,39 @@ impl<'a> OffsetSearcher<'a> {
         (pattern_p1, pattern_p2)
     }
 
-    fn search_version(&self) -> Result<String> {
+    /// Search for version string and song list with expanding search area
+    fn search_version_and_song_list(&mut self, base_hint: u64) -> Result<(String, u64)> {
         let pattern = b"P2D:J:B:A:";
+        let mut search_size = INITIAL_SEARCH_SIZE;
 
-        if let Some(pos) = self.find_pattern(pattern, None) {
-            let end = self.buffer[pos..]
-                .iter()
-                .position(|&b| b == 0)
-                .map(|p| pos + p)
-                .unwrap_or(pos + 30);
+        while search_size <= MAX_SEARCH_SIZE {
+            debug!(
+                "  Searching for version string in {}MB area...",
+                search_size / 1024 / 1024
+            );
+            self.load_buffer_around(base_hint, search_size)?;
 
-            let version_bytes = &self.buffer[pos..end.min(pos + 30)];
-            let version = String::from_utf8_lossy(version_bytes).to_string();
-            return Ok(version);
+            if let Some(pos) = self.find_pattern(pattern, None) {
+                let song_list = self.buffer_base + pos as u64;
+
+                // Extract version string
+                let end = self.buffer[pos..]
+                    .iter()
+                    .position(|&b| b == 0)
+                    .map(|p| pos + p)
+                    .unwrap_or(pos + 30);
+
+                let version_bytes = &self.buffer[pos..end.min(pos + 30)];
+                let version = String::from_utf8_lossy(version_bytes).to_string();
+
+                return Ok((version, song_list));
+            }
+
+            search_size *= 2;
         }
 
         Err(Error::OffsetSearchFailed(
-            "Version string not found".to_string(),
-        ))
-    }
-
-    fn search_song_list(&self) -> Result<u64> {
-        let pattern = b"P2D:J:B:A:";
-        if let Some(pos) = self.find_pattern(pattern, None) {
-            return Ok(self.buffer_base + pos as u64);
-        }
-
-        Err(Error::OffsetSearchFailed(
-            "Song list offset not found".to_string(),
+            "Version string not found within search area".to_string(),
         ))
     }
 
