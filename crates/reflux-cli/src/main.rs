@@ -63,16 +63,23 @@ struct Args {
     /// Path to tracker database file
     #[arg(short, long, default_value = "tracker.db")]
     tracker: PathBuf,
+
+    /// Enable verbose debug output for offset detection
+    #[arg(long)]
+    debug_offsets: bool,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize logging
+    let args = Args::parse();
+
+    // Initialize logging (debug level if --debug-offsets is set)
+    let log_level = if args.debug_offsets { "debug" } else { "info" };
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::from_default_env()
-                .add_directive("reflux=info".parse()?)
-                .add_directive("reflux_core=info".parse()?),
+                .add_directive(format!("reflux={}", log_level).parse()?)
+                .add_directive(format!("reflux_core={}", log_level).parse()?),
         )
         .init();
 
@@ -83,8 +90,6 @@ async fn main() -> Result<()> {
         info!("Received shutdown signal, stopping...");
         r.store(false, Ordering::SeqCst);
     })?;
-
-    let args = Args::parse();
 
     // Print version and check for updates
     let current_version = env!("CARGO_PKG_VERSION");
@@ -200,7 +205,7 @@ async fn main() -> Result<()> {
 
                 // Check if offsets are valid before proceeding
                 if !reflux.offsets().is_valid() {
-                    warn!("Invalid offsets detected. Starting interactive offset search...");
+                    warn!("Invalid offsets detected. Attempting automatic offset detection...");
 
                     // Get the game version for the new offsets
                     let version = match reflux.check_game_version(&reader, process.base_address) {
@@ -208,29 +213,55 @@ async fn main() -> Result<()> {
                         _ => String::from("unknown"),
                     };
 
-                    // Run interactive offset search
                     let mut searcher = OffsetSearcher::new(&reader);
-                    let prompter = CliPrompter;
 
-                    // Use default offsets as hints (they contain typical memory regions)
-                    let hint_offsets = OffsetsCollection::default();
+                    // Try automatic detection first
+                    let search_result = searcher.search_all();
 
-                    match searcher.interactive_search(&prompter, &hint_offsets, &version) {
-                        Ok(result) => {
-                            info!("Offset search completed successfully!");
+                    let final_offsets = match search_result {
+                        Ok(offsets) => {
+                            info!("Automatic offset detection successful!");
+                            Some(OffsetsCollection {
+                                version: version.clone(),
+                                ..offsets
+                            })
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Automatic detection failed: {}. Falling back to interactive search...",
+                                e
+                            );
 
+                            // Fallback to interactive search
+                            let prompter = CliPrompter;
+                            let hint_offsets = OffsetsCollection::default();
+
+                            match searcher.interactive_search(&prompter, &hint_offsets, &version) {
+                                Ok(result) => {
+                                    info!("Interactive offset search completed successfully!");
+                                    Some(result.offsets)
+                                }
+                                Err(e) => {
+                                    error!("Interactive offset search also failed: {}", e);
+                                    None
+                                }
+                            }
+                        }
+                    };
+
+                    match final_offsets {
+                        Some(offsets) => {
                             // Save the new offsets
-                            if let Err(e) = save_offsets(&args.offsets, &result.offsets) {
+                            if let Err(e) = save_offsets(&args.offsets, &offsets) {
                                 error!("Failed to save offsets: {}", e);
                             } else {
                                 info!("Saved new offsets to {:?}", args.offsets);
                             }
 
                             // Update reflux with new offsets
-                            reflux = Reflux::new(reflux.config().clone(), result.offsets);
+                            reflux = Reflux::new(reflux.config().clone(), offsets);
                         }
-                        Err(e) => {
-                            error!("Offset search failed: {}", e);
+                        None => {
                             error!(
                                 "Cannot proceed with invalid offsets. Please provide valid offsets.txt or run offset search again."
                             );

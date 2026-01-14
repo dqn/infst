@@ -1,3 +1,5 @@
+use tracing::{debug, info, warn};
+
 use crate::error::{Error, Result};
 use crate::game::PlayType;
 use crate::memory::MemoryReader;
@@ -5,6 +7,28 @@ use crate::offset::OffsetsCollection;
 
 const INITIAL_SEARCH_SIZE: usize = 2 * 1024 * 1024; // 2MB
 const MAX_SEARCH_SIZE: usize = 300 * 1024 * 1024; // 300MB
+
+/// Memory layout constants for JudgeData structure (for validation)
+mod judge_layout {
+    /// Word size (4 bytes / 32-bit integer)
+    pub const WORD: u64 = 4;
+
+    /// Size of initial zero region in song select state (18 i32 values = 72 bytes)
+    /// P1 (5) + P2 (5) + CB (2) + Fast/Slow (4) + MeasureEnd (2) = 18
+    pub const INITIAL_ZERO_SIZE: usize = 72;
+
+    /// State marker positions
+    pub const STATE_MARKER_1: u64 = WORD * 54; // 216
+    pub const STATE_MARKER_2: u64 = WORD * 55; // 220
+}
+
+/// Memory layout constants for PlaySettings structure (for validation)
+mod settings_layout {
+    pub const WORD: u64 = 4;
+
+    /// Song select marker position (negative offset from PlaySettings)
+    pub const SONG_SELECT_MARKER_OFFSET: u64 = WORD * 6; // 24
+}
 
 /// Judge data for interactive offset searching
 #[derive(Debug, Clone, Default)]
@@ -42,16 +66,106 @@ impl<'a> OffsetSearcher<'a> {
     }
 
     /// Search for all offsets automatically (non-interactive)
+    ///
+    /// This method attempts to find all offsets without user interaction.
+    /// It uses multiple strategies:
+    /// 1. Static pattern search (version, song_list, unlock_data, data_map)
+    /// 2. Initial state pattern search (judge_data, play_settings)
+    /// 3. Relative offset inference (play_data, current_song)
+    /// 4. Code signature validation
     pub fn search_all(&mut self) -> Result<OffsetsCollection> {
+        info!("Starting automatic offset detection...");
         let mut offsets = OffsetsCollection::default();
+        let base = self.reader.base_address();
 
-        // Load memory buffer
-        self.load_buffer_around(self.reader.base_address(), INITIAL_SEARCH_SIZE)?;
+        // Phase 1: Static pattern search (high reliability)
+        debug!("Phase 1: Searching static patterns...");
+        self.load_buffer_around(base, INITIAL_SEARCH_SIZE)?;
 
-        // Search for version string to find song list offset
         offsets.version = self.search_version()?;
-        offsets.song_list = self.search_song_list()?;
+        info!("  Version: {}", offsets.version);
 
+        offsets.song_list = self.search_song_list()?;
+        info!("  SongList: 0x{:X}", offsets.song_list);
+
+        offsets.unlock_data = self.search_unlock_data_offset(offsets.song_list)?;
+        info!("  UnlockData: 0x{:X}", offsets.unlock_data);
+
+        offsets.data_map = self.search_data_map_offset(offsets.song_list)?;
+        info!("  DataMap: 0x{:X}", offsets.data_map);
+
+        // Phase 2: Initial state pattern search (medium reliability)
+        debug!("Phase 2: Searching initial state patterns...");
+
+        match self.search_judge_data_initial_state(offsets.data_map) {
+            Ok(addr) => {
+                offsets.judge_data = addr;
+                info!("  JudgeData: 0x{:X}", offsets.judge_data);
+            }
+            Err(e) => {
+                warn!("  JudgeData search failed: {}", e);
+                return Err(e);
+            }
+        }
+
+        match self.search_play_settings_from_marker(offsets.judge_data) {
+            Ok(addr) => {
+                offsets.play_settings = addr;
+                info!("  PlaySettings: 0x{:X}", offsets.play_settings);
+            }
+            Err(e) => {
+                warn!("  PlaySettings search failed: {}", e);
+                return Err(e);
+            }
+        }
+
+        // Phase 3: Relative offset search (low-medium reliability)
+        debug!("Phase 3: Searching relative offsets...");
+
+        match self.search_play_data_relative(offsets.judge_data) {
+            Ok(addr) => {
+                offsets.play_data = addr;
+                info!("  PlayData: 0x{:X}", offsets.play_data);
+            }
+            Err(e) => {
+                warn!("  PlayData search failed: {}", e);
+                return Err(e);
+            }
+        }
+
+        match self.search_current_song_relative(offsets.play_data) {
+            Ok(addr) => {
+                offsets.current_song = addr;
+                info!("  CurrentSong: 0x{:X}", offsets.current_song);
+            }
+            Err(e) => {
+                warn!("  CurrentSong search failed: {}", e);
+                return Err(e);
+            }
+        }
+
+        // Phase 4: Validation
+        debug!("Phase 4: Validating offsets...");
+        if !offsets.is_valid() {
+            warn!("Offset validation failed");
+            return Err(Error::OffsetSearchFailed(
+                "Validation failed: some offsets are zero".to_string(),
+            ));
+        }
+
+        // Phase 5: Code signature validation (optional, for increased confidence)
+        debug!("Phase 5: Code signature validation...");
+        let signature_matches = self.validate_offsets_with_signatures(&offsets);
+        if signature_matches > 0 {
+            info!(
+                "  Validated {} offset(s) with code signatures",
+                signature_matches
+            );
+        } else {
+            debug!("  No code signature matches found (this is OK)");
+        }
+
+        info!("Automatic offset detection completed successfully");
         Ok(offsets)
     }
 
@@ -517,6 +631,330 @@ impl<'a> OffsetSearcher<'a> {
 
         let pattern = merge_byte_representations(&[song_id as i32, difficulty as i32]);
         self.fetch_and_search(base_hint, &pattern, 0, exclude)
+    }
+
+    // ==========================================================================
+    // Automatic offset detection methods (non-interactive)
+    // ==========================================================================
+
+    /// Search for JudgeData using initial state pattern (72 zero bytes)
+    ///
+    /// In song select state, JudgeData contains all zeros for the first 72 bytes
+    /// (P1/P2 judgments, combo breaks, fast/slow, measure ends).
+    /// We validate candidates by checking STATE_MARKER positions.
+    fn search_judge_data_initial_state(&mut self, data_map_hint: u64) -> Result<u64> {
+        debug!("Searching JudgeData with initial state pattern...");
+
+        // Expand search area
+        let mut search_size = INITIAL_SEARCH_SIZE;
+
+        while search_size <= MAX_SEARCH_SIZE {
+            self.load_buffer_around(data_map_hint, search_size)?;
+
+            let zero_pattern = vec![0u8; judge_layout::INITIAL_ZERO_SIZE];
+            let candidates = self.find_all_matches(&zero_pattern);
+            debug!("  Found {} zero pattern candidates in {}MB", candidates.len(), search_size / 1024 / 1024);
+
+            // Filter candidates by STATE_MARKER validation
+            for candidate in &candidates {
+                // Read STATE_MARKERs - in song select state, both should be 0
+                let marker1 = self
+                    .reader
+                    .read_i32(candidate + judge_layout::STATE_MARKER_1)
+                    .unwrap_or(-1);
+                let marker2 = self
+                    .reader
+                    .read_i32(candidate + judge_layout::STATE_MARKER_2)
+                    .unwrap_or(-1);
+
+                // Validate: in song select, both markers should be 0
+                if marker1 != 0 || marker2 != 0 {
+                    continue;
+                }
+
+                // Additional validation: check distance from DataMap
+                // Typically judge_data is 2-10 MB away from data_map
+                let distance = (*candidate as i64 - data_map_hint as i64).abs();
+                if !(1_000_000..=15_000_000).contains(&distance) {
+                    debug!(
+                        "    0x{:X} rejected: distance from DataMap = {} bytes",
+                        candidate, distance
+                    );
+                    continue;
+                }
+
+                debug!(
+                    "    0x{:X} validated: markers=({}, {}), distance={}",
+                    candidate, marker1, marker2, distance
+                );
+                return Ok(*candidate);
+            }
+
+            search_size *= 2;
+        }
+
+        Err(Error::OffsetSearchFailed(
+            "JudgeData not found with initial state pattern".to_string(),
+        ))
+    }
+
+    /// Search for PlaySettings using song_select_marker
+    ///
+    /// In song select state, the marker at (PlaySettings - 24) equals 1.
+    /// We search for this marker and validate the settings values.
+    fn search_play_settings_from_marker(&mut self, judge_data_hint: u64) -> Result<u64> {
+        debug!("Searching PlaySettings using song_select_marker...");
+
+        let mut search_size = INITIAL_SEARCH_SIZE;
+
+        while search_size <= MAX_SEARCH_SIZE {
+            self.load_buffer_around(judge_data_hint, search_size)?;
+
+            // Search for song_select_marker == 1
+            let marker_pattern = 1i32.to_le_bytes().to_vec();
+            let candidates = self.find_all_matches(&marker_pattern);
+            debug!(
+                "  Found {} marker candidates in {}MB",
+                candidates.len(),
+                search_size / 1024 / 1024
+            );
+
+            for marker_addr in &candidates {
+                // PlaySettings is at marker_addr + 24
+                let play_settings = marker_addr + settings_layout::SONG_SELECT_MARKER_OFFSET;
+
+                // Validate: read settings values and check if they're in valid range
+                let style = self.reader.read_i32(play_settings).unwrap_or(-1);
+                let gauge = self.reader.read_i32(play_settings + 4).unwrap_or(-1);
+                let assist = self.reader.read_i32(play_settings + 8).unwrap_or(-1);
+
+                // Valid ranges: style (0-7), gauge (0-5), assist (0-3)
+                if !(0..=10).contains(&style) {
+                    continue;
+                }
+                if !(0..=10).contains(&gauge) {
+                    continue;
+                }
+                if !(0..=10).contains(&assist) {
+                    continue;
+                }
+
+                // Additional validation: check distance from JudgeData
+                let distance = (play_settings as i64 - judge_data_hint as i64).abs();
+                if !(100_000..=10_000_000).contains(&distance) {
+                    continue;
+                }
+
+                debug!(
+                    "    0x{:X} validated: style={}, gauge={}, assist={}, distance={}",
+                    play_settings, style, gauge, assist, distance
+                );
+                return Ok(play_settings);
+            }
+
+            search_size *= 2;
+        }
+
+        Err(Error::OffsetSearchFailed(
+            "PlaySettings not found with marker pattern".to_string(),
+        ))
+    }
+
+    /// Search for PlayData using relative offset from JudgeData
+    ///
+    /// PlayData is typically located 2-3 MB before JudgeData.
+    fn search_play_data_relative(&mut self, judge_data: u64) -> Result<u64> {
+        debug!("Searching PlayData with relative offset...");
+
+        // Expected distance: JudgeData - PlayData ≈ 2.8MB (based on historical data)
+        let expected_distance: i64 = 2_800_000;
+        let tolerance: i64 = 1_000_000;
+
+        let search_start = judge_data.saturating_sub((expected_distance + tolerance) as u64);
+        let search_end = judge_data.saturating_sub((expected_distance - tolerance) as u64);
+
+        debug!(
+            "  Search range: 0x{:X} - 0x{:X}",
+            search_start, search_end
+        );
+
+        // Load the search region
+        let center = (search_start + search_end) / 2;
+        let range = ((search_end - search_start) / 2) as usize + INITIAL_SEARCH_SIZE;
+        self.load_buffer_around(center, range)?;
+
+        // Search for PlayData structure pattern
+        // In song select state, PlayData may contain zeros or last played data
+        // We look for a structure with: song_id (small int), difficulty (0-9), zeros
+        for offset in (search_start..search_end).step_by(4) {
+            let song_id = self.reader.read_i32(offset).unwrap_or(-1);
+            let difficulty = self.reader.read_i32(offset + 4).unwrap_or(-1);
+
+            // Validate: song_id in valid range (0-50000), difficulty (0-9)
+            if !(0..=50000).contains(&song_id) {
+                continue;
+            }
+            if !(0..=9).contains(&difficulty) {
+                continue;
+            }
+
+            // Additional check: next few fields should be small integers
+            let field3 = self.reader.read_i32(offset + 8).unwrap_or(-1);
+            let field4 = self.reader.read_i32(offset + 12).unwrap_or(-1);
+
+            if !(0..=100000).contains(&field3) {
+                continue;
+            }
+            if !(0..=100000).contains(&field4) {
+                continue;
+            }
+
+            debug!(
+                "    0x{:X} candidate: song_id={}, difficulty={}, field3={}, field4={}",
+                offset, song_id, difficulty, field3, field4
+            );
+            return Ok(offset);
+        }
+
+        Err(Error::OffsetSearchFailed(
+            "PlayData not found with relative search".to_string(),
+        ))
+    }
+
+    /// Search for CurrentSong using relative offset from PlayData
+    ///
+    /// CurrentSong is typically located 2-3 MB after PlayData.
+    fn search_current_song_relative(&mut self, play_data: u64) -> Result<u64> {
+        debug!("Searching CurrentSong with relative offset...");
+
+        // Expected distance: CurrentSong - PlayData ≈ 2.8MB
+        let expected_distance: i64 = 2_800_000;
+        let tolerance: i64 = 1_000_000;
+
+        let search_start = play_data + (expected_distance - tolerance) as u64;
+        let search_end = play_data + (expected_distance + tolerance) as u64;
+
+        debug!(
+            "  Search range: 0x{:X} - 0x{:X}",
+            search_start, search_end
+        );
+
+        // Load the search region
+        let center = (search_start + search_end) / 2;
+        let range = ((search_end - search_start) / 2) as usize + INITIAL_SEARCH_SIZE;
+        self.load_buffer_around(center, range)?;
+
+        // Search for CurrentSong structure pattern
+        // Similar to PlayData: song_id, difficulty
+        for offset in (search_start..search_end).step_by(4) {
+            if offset == play_data {
+                continue; // Skip PlayData itself
+            }
+
+            let song_id = self.reader.read_i32(offset).unwrap_or(-1);
+            let difficulty = self.reader.read_i32(offset + 4).unwrap_or(-1);
+
+            // Validate: song_id in valid range (0-50000), difficulty (0-9)
+            if !(0..=50000).contains(&song_id) {
+                continue;
+            }
+            if !(0..=9).contains(&difficulty) {
+                continue;
+            }
+
+            debug!(
+                "    0x{:X} candidate: song_id={}, difficulty={}",
+                offset, song_id, difficulty
+            );
+            return Ok(offset);
+        }
+
+        Err(Error::OffsetSearchFailed(
+            "CurrentSong not found with relative search".to_string(),
+        ))
+    }
+
+    /// Find all matches of a pattern in the current buffer
+    fn find_all_matches(&self, pattern: &[u8]) -> Vec<u64> {
+        self.buffer
+            .windows(pattern.len())
+            .enumerate()
+            .filter(|(_, window)| *window == pattern)
+            .map(|(pos, _)| self.buffer_base + pos as u64)
+            .collect()
+    }
+
+    // ==========================================================================
+    // Code signature search (AOB scan) for validation
+    // ==========================================================================
+
+    /// Validate offsets by searching for code references
+    ///
+    /// This searches for x64 RIP-relative addressing instructions (LEA, MOV)
+    /// that reference the found offsets. If found, it increases confidence.
+    fn validate_offsets_with_signatures(&mut self, offsets: &OffsetsCollection) -> usize {
+        let mut matches = 0;
+
+        // Load code section for signature search
+        let code_base = self.reader.base_address();
+        if self.load_buffer_around(code_base, 50 * 1024 * 1024).is_err() {
+            debug!("Failed to load code section for signature validation");
+            return 0;
+        }
+
+        // Collect all addresses to validate
+        let addresses = [
+            ("JudgeData", offsets.judge_data),
+            ("PlayData", offsets.play_data),
+            ("PlaySettings", offsets.play_settings),
+            ("CurrentSong", offsets.current_song),
+        ];
+
+        for (name, addr) in addresses {
+            if self.find_code_reference(addr) {
+                debug!("    {} (0x{:X}) validated by code reference", name, addr);
+                matches += 1;
+            }
+        }
+
+        matches
+    }
+
+    /// Search for code that references a specific data address
+    ///
+    /// Looks for x64 RIP-relative LEA/MOV instructions.
+    fn find_code_reference(&self, target_addr: u64) -> bool {
+        // Search for LEA rcx/rdx/rax, [rip+disp32] patterns
+        // 48 8D 0D xx xx xx xx  (LEA rcx, [rip+disp32])
+        // 48 8D 15 xx xx xx xx  (LEA rdx, [rip+disp32])
+        // 48 8D 05 xx xx xx xx  (LEA rax, [rip+disp32])
+        let lea_prefixes = [
+            [0x48, 0x8D, 0x0D], // LEA rcx
+            [0x48, 0x8D, 0x15], // LEA rdx
+            [0x48, 0x8D, 0x05], // LEA rax
+        ];
+
+        for prefix in lea_prefixes {
+            for (pos, window) in self.buffer.windows(7).enumerate() {
+                if window[0..3] == prefix {
+                    // Extract RIP-relative offset
+                    let rel_offset =
+                        i32::from_le_bytes(window[3..7].try_into().unwrap_or([0; 4]));
+
+                    // Calculate absolute address
+                    // RIP points to next instruction (current_pos + 7)
+                    let code_addr = self.buffer_base + pos as u64;
+                    let next_ip = code_addr + 7;
+                    let ref_addr = next_ip.wrapping_add_signed(rel_offset as i64);
+
+                    if ref_addr == target_addr {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        false
     }
 }
 
