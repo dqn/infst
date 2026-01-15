@@ -22,3 +22,14 @@ jobs:
         with:
           components: clippy
       - run: cargo clippy --all-targets -- -D warnings
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reflux-windows
+          path: target/release/reflux.exe
