@@ -244,10 +244,10 @@ impl Reflux {
         }
 
         const MAX_READ_RETRIES: u32 = 3;
-        const RETRY_DELAY_MS: u64 = 50;
+        const RETRY_DELAYS_MS: [u64; 3] = [50, 100, 200];
 
         loop {
-            // Check if process is still alive with retry mechanism
+            // Check if process is still alive with retry mechanism (exponential backoff)
             let mut process_alive = false;
             for attempt in 0..MAX_READ_RETRIES {
                 match reader.read_bytes(process.base_address, 4) {
@@ -257,13 +257,15 @@ impl Reflux {
                     }
                     Err(e) => {
                         if attempt < MAX_READ_RETRIES - 1 {
+                            let delay = RETRY_DELAYS_MS[attempt as usize];
                             debug!(
-                                "Memory read failed (attempt {}/{}): {}",
+                                "Memory read failed (attempt {}/{}, retry in {}ms): {}",
                                 attempt + 1,
                                 MAX_READ_RETRIES,
+                                delay,
                                 e
                             );
-                            thread::sleep(Duration::from_millis(RETRY_DELAY_MS));
+                            thread::sleep(Duration::from_millis(delay));
                         } else {
                             info!(
                                 "Process terminated after {} retries: {}",
