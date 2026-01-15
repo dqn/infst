@@ -224,3 +224,101 @@ impl RangeType {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_style_try_from_valid() {
+        assert_eq!(Style::try_from(0).unwrap(), Style::Off);
+        assert_eq!(Style::try_from(1).unwrap(), Style::Random);
+        assert_eq!(Style::try_from(4).unwrap(), Style::Mirror);
+        assert_eq!(Style::try_from(6).unwrap(), Style::SymmetryRandom);
+    }
+
+    #[test]
+    fn test_style_try_from_invalid() {
+        assert!(Style::try_from(7).is_err());
+        assert!(Style::try_from(-1).is_err());
+        assert!(Style::try_from(100).is_err());
+    }
+
+    #[test]
+    fn test_gauge_type_try_from_valid() {
+        assert_eq!(GaugeType::try_from(0).unwrap(), GaugeType::Off);
+        assert_eq!(GaugeType::try_from(2).unwrap(), GaugeType::Easy);
+        assert_eq!(GaugeType::try_from(4).unwrap(), GaugeType::ExHard);
+    }
+
+    #[test]
+    fn test_gauge_type_try_from_invalid() {
+        assert!(GaugeType::try_from(5).is_err());
+        assert!(GaugeType::try_from(-1).is_err());
+    }
+
+    #[test]
+    fn test_assist_type_try_from_valid() {
+        assert_eq!(AssistType::try_from(0).unwrap(), AssistType::Off);
+        assert_eq!(AssistType::try_from(1).unwrap(), AssistType::AutoScratch);
+        assert_eq!(AssistType::try_from(5).unwrap(), AssistType::AnyKey);
+    }
+
+    #[test]
+    fn test_assist_type_try_from_invalid() {
+        assert!(AssistType::try_from(6).is_err());
+        assert!(AssistType::try_from(-1).is_err());
+    }
+
+    #[test]
+    fn test_range_type_try_from_valid() {
+        assert_eq!(RangeType::try_from(0).unwrap(), RangeType::Off);
+        assert_eq!(RangeType::try_from(1).unwrap(), RangeType::SuddenPlus);
+        assert_eq!(RangeType::try_from(5).unwrap(), RangeType::LiftSud);
+    }
+
+    #[test]
+    fn test_range_type_try_from_invalid() {
+        assert!(RangeType::try_from(6).is_err());
+        assert!(RangeType::try_from(-1).is_err());
+    }
+
+    #[test]
+    fn test_settings_from_raw_values_p1() {
+        let settings = Settings::from_raw_values(PlayType::P1, 1, 0, 2, 0, 1, 0, 0, 0);
+        assert_eq!(settings.style, Style::Random);
+        assert!(settings.style2.is_none());
+        assert_eq!(settings.gauge, GaugeType::Easy);
+        assert_eq!(settings.range, RangeType::SuddenPlus);
+        assert!(!settings.flip);
+        assert!(!settings.battle);
+        assert!(!settings.h_ran);
+    }
+
+    #[test]
+    fn test_settings_from_raw_values_dp() {
+        let settings = Settings::from_raw_values(PlayType::Dp, 4, 1, 3, 0, 0, 1, 1, 1);
+        assert_eq!(settings.style, Style::Mirror);
+        assert_eq!(settings.style2, Some(Style::Random));
+        assert_eq!(settings.gauge, GaugeType::Hard);
+        assert!(settings.flip);
+        assert!(settings.battle);
+        assert!(settings.h_ran);
+    }
+
+    #[test]
+    fn test_settings_from_raw_values_invalid_defaults() {
+        // Invalid values should default to Off
+        let settings = Settings::from_raw_values(PlayType::P1, 100, 0, 100, 100, 100, 0, 0, 0);
+        assert_eq!(settings.style, Style::Off);
+        assert_eq!(settings.gauge, GaugeType::Off);
+        assert_eq!(settings.assist, AssistType::Off);
+        assert_eq!(settings.range, RangeType::Off);
+    }
+
+    #[test]
+    fn test_invalid_enum_value_error_display() {
+        let err = InvalidEnumValueError::new("TestEnum", 42);
+        assert_eq!(format!("{}", err), "Invalid TestEnum value: 42");
+    }
+}
