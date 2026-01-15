@@ -12,9 +12,9 @@ use tracing::{debug, error, info, warn};
 
 use crate::error::Result;
 use crate::game::{
-    AssistType, ChartInfo, Difficulty, GameState, Grade, Judge, Lamp, PlayData, PlayType, Settings,
-    SongInfo, UnlockType, check_version_match, find_game_version, get_unlock_state_for_difficulty,
-    get_unlock_states,
+    AssistType, ChartInfo, Difficulty, GameState, Grade, Judge, Lamp, PlayData, PlayType,
+    PlayerJudge, RawJudgeData, Settings, SongInfo, UnlockType, check_version_match,
+    find_game_version, get_unlock_state_for_difficulty, get_unlock_states,
 };
 use crate::memory::layout::{judge, play, settings, timing};
 use crate::memory::{MemoryReader, ProcessHandle, ReadMemory};
@@ -513,54 +513,31 @@ impl Reflux {
     fn fetch_judge_data(&self, reader: &MemoryReader) -> Result<Judge> {
         let base = self.offsets.judge_data;
 
-        // Player 1 judge counts
-        let p1_pgreat = reader.read_u32(base + judge::P1_PGREAT)?;
-        let p1_great = reader.read_u32(base + judge::P1_GREAT)?;
-        let p1_good = reader.read_u32(base + judge::P1_GOOD)?;
-        let p1_bad = reader.read_u32(base + judge::P1_BAD)?;
-        let p1_poor = reader.read_u32(base + judge::P1_POOR)?;
+        let p1 = PlayerJudge {
+            pgreat: reader.read_u32(base + judge::P1_PGREAT)?,
+            great: reader.read_u32(base + judge::P1_GREAT)?,
+            good: reader.read_u32(base + judge::P1_GOOD)?,
+            bad: reader.read_u32(base + judge::P1_BAD)?,
+            poor: reader.read_u32(base + judge::P1_POOR)?,
+            combo_break: reader.read_u32(base + judge::P1_COMBO_BREAK)?,
+            fast: reader.read_u32(base + judge::P1_FAST)?,
+            slow: reader.read_u32(base + judge::P1_SLOW)?,
+            measure_end: reader.read_u32(base + judge::P1_MEASURE_END)?,
+        };
 
-        // Player 2 judge counts
-        let p2_pgreat = reader.read_u32(base + judge::P2_PGREAT)?;
-        let p2_great = reader.read_u32(base + judge::P2_GREAT)?;
-        let p2_good = reader.read_u32(base + judge::P2_GOOD)?;
-        let p2_bad = reader.read_u32(base + judge::P2_BAD)?;
-        let p2_poor = reader.read_u32(base + judge::P2_POOR)?;
+        let p2 = PlayerJudge {
+            pgreat: reader.read_u32(base + judge::P2_PGREAT)?,
+            great: reader.read_u32(base + judge::P2_GREAT)?,
+            good: reader.read_u32(base + judge::P2_GOOD)?,
+            bad: reader.read_u32(base + judge::P2_BAD)?,
+            poor: reader.read_u32(base + judge::P2_POOR)?,
+            combo_break: reader.read_u32(base + judge::P2_COMBO_BREAK)?,
+            fast: reader.read_u32(base + judge::P2_FAST)?,
+            slow: reader.read_u32(base + judge::P2_SLOW)?,
+            measure_end: reader.read_u32(base + judge::P2_MEASURE_END)?,
+        };
 
-        // Combo break counts
-        let p1_cb = reader.read_u32(base + judge::P1_COMBO_BREAK)?;
-        let p2_cb = reader.read_u32(base + judge::P2_COMBO_BREAK)?;
-
-        // Fast/Slow counts
-        let p1_fast = reader.read_u32(base + judge::P1_FAST)?;
-        let p2_fast = reader.read_u32(base + judge::P2_FAST)?;
-        let p1_slow = reader.read_u32(base + judge::P1_SLOW)?;
-        let p2_slow = reader.read_u32(base + judge::P2_SLOW)?;
-
-        // Measure end markers (for premature end detection)
-        let p1_measure_end = reader.read_u32(base + judge::P1_MEASURE_END)?;
-        let p2_measure_end = reader.read_u32(base + judge::P2_MEASURE_END)?;
-
-        Ok(Judge::from_raw_values(
-            p1_pgreat,
-            p1_great,
-            p1_good,
-            p1_bad,
-            p1_poor,
-            p2_pgreat,
-            p2_great,
-            p2_good,
-            p2_bad,
-            p2_poor,
-            p1_cb,
-            p2_cb,
-            p1_fast,
-            p2_fast,
-            p1_slow,
-            p2_slow,
-            p1_measure_end,
-            p2_measure_end,
-        ))
+        Ok(Judge::from_raw_data(RawJudgeData { p1, p2 }))
     }
 
     fn fetch_settings(&self, reader: &MemoryReader, play_type: PlayType) -> Result<Settings> {

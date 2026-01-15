@@ -2,6 +2,34 @@ use serde::{Deserialize, Serialize};
 
 use crate::game::PlayType;
 
+/// Raw judge data for a single player side (P1 or P2)
+#[derive(Debug, Clone, Default)]
+pub struct PlayerJudge {
+    pub pgreat: u32,
+    pub great: u32,
+    pub good: u32,
+    pub bad: u32,
+    pub poor: u32,
+    pub combo_break: u32,
+    pub fast: u32,
+    pub slow: u32,
+    pub measure_end: u32,
+}
+
+impl PlayerJudge {
+    /// Calculate total note count for this side
+    pub fn total_notes(&self) -> u32 {
+        self.pgreat + self.great + self.good + self.bad + self.poor
+    }
+}
+
+/// Raw judge data from memory (P1 and P2 combined)
+#[derive(Debug, Clone, Default)]
+pub struct RawJudgeData {
+    pub p1: PlayerJudge,
+    pub p2: PlayerJudge,
+}
+
 /// Judge information from a play
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Judge {
@@ -42,31 +70,10 @@ impl Judge {
         self.bad + self.poor
     }
 
-    /// Build judge data from P1 and P2 values
-    #[allow(clippy::too_many_arguments)] // Mapping raw memory layout requires many parameters
-    pub fn from_raw_values(
-        p1_pgreat: u32,
-        p1_great: u32,
-        p1_good: u32,
-        p1_bad: u32,
-        p1_poor: u32,
-        p2_pgreat: u32,
-        p2_great: u32,
-        p2_good: u32,
-        p2_bad: u32,
-        p2_poor: u32,
-        p1_cb: u32,
-        p2_cb: u32,
-        p1_fast: u32,
-        p2_fast: u32,
-        p1_slow: u32,
-        p2_slow: u32,
-        p1_measure_end: u32,
-        p2_measure_end: u32,
-    ) -> Self {
-        // Determine play type based on which side has judgments
-        let p1_total = p1_pgreat + p1_great + p1_good + p1_bad + p1_poor;
-        let p2_total = p2_pgreat + p2_great + p2_good + p2_bad + p2_poor;
+    /// Build judge data from raw memory data
+    pub fn from_raw_data(raw: RawJudgeData) -> Self {
+        let p1_total = raw.p1.total_notes();
+        let p2_total = raw.p2.total_notes();
 
         let play_type = if p1_total == 0 && p2_total > 0 {
             PlayType::P2
@@ -78,15 +85,15 @@ impl Judge {
 
         Self {
             play_type,
-            pgreat: p1_pgreat + p2_pgreat,
-            great: p1_great + p2_great,
-            good: p1_good + p2_good,
-            bad: p1_bad + p2_bad,
-            poor: p1_poor + p2_poor,
-            fast: p1_fast + p2_fast,
-            slow: p1_slow + p2_slow,
-            combo_break: p1_cb + p2_cb,
-            premature_end: (p1_measure_end + p2_measure_end) != 0,
+            pgreat: raw.p1.pgreat + raw.p2.pgreat,
+            great: raw.p1.great + raw.p2.great,
+            good: raw.p1.good + raw.p2.good,
+            bad: raw.p1.bad + raw.p2.bad,
+            poor: raw.p1.poor + raw.p2.poor,
+            fast: raw.p1.fast + raw.p2.fast,
+            slow: raw.p1.slow + raw.p2.slow,
+            combo_break: raw.p1.combo_break + raw.p2.combo_break,
+            premature_end: (raw.p1.measure_end + raw.p2.measure_end) != 0,
         }
     }
 }
