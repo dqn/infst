@@ -137,28 +137,41 @@ impl RefluxApi {
 
         // Compare versions (format: YYYYMMDD)
         if remote_version > current_version {
+            // Save old content for archiving (before any file operations)
+            let old_content = if path.as_ref().exists() {
+                Some(fs::read_to_string(&path)?)
+            } else {
+                None
+            };
+
             // Write to temp file first for atomic update
             // TempFile ensures cleanup even if subsequent operations fail
             let temp_file = TempFile::new(path.as_ref().with_extension("tmp"));
             fs::write(temp_file.path(), &content)?;
 
-            // Archive old file if it exists
-            if path.as_ref().exists() {
+            // Persist new file first to ensure update succeeds
+            // This is done before archiving to prevent data loss if persist fails
+            temp_file.persist(path.as_ref())?;
+
+            // Archive old content (best-effort, failure doesn't affect the update)
+            if let Some(old_content) = old_content {
                 let archive_dir = path
                     .as_ref()
                     .parent()
                     .unwrap_or(Path::new("."))
                     .join("archive");
-                fs::create_dir_all(&archive_dir)?;
 
-                let archive_name = format!("{}_{}.txt", filename, current_version);
-                let archive_path = archive_dir.join(archive_name);
-                fs::rename(&path, archive_path)?;
+                if let Err(e) = fs::create_dir_all(&archive_dir) {
+                    tracing::warn!("Failed to create archive directory: {}", e);
+                } else {
+                    let archive_name = format!("{}_{}.txt", filename, current_version);
+                    let archive_path = archive_dir.join(archive_name);
+                    if let Err(e) = fs::write(&archive_path, old_content) {
+                        tracing::warn!("Failed to archive old file: {}", e);
+                    }
+                }
             }
 
-            // Rename temp file to target (atomic on most filesystems)
-            // This consumes temp_file and prevents cleanup
-            temp_file.persist(path.as_ref())?;
             return Ok(true);
         }
 
@@ -178,31 +191,46 @@ impl RefluxApi {
             return Ok(false);
         }
 
-        // Write to temp file first for atomic update
-        let temp_path = path.as_ref().with_extension("tmp");
-        fs::write(&temp_path, &content)?;
+        // Save old content for archiving (before any file operations)
+        let old_content = if path.as_ref().exists() {
+            let content = fs::read_to_string(&path)?;
+            let old_version = content
+                .lines()
+                .next()
+                .map(|s| s.trim().replace(':', "_"))
+                .unwrap_or_else(|| "unknown".to_string());
+            Some((content, old_version))
+        } else {
+            None
+        };
 
-        // Archive old file if it exists
-        if path.as_ref().exists() {
+        // Write to temp file first for atomic update
+        // TempFile ensures cleanup even if subsequent operations fail
+        let temp_file = TempFile::new(path.as_ref().with_extension("tmp"));
+        fs::write(temp_file.path(), &content)?;
+
+        // Persist new file first to ensure update succeeds
+        // This is done before archiving to prevent data loss if persist fails
+        temp_file.persist(path.as_ref())?;
+
+        // Archive old content (best-effort, failure doesn't affect the update)
+        if let Some((old_content, old_version)) = old_content {
             let archive_dir = path
                 .as_ref()
                 .parent()
                 .unwrap_or(Path::new("."))
                 .join("archive");
-            fs::create_dir_all(&archive_dir)?;
 
-            let old_version = fs::read_to_string(&path)?
-                .lines()
-                .next()
-                .map(|s| s.trim().replace(':', "_"))
-                .unwrap_or_else(|| "unknown".to_string());
-
-            let archive_path = archive_dir.join(format!("{}.txt", old_version));
-            fs::rename(&path, archive_path)?;
+            if let Err(e) = fs::create_dir_all(&archive_dir) {
+                tracing::warn!("Failed to create archive directory: {}", e);
+            } else {
+                let archive_path = archive_dir.join(format!("{}.txt", old_version));
+                if let Err(e) = fs::write(&archive_path, old_content) {
+                    tracing::warn!("Failed to archive old offsets file: {}", e);
+                }
+            }
         }
 
-        // Rename temp file to target (atomic on most filesystems)
-        fs::rename(&temp_path, &path)?;
         Ok(true)
     }
 
