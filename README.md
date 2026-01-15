@@ -14,6 +14,33 @@ A Rust reimplementation of [Reflux](https://github.com/olji/Reflux), a score tra
 - **Kamaitachi Integration**: Supports [Kamaitachi](https://kamai.tachi.ac/) score submission
 - **OBS Streaming**: Outputs current song info and play state to text files for OBS
 
+## Feature Comparison with Original Reflux
+
+| Category | Feature | Original (C#) | This (Rust) | Notes |
+|----------|---------|---------------|-------------|-------|
+| **Core** | Memory reading | ✅ | ✅ | |
+| | Game state detection | ✅ | ✅ | |
+| | Auto offset search | ✅ | ✅ | Enhanced multi-phase search |
+| | Version detection | ✅ | ✅ | |
+| **Data** | Play data | ✅ | ✅ | Score, lamp, grade |
+| | Judge data | ✅ | ✅ | P1/P2, Fast/Slow |
+| | Settings | ✅ | ✅ | Style, gauge, assist, H-RAN |
+| | Unlock tracking | ✅ | ✅ | |
+| **Storage** | TSV session | ✅ | ✅ | |
+| | JSON session | ✅ | ✅ | |
+| | Tracker DB | ✅ | ✅ | Best scores |
+| | Unlock DB | ✅ | ✅ | |
+| **Remote** | Server sync | ✅ | ✅ | |
+| | File updates | ✅ | ✅ | Offsets, support files |
+| | Kamaitachi | ⚠️ | ⚠️ | Song search only |
+| **Stream** | playstate/marquee | ✅ | ✅ | |
+| | latest-*.txt | ✅ | ✅ | |
+| | Song info files | ✅ | ✅ | |
+| **Config** | INI config | ✅ | ✅ | All sections |
+| **Extra** | GitHub update check | ❌ | ✅ | Rust only |
+
+✅ = Implemented, ⚠️ = Partial, ❌ = Not implemented
+
 ## Requirements
 
 - Windows (uses ReadProcessMemory API)
