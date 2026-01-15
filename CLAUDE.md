@@ -97,7 +97,7 @@ cargo run            # CLI 実行（Windows のみ動作）
 - [x] **マジックナンバーの定数化** (`reflux.rs:1020` など)
   - 遅延時間に意図を示す定数名を付与
 
-- [ ] **リトライロジックの共通化** (`network/client.rs`)
+- [x] **リトライロジックの共通化** (`network/client.rs`)
   - `post_form()` と `get()` の重複を抽出
 
 - [ ] **INI パーサーのエラー改善** (`config/mod.rs`)
