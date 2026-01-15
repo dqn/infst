@@ -130,3 +130,73 @@ impl SessionManager {
         self.current_json_session.as_deref()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn create_temp_session_manager() -> (SessionManager, TempDir) {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = SessionManager::new(temp_dir.path());
+        (manager, temp_dir)
+    }
+
+    #[test]
+    fn test_new_session_manager() {
+        let (manager, _temp) = create_temp_session_manager();
+        assert!(manager.current_session_path().is_none());
+        assert!(manager.current_json_session_path().is_none());
+    }
+
+    #[test]
+    fn test_start_session() {
+        let (mut manager, _temp) = create_temp_session_manager();
+        let path = manager.start_session().unwrap();
+
+        assert!(path.exists() || path.parent().unwrap().exists());
+        assert!(manager.current_session_path().is_some());
+        assert!(path.extension().unwrap() == "tsv");
+    }
+
+    #[test]
+    fn test_start_json_session() {
+        let (mut manager, _temp) = create_temp_session_manager();
+        let path = manager.start_json_session().unwrap();
+
+        assert!(path.exists());
+        assert!(manager.current_json_session_path().is_some());
+        assert!(path.extension().unwrap() == "json");
+
+        // Verify JSON structure
+        let content = fs::read_to_string(&path).unwrap();
+        let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+        assert!(json.get("head").is_some());
+        assert!(json.get("body").is_some());
+        assert_eq!(json["head"]["service"], "Infinitas");
+        assert_eq!(json["head"]["game"], "iidx");
+    }
+
+    #[test]
+    fn test_append_line() {
+        let (mut manager, _temp) = create_temp_session_manager();
+        manager.start_session().unwrap();
+
+        manager.append_line("test line 1").unwrap();
+        manager.append_line("test line 2").unwrap();
+
+        let path = manager.current_session_path().unwrap();
+        let content = fs::read_to_string(path).unwrap();
+        assert!(content.contains("test line 1"));
+        assert!(content.contains("test line 2"));
+    }
+
+    #[test]
+    fn test_append_line_without_session() {
+        let (manager, _temp) = create_temp_session_manager();
+        // Should not error even without active session
+        let result = manager.append_line("test");
+        assert!(result.is_ok());
+    }
+}

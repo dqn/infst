@@ -242,3 +242,165 @@ impl Tracker {
         self.db.iter()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_tracker_info_update_lamp() {
+        let mut info = TrackerInfo {
+            grade: Grade::B,
+            lamp: Lamp::Clear,
+            ex_score: 1000,
+            miss_count: Some(5),
+            dj_points: 50.0,
+        };
+
+        let other = TrackerInfo {
+            grade: Grade::C,
+            lamp: Lamp::HardClear,
+            ex_score: 900,
+            miss_count: Some(10),
+            dj_points: 40.0,
+        };
+
+        info.update(&other);
+
+        // Only lamp should be updated (HardClear > Clear)
+        assert_eq!(info.lamp, Lamp::HardClear);
+        assert_eq!(info.grade, Grade::B); // B > C, no change
+        assert_eq!(info.ex_score, 1000); // 1000 > 900, no change
+        assert_eq!(info.miss_count, Some(5)); // 5 < 10, no change
+        assert_eq!(info.dj_points, 50.0); // 50 > 40, no change
+    }
+
+    #[test]
+    fn test_tracker_info_update_all_better() {
+        let mut info = TrackerInfo {
+            grade: Grade::C,
+            lamp: Lamp::Clear,
+            ex_score: 500,
+            miss_count: Some(10),
+            dj_points: 30.0,
+        };
+
+        let other = TrackerInfo {
+            grade: Grade::A,
+            lamp: Lamp::ExHardClear,
+            ex_score: 1500,
+            miss_count: Some(2),
+            dj_points: 80.0,
+        };
+
+        info.update(&other);
+
+        assert_eq!(info.lamp, Lamp::ExHardClear);
+        assert_eq!(info.grade, Grade::A);
+        assert_eq!(info.ex_score, 1500);
+        assert_eq!(info.miss_count, Some(2));
+        assert_eq!(info.dj_points, 80.0);
+    }
+
+    #[test]
+    fn test_tracker_info_update_miss_count_none_to_some() {
+        let mut info = TrackerInfo {
+            miss_count: None,
+            ..Default::default()
+        };
+
+        let other = TrackerInfo {
+            miss_count: Some(5),
+            ..Default::default()
+        };
+
+        info.update(&other);
+        assert_eq!(info.miss_count, Some(5));
+    }
+
+    #[test]
+    fn test_tracker_new() {
+        let tracker = Tracker::new();
+        let key = ChartKey {
+            song_id: 1000,
+            difficulty: Difficulty::SpA,
+        };
+        assert!(tracker.get(&key).is_none());
+    }
+
+    #[test]
+    fn test_tracker_update_and_get() {
+        let mut tracker = Tracker::new();
+        let key = ChartKey {
+            song_id: 1000,
+            difficulty: Difficulty::SpA,
+        };
+        let info = TrackerInfo {
+            grade: Grade::A,
+            lamp: Lamp::HardClear,
+            ex_score: 2000,
+            miss_count: Some(3),
+            dj_points: 75.0,
+        };
+
+        tracker.update(key, info.clone());
+
+        let retrieved = tracker.get(&key).unwrap();
+        assert_eq!(retrieved.grade, Grade::A);
+        assert_eq!(retrieved.lamp, Lamp::HardClear);
+        assert_eq!(retrieved.ex_score, 2000);
+    }
+
+    #[test]
+    fn test_tracker_save_and_load() {
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path().join("tracker.txt");
+
+        let mut tracker = Tracker::new();
+        let key = ChartKey {
+            song_id: 1000,
+            difficulty: Difficulty::SpA,
+        };
+        let info = TrackerInfo {
+            grade: Grade::A,
+            lamp: Lamp::HardClear,
+            ex_score: 2000,
+            miss_count: Some(3),
+            dj_points: 75.0,
+        };
+        tracker.update(key, info);
+
+        tracker.save(&path).unwrap();
+
+        let loaded = Tracker::load(&path).unwrap();
+        let loaded_info = loaded.get(&key).unwrap();
+
+        assert_eq!(loaded_info.grade, Grade::A);
+        assert_eq!(loaded_info.lamp, Lamp::HardClear);
+        assert_eq!(loaded_info.ex_score, 2000);
+        assert_eq!(loaded_info.miss_count, Some(3));
+    }
+
+    #[test]
+    fn test_tracker_iter() {
+        let mut tracker = Tracker::new();
+
+        for i in 0..3 {
+            let key = ChartKey {
+                song_id: 1000 + i,
+                difficulty: Difficulty::SpN,
+            };
+            tracker.update(
+                key,
+                TrackerInfo {
+                    ex_score: i * 100,
+                    ..Default::default()
+                },
+            );
+        }
+
+        let count = tracker.iter().count();
+        assert_eq!(count, 3);
+    }
+}

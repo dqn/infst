@@ -140,3 +140,116 @@ impl ReadMemory for MemoryReader<'_> {
         self.process.base_address
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Mock memory reader for testing
+    struct MockMemoryReader {
+        data: Vec<u8>,
+        base: u64,
+    }
+
+    impl MockMemoryReader {
+        fn new(data: Vec<u8>) -> Self {
+            Self { data, base: 0x1000 }
+        }
+    }
+
+    impl ReadMemory for MockMemoryReader {
+        fn read_bytes(&self, address: u64, size: usize) -> Result<Vec<u8>> {
+            let offset = (address - self.base) as usize;
+            if offset + size > self.data.len() {
+                return Err(Error::MemoryReadFailed {
+                    address,
+                    message: "Out of bounds".to_string(),
+                });
+            }
+            Ok(self.data[offset..offset + size].to_vec())
+        }
+
+        fn base_address(&self) -> u64 {
+            self.base
+        }
+    }
+
+    #[test]
+    fn test_read_i32() {
+        let data = vec![0x78, 0x56, 0x34, 0x12]; // Little-endian 0x12345678
+        let reader = MockMemoryReader::new(data);
+
+        let value = reader.read_i32(0x1000).unwrap();
+        assert_eq!(value, 0x12345678);
+    }
+
+    #[test]
+    fn test_read_i32_negative() {
+        let data = vec![0xFF, 0xFF, 0xFF, 0xFF]; // -1 in little-endian
+        let reader = MockMemoryReader::new(data);
+
+        let value = reader.read_i32(0x1000).unwrap();
+        assert_eq!(value, -1);
+    }
+
+    #[test]
+    fn test_read_u32() {
+        let data = vec![0xFF, 0xFF, 0xFF, 0xFF]; // 0xFFFFFFFF
+        let reader = MockMemoryReader::new(data);
+
+        let value = reader.read_u32(0x1000).unwrap();
+        assert_eq!(value, 0xFFFFFFFF);
+    }
+
+    #[test]
+    fn test_read_i64() {
+        let data = vec![0xEF, 0xCD, 0xAB, 0x90, 0x78, 0x56, 0x34, 0x12];
+        let reader = MockMemoryReader::new(data);
+
+        let value = reader.read_i64(0x1000).unwrap();
+        assert_eq!(value, 0x1234567890ABCDEF_i64);
+    }
+
+    #[test]
+    fn test_read_u64() {
+        let data = vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
+        let reader = MockMemoryReader::new(data);
+
+        let value = reader.read_u64(0x1000).unwrap();
+        assert_eq!(value, 0xFFFFFFFFFFFFFFFF);
+    }
+
+    #[test]
+    fn test_read_string_shift_jis() {
+        // "テスト" in Shift-JIS: 0x83, 0x65, 0x83, 0x58, 0x83, 0x67
+        let data = vec![0x83, 0x65, 0x83, 0x58, 0x83, 0x67, 0x00];
+        let reader = MockMemoryReader::new(data.clone());
+
+        let value = reader.read_string_shift_jis(0x1000, data.len()).unwrap();
+        assert_eq!(value, "テスト");
+    }
+
+    #[test]
+    fn test_read_string_utf8() {
+        let data = b"Hello\0World".to_vec();
+        let reader = MockMemoryReader::new(data.clone());
+
+        let value = reader.read_string_utf8(0x1000, data.len()).unwrap();
+        assert_eq!(value, "Hello");
+    }
+
+    #[test]
+    fn test_read_out_of_bounds() {
+        let data = vec![0x01, 0x02];
+        let reader = MockMemoryReader::new(data);
+
+        let result = reader.read_u32(0x1000);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_base_address() {
+        let reader = MockMemoryReader::new(vec![]);
+        assert_eq!(reader.base_address(), 0x1000);
+    }
+}

@@ -244,3 +244,92 @@ impl ScoreMap {
         self.scores.is_empty()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_score_data_new() {
+        let data = ScoreData::new(1000);
+        assert_eq!(data.song_id, 1000);
+        assert_eq!(data.lamp, [Lamp::NoPlay; 10]);
+        assert_eq!(data.score, [0; 10]);
+    }
+
+    #[test]
+    fn test_score_data_get_set() {
+        let mut data = ScoreData::new(1000);
+
+        data.set_lamp(Difficulty::SpA, Lamp::HardClear);
+        data.set_score(Difficulty::SpA, 2500);
+
+        assert_eq!(data.get_lamp(Difficulty::SpA), Lamp::HardClear);
+        assert_eq!(data.get_score(Difficulty::SpA), 2500);
+        assert_eq!(data.get_lamp(Difficulty::SpN), Lamp::NoPlay);
+        assert_eq!(data.get_score(Difficulty::SpN), 0);
+    }
+
+    #[test]
+    fn test_score_map_operations() {
+        let mut map = ScoreMap::new();
+        assert!(map.is_empty());
+
+        let data = ScoreData::new(1000);
+        map.insert(1000, data);
+
+        assert!(!map.is_empty());
+        assert_eq!(map.len(), 1);
+        assert!(map.get(1000).is_some());
+        assert!(map.get(2000).is_none());
+    }
+
+    #[test]
+    fn test_score_map_get_or_insert() {
+        let mut map = ScoreMap::new();
+
+        // First access creates entry
+        let entry = map.get_or_insert(1000);
+        entry.set_lamp(Difficulty::SpN, Lamp::Clear);
+
+        // Second access returns same entry
+        let entry2 = map.get_or_insert(1000);
+        assert_eq!(entry2.get_lamp(Difficulty::SpN), Lamp::Clear);
+
+        assert_eq!(map.len(), 1);
+    }
+
+    #[test]
+    fn test_list_node_from_bytes() {
+        // Create test bytes for ListNode (64 bytes)
+        let mut bytes = [0u8; 64];
+
+        // next pointer (8 bytes at offset 0)
+        bytes[0..8].copy_from_slice(&0x1234567890ABCDEFu64.to_le_bytes());
+        // prev pointer (8 bytes at offset 8)
+        bytes[8..16].copy_from_slice(&0xFEDCBA0987654321u64.to_le_bytes());
+        // diff (4 bytes at offset 16)
+        bytes[16..20].copy_from_slice(&3i32.to_le_bytes()); // SPA
+        // song (4 bytes at offset 20)
+        bytes[20..24].copy_from_slice(&1000i32.to_le_bytes());
+        // playtype (4 bytes at offset 24)
+        bytes[24..28].copy_from_slice(&0i32.to_le_bytes()); // SP
+        // score (4 bytes at offset 32)
+        bytes[32..36].copy_from_slice(&2500u32.to_le_bytes());
+        // miss_count (4 bytes at offset 36)
+        bytes[36..40].copy_from_slice(&15u32.to_le_bytes());
+        // lamp (4 bytes at offset 48)
+        bytes[48..52].copy_from_slice(&5i32.to_le_bytes()); // HardClear
+
+        let node = ListNode::from_bytes(&bytes);
+
+        assert_eq!(node.next, 0x1234567890ABCDEF);
+        assert_eq!(node.diff, 3);
+        assert_eq!(node.song, 1000);
+        assert_eq!(node.playtype, 0);
+        assert_eq!(node.score, 2500);
+        assert_eq!(node.miss_count, 15);
+        assert_eq!(node.lamp, 5);
+        assert_eq!(node.key(), (1000, 3, 0));
+    }
+}
