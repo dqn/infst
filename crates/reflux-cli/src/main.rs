@@ -71,6 +71,10 @@ struct Args {
     /// Dump offset information to JSON file after detection
     #[arg(long)]
     dump_offsets: bool,
+
+    /// Skip automatic detection and use interactive search
+    #[arg(long)]
+    force_interactive: bool,
 }
 
 #[tokio::main]
@@ -219,22 +223,26 @@ async fn main() -> Result<()> {
 
                     let mut searcher = OffsetSearcher::new(&reader);
 
-                    // Try automatic detection first
-                    let search_result = searcher.search_all();
+                    // Try automatic detection first (unless --force-interactive)
+                    let search_result = if args.force_interactive {
+                        info!("Skipping automatic detection (--force-interactive)");
+                        None
+                    } else {
+                        searcher.search_all().ok()
+                    };
 
                     let final_offsets = match search_result {
-                        Ok(offsets) => {
+                        Some(offsets) => {
                             info!("Automatic offset detection successful!");
                             Some(OffsetsCollection {
                                 version: version.clone(),
                                 ..offsets
                             })
                         }
-                        Err(e) => {
-                            warn!(
-                                "Automatic detection failed: {}. Falling back to interactive search...",
-                                e
-                            );
+                        None => {
+                            if !args.force_interactive {
+                                warn!("Automatic detection failed. Falling back to interactive search...");
+                            }
 
                             // Fallback to interactive search
                             let prompter = CliPrompter;
