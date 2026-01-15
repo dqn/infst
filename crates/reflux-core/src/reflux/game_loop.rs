@@ -1,152 +1,32 @@
-use std::collections::HashMap;
+//! Game loop and state handling for Reflux
+//!
+//! This module contains the main tracking loop and game state handling methods.
+
 use std::path::Path;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 use std::time::Duration;
 
 use chrono::Utc;
-use tokio::runtime::Handle;
 use tracing::{debug, error, info, warn};
 
-use crate::config::Config;
 use crate::error::Result;
-use crate::memory::layout::{judge, play, settings, timing};
-
 use crate::game::{
-    AssistType, ChartInfo, Difficulty, GameState, GameStateDetector, Grade, Judge, Lamp, PlayData,
-    PlayType, Settings, SongInfo, UnlockData, UnlockType, calculate_dj_points, check_version_match,
-    find_game_version, get_unlock_state_for_difficulty, get_unlock_states,
+    check_version_match, find_game_version, get_unlock_state_for_difficulty, get_unlock_states,
+    AssistType, ChartInfo, Difficulty, GameState, Grade, Judge, Lamp, PlayData, PlayType, Settings,
+    SongInfo, UnlockType,
 };
+use crate::memory::layout::{judge, play, settings, timing};
 use crate::memory::{MemoryReader, ProcessHandle, ReadMemory};
 use crate::network::{AddSongParams, RefluxApi};
-use crate::offset::OffsetsCollection;
 use crate::storage::{
-    ScoreMap, SessionManager, Tracker, TrackerInfo, UnlockDb, export_tracker_tsv,
-    format_play_data_console, format_post_form,
+    export_tracker_tsv, format_play_data_console, format_post_form, ChartKey, TrackerInfo,
 };
-use crate::stream::StreamOutput;
 
-/// Game data loaded from memory and files
-pub struct GameData {
-    /// Song database loaded from game memory
-    pub song_db: HashMap<u32, SongInfo>,
-    /// Score map from game memory
-    pub score_map: ScoreMap,
-    /// Current unlock state from memory
-    pub unlock_state: HashMap<u32, UnlockData>,
-    /// Custom unlock types from customtypes.txt
-    pub custom_types: HashMap<u32, String>,
-}
-
-impl GameData {
-    fn new() -> Self {
-        Self {
-            song_db: HashMap::new(),
-            score_map: ScoreMap::new(),
-            unlock_state: HashMap::new(),
-            custom_types: HashMap::new(),
-        }
-    }
-}
-
-/// Main Reflux application
-pub struct Reflux {
-    config: Config,
-    offsets: OffsetsCollection,
-    /// Game data from memory
-    game_data: GameData,
-    tracker: Tracker,
-    state_detector: GameStateDetector,
-    session_manager: SessionManager,
-    stream_output: StreamOutput,
-    api: Option<RefluxApi>,
-    /// Persistent unlock state storage (from file)
-    unlock_db: UnlockDb,
-    /// Tokio runtime handle for spawning async tasks
-    runtime_handle: Option<Handle>,
-    /// Counter for failed remote API calls
-    failed_remote_count: Arc<AtomicUsize>,
-}
+use super::{Reflux, UpdateResult};
 
 impl Reflux {
-    pub fn new(config: Config, offsets: OffsetsCollection) -> Self {
-        let stream_output = StreamOutput::new(
-            config.livestream.show_play_state
-                || config.livestream.enable_marquee
-                || config.livestream.enable_full_song_info
-                || config.record.save_latest_json
-                || config.record.save_latest_txt,
-            ".".to_string(),
-        );
-
-        let api = if config.record.save_remote {
-            match RefluxApi::new(
-                config.remote_record.server_address.clone(),
-                config.remote_record.api_key.clone(),
-            ) {
-                Ok(api) => Some(api),
-                Err(e) => {
-                    warn!("Failed to create API client: {}, remote saving disabled", e);
-                    None
-                }
-            }
-        } else {
-            None
-        };
-
-        // Try to get the current tokio runtime handle if one exists
-        let runtime_handle = Handle::try_current().ok();
-
-        Self {
-            config,
-            offsets,
-            game_data: GameData::new(),
-            tracker: Tracker::new(),
-            state_detector: GameStateDetector::new(),
-            session_manager: SessionManager::new("sessions"),
-            stream_output,
-            api,
-            unlock_db: UnlockDb::new(),
-            runtime_handle,
-            failed_remote_count: Arc::new(AtomicUsize::new(0)),
-        }
-    }
-
-    /// Set score map
-    pub fn set_score_map(&mut self, score_map: ScoreMap) {
-        self.game_data.score_map = score_map;
-    }
-
-    /// Set custom types
-    pub fn set_custom_types(&mut self, custom_types: HashMap<u32, String>) {
-        self.game_data.custom_types = custom_types;
-    }
-
-    /// Load tracker data from file
-    pub fn load_tracker<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
-        match Tracker::load(&path) {
-            Ok(tracker) => {
-                self.tracker = tracker;
-                info!("Loaded tracker from {:?}", path.as_ref());
-            }
-            Err(e) => {
-                if e.is_not_found() {
-                    info!("Tracker file not found, starting fresh");
-                } else {
-                    warn!("Failed to load tracker: {}, starting fresh", e);
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Save tracker data to file
-    pub fn save_tracker<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        self.tracker.save(path)?;
-        Ok(())
-    }
-
     /// Run the main tracking loop
     pub fn run(&mut self, process: &ProcessHandle) -> Result<()> {
         let reader = MemoryReader::new(process);
@@ -155,7 +35,7 @@ impl Reflux {
         info!("Starting tracker loop...");
 
         if self.config.record.save_local || self.config.record.save_json {
-            self.session_manager = SessionManager::new("sessions");
+            self.session_manager = crate::storage::SessionManager::new("sessions");
 
             if self.config.record.save_local {
                 match self
@@ -717,8 +597,6 @@ impl Reflux {
     }
 
     fn update_tracker(&mut self, play_data: &PlayData) {
-        use crate::storage::ChartKey;
-
         let key = ChartKey {
             song_id: play_data.chart.song_id,
             difficulty: play_data.chart.difficulty,
@@ -733,43 +611,14 @@ impl Reflux {
             } else {
                 None
             },
-            dj_points: calculate_dj_points(play_data.ex_score, play_data.grade, play_data.lamp),
+            dj_points: crate::game::calculate_dj_points(
+                play_data.ex_score,
+                play_data.grade,
+                play_data.lamp,
+            ),
         };
 
         self.tracker.update(key, new_info);
-    }
-
-    /// Set song database
-    pub fn set_song_db(&mut self, song_db: HashMap<u32, SongInfo>) {
-        self.game_data.song_db = song_db;
-    }
-
-    /// Load unlock database from file
-    pub fn load_unlock_db<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
-        match UnlockDb::load(&path) {
-            Ok(db) => {
-                info!(
-                    "Loaded unlock db from {:?} ({} entries)",
-                    path.as_ref(),
-                    db.len()
-                );
-                self.unlock_db = db;
-            }
-            Err(e) => {
-                if e.is_not_found() {
-                    info!("Unlock db file not found, starting fresh");
-                } else {
-                    warn!("Failed to load unlock db: {}, starting fresh", e);
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Save unlock database to file
-    pub fn save_unlock_db<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        self.unlock_db.save(path)?;
-        Ok(())
     }
 
     /// Load current unlock state from memory
@@ -1068,27 +917,4 @@ impl Reflux {
 
         Ok(result)
     }
-
-    /// Get a reference to the offsets
-    pub fn offsets(&self) -> &OffsetsCollection {
-        &self.offsets
-    }
-
-    /// Get the offsets version
-    pub fn offsets_version(&self) -> &str {
-        &self.offsets.version
-    }
-
-    /// Get a reference to the config
-    pub fn config(&self) -> &Config {
-        &self.config
-    }
-}
-
-/// Result of support file updates
-#[derive(Debug, Default)]
-pub struct UpdateResult {
-    pub offsets_updated: bool,
-    pub encoding_fixes_updated: bool,
-    pub custom_types_updated: bool,
 }

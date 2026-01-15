@@ -22,7 +22,7 @@ pub use offset::{
     InteractiveSearchResult, JudgeInput, OffsetSearcher, OffsetsCollection, SearchPrompter,
     SearchResult, load_offsets, save_offsets,
 };
-pub use reflux::Reflux;
+pub use reflux::{GameData, Reflux, UpdateResult};
 pub use storage::{
     ChartKey, ScoreData, ScoreMap, SessionManager, Tracker, TrackerInfo, TsvRowData, UnlockDb,
     export_song_list, export_tracker_tsv, format_tracker_tsv_header,
