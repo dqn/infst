@@ -281,7 +281,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
     }
 
     /// Like fetch_and_search, but returns the LAST match instead of first.
-    /// Searches the FULL memory area to find all matches, then returns the last one.
+    /// Expands search area progressively and uses the last match found.
     /// This avoids false positives from earlier memory regions (e.g., 2016-build data).
     fn fetch_and_search_last(
         &mut self,
@@ -289,11 +289,24 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         pattern: &[u8],
         offset_from_match: i64,
     ) -> Result<u64> {
-        // Search the full MAX_SEARCH_SIZE area to find all matches
-        self.load_buffer_around(hint, MAX_SEARCH_SIZE)?;
+        let mut search_size = INITIAL_SEARCH_SIZE;
+        let mut last_matches: Vec<u64> = Vec::new();
 
-        let matches = self.find_all_matches(pattern);
-        if matches.is_empty() {
+        // Keep expanding to find all matches across the readable memory area
+        while search_size <= MAX_SEARCH_SIZE {
+            match self.load_buffer_around(hint, search_size) {
+                Ok(()) => {
+                    last_matches = self.find_all_matches(pattern);
+                }
+                Err(_) => {
+                    // Memory read failed, use results from previous size
+                    break;
+                }
+            }
+            search_size *= 2;
+        }
+
+        if last_matches.is_empty() {
             return Err(Error::OffsetSearchFailed(format!(
                 "Pattern not found within {} MB",
                 MAX_SEARCH_SIZE / 1024 / 1024
@@ -301,11 +314,11 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         }
 
         // Use last match to avoid false positives from earlier regions
-        let last_match = *matches.last().expect("matches is non-empty");
+        let last_match = *last_matches.last().expect("matches is non-empty");
         let address = last_match.wrapping_add_signed(offset_from_match);
         debug!(
             "  Found {} match(es), using last at 0x{:X}",
-            matches.len(),
+            last_matches.len(),
             address
         );
         Ok(address)
