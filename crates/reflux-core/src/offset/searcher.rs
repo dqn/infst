@@ -132,6 +132,21 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             ));
         }
 
+        // Additional sanity checks for offset positions
+        // songList should typically be at least 20MB from base
+        let song_list_offset = offsets.song_list.saturating_sub(base);
+        if song_list_offset < 20 * 1024 * 1024 {
+            warn!(
+                "songList offset seems too low: 0x{:X} ({}MB from base). This may indicate wrong detection.",
+                offsets.song_list,
+                song_list_offset / 1024 / 1024
+            );
+            return Err(Error::OffsetSearchFailed(format!(
+                "songList offset too low: 0x{:X} (expected >= 20MB from base)",
+                offsets.song_list
+            )));
+        }
+
         // Phase 5: Code signature validation (optional, for increased confidence)
         debug!("Phase 5: Code signature validation...");
         let signature_matches = self.validate_offsets_with_signatures(&offsets);
