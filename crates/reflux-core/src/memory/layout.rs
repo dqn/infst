@@ -1,9 +1,56 @@
 //! Memory layout constants for INFINITAS data structures
 //!
 //! This module centralizes all memory layout constants used for reading game data.
-//! Constants are organized by structure type.
+//! Constants are organized by structure type and derived from the original C# Reflux
+//! implementation.
+//!
+//! # Memory Structure Overview
+//!
+//! The game uses several key memory structures:
+//! - **JudgeData**: Stores real-time judgment counts during play
+//! - **PlayData**: Contains play result information (song ID, difficulty, lamp)
+//! - **PlaySettings**: Player options (style, gauge, assist, etc.)
+//!
+//! # Relative Offset Relationships
+//!
+//! The offset searcher uses these approximate relationships:
+//! - JudgeData - PlaySettings ≈ 0x2ACE00
+//! - JudgeData + SongList ≈ 0x94E000
+//! - PlaySettings + PlayData ≈ 0x2B0
+//! - JudgeData + CurrentSong ≈ 0x1E4
 
 /// Memory layout constants for JudgeData structure
+///
+/// # Structure Layout
+///
+/// ```text
+/// Offset   Field              Size    Description
+/// ──────────────────────────────────────────────────────
+/// 0x00     P1 PGreat          4       Player 1 Perfect Great count
+/// 0x04     P1 Great           4       Player 1 Great count
+/// 0x08     P1 Good            4       Player 1 Good count
+/// 0x0C     P1 Bad             4       Player 1 Bad count
+/// 0x10     P1 Poor            4       Player 1 Poor count
+/// 0x14     P2 PGreat          4       Player 2 Perfect Great count
+/// 0x18     P2 Great           4       Player 2 Great count
+/// 0x1C     P2 Good            4       Player 2 Good count
+/// 0x20     P2 Bad             4       Player 2 Bad count
+/// 0x24     P2 Poor            4       Player 2 Poor count
+/// 0x28     P1 ComboBreak      4       Player 1 combo break count
+/// 0x2C     P2 ComboBreak      4       Player 2 combo break count
+/// 0x30     P1 Fast            4       Player 1 fast timing count
+/// 0x34     P2 Fast            4       Player 2 fast timing count
+/// 0x38     P1 Slow            4       Player 1 slow timing count
+/// 0x3C     P2 Slow            4       Player 2 slow timing count
+/// 0x40     P1 MeasureEnd      4       Player 1 premature end marker
+/// 0x44     P2 MeasureEnd      4       Player 2 premature end marker
+/// ...      (reserved)         ...
+/// 0xD8     StateMarker1       4       Non-zero during play
+/// 0xDC     StateMarker2       4       Non-zero during play
+/// ...      (reserved)         ...
+/// 0x144    P1 Gauge           4       Player 1 gauge percentage
+/// 0x148    P2 Gauge           4       Player 2 gauge percentage
+/// ```
 pub mod judge {
     /// Word size (4 bytes / 32-bit integer)
     pub const WORD: u64 = 4;
