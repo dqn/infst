@@ -3,32 +3,11 @@ use tracing::{debug, info, warn};
 use crate::error::{Error, Result};
 use crate::game::PlayType;
 use crate::memory::MemoryReader;
+use crate::memory::layout::{judge, settings};
 use crate::offset::OffsetsCollection;
 
 const INITIAL_SEARCH_SIZE: usize = 2 * 1024 * 1024; // 2MB
 const MAX_SEARCH_SIZE: usize = 300 * 1024 * 1024; // 300MB
-
-/// Memory layout constants for JudgeData structure (for validation)
-mod judge_layout {
-    /// Word size (4 bytes / 32-bit integer)
-    pub const WORD: u64 = 4;
-
-    /// Size of initial zero region in song select state (18 i32 values = 72 bytes)
-    /// P1 (5) + P2 (5) + CB (2) + Fast/Slow (4) + MeasureEnd (2) = 18
-    pub const INITIAL_ZERO_SIZE: usize = 72;
-
-    /// State marker positions
-    pub const STATE_MARKER_1: u64 = WORD * 54; // 216
-    pub const STATE_MARKER_2: u64 = WORD * 55; // 220
-}
-
-/// Memory layout constants for PlaySettings structure (for validation)
-mod settings_layout {
-    pub const WORD: u64 = 4;
-
-    /// Song select marker position (negative offset from PlaySettings)
-    pub const SONG_SELECT_MARKER_OFFSET: u64 = WORD * 6; // 24
-}
 
 /// Judge data for interactive offset searching
 #[derive(Debug, Clone, Default)]
@@ -707,7 +686,7 @@ impl<'a> OffsetSearcher<'a> {
         while search_size <= MAX_SEARCH_SIZE {
             self.load_buffer_around(data_map_hint, search_size)?;
 
-            let zero_pattern = vec![0u8; judge_layout::INITIAL_ZERO_SIZE];
+            let zero_pattern = vec![0u8; judge::INITIAL_ZERO_SIZE];
             let candidates = self.find_all_matches(&zero_pattern);
             debug!(
                 "  Found {} zero pattern candidates in {}MB",
@@ -720,11 +699,11 @@ impl<'a> OffsetSearcher<'a> {
                 // Read STATE_MARKERs - in song select state, both should be 0
                 let marker1 = self
                     .reader
-                    .read_i32(candidate + judge_layout::STATE_MARKER_1)
+                    .read_i32(candidate + judge::STATE_MARKER_1)
                     .unwrap_or(-1);
                 let marker2 = self
                     .reader
-                    .read_i32(candidate + judge_layout::STATE_MARKER_2)
+                    .read_i32(candidate + judge::STATE_MARKER_2)
                     .unwrap_or(-1);
 
                 // Validate: in song select, both markers should be 0
@@ -783,7 +762,7 @@ impl<'a> OffsetSearcher<'a> {
 
             for marker_addr in &candidates {
                 // PlaySettings is at marker_addr + 24
-                let play_settings = marker_addr + settings_layout::SONG_SELECT_MARKER_OFFSET;
+                let play_settings = marker_addr + settings::SONG_SELECT_MARKER;
 
                 // Validate: read settings values and check if they're in valid range
                 let style = self.reader.read_i32(play_settings).unwrap_or(-1);
