@@ -1,3 +1,9 @@
+//! Offset searcher for INFINITAS memory
+
+mod constants;
+mod types;
+mod utils;
+
 use tracing::{debug, info, warn};
 
 use crate::error::{Error, Result};
@@ -6,54 +12,10 @@ use crate::memory::ReadMemory;
 use crate::memory::layout::judge;
 use crate::offset::OffsetsCollection;
 
-const INITIAL_SEARCH_SIZE: usize = 2 * 1024 * 1024; // 2MB
-const MAX_SEARCH_SIZE: usize = 300 * 1024 * 1024; // 300MB
-
-/// Minimum number of songs expected in INFINITAS (for validation)
-const MIN_EXPECTED_SONGS: usize = 1000;
-
-// Relative offsets derived from historical analysis (9 versions)
-// These are remarkably stable across versions
-
-/// Expected offset: judgeData - playSettings ≈ 0x2ACE00 (variation: 0x100)
-const JUDGE_TO_PLAY_SETTINGS: u64 = 0x2ACE00;
-/// Search range for playSettings (±8KB, ~32x measured variation)
-const PLAY_SETTINGS_SEARCH_RANGE: usize = 0x2000;
-
-/// Expected offset: songList - judgeData ≈ 0x94E000 (variation: 0x600)
-const JUDGE_TO_SONG_LIST: u64 = 0x94E000;
-/// Search range for songList (±64KB, ~27x measured variation)
-const SONG_LIST_SEARCH_RANGE: usize = 0x10000;
-
-/// Expected offset: playData - playSettings ≈ 0x2B0 (variation: 0x10)
-const PLAY_SETTINGS_TO_PLAY_DATA: u64 = 0x2B0;
-/// Search range for playData (±256 bytes, ~16x measured variation)
-const PLAY_DATA_SEARCH_RANGE: usize = 0x100;
-
-/// Expected offset: currentSong - judgeData ≈ 0x1E4 (variation: 0x10)
-const JUDGE_TO_CURRENT_SONG: u64 = 0x1E4;
-/// Search range for currentSong (±256 bytes, ~16x measured variation)
-const CURRENT_SONG_SEARCH_RANGE: usize = 0x100;
-
-/// Judge data for interactive offset searching
-#[derive(Debug, Clone, Default)]
-pub struct JudgeInput {
-    pub pgreat: u32,
-    pub great: u32,
-    pub good: u32,
-    pub bad: u32,
-    pub poor: u32,
-    pub combo_break: u32,
-    pub fast: u32,
-    pub slow: u32,
-}
-
-/// Search result with address and matching pattern index
-#[derive(Debug, Clone)]
-pub struct SearchResult {
-    pub address: u64,
-    pub pattern_index: usize,
-}
+use constants::*;
+pub use types::*;
+use utils::is_power_of_two;
+pub use utils::merge_byte_representations;
 
 pub struct OffsetSearcher<'a, R: ReadMemory> {
     reader: &'a R,
@@ -589,28 +551,6 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             })
             .map(|(pos, _)| pos)
     }
-}
-
-/// Trait for interactive user prompts during offset search
-pub trait SearchPrompter {
-    /// Prompt user to press enter to continue
-    fn prompt_continue(&self, message: &str);
-
-    /// Prompt user to enter a number
-    fn prompt_number(&self, prompt: &str) -> u32;
-
-    /// Display a message to the user
-    fn display_message(&self, message: &str);
-
-    /// Display a warning message
-    fn display_warning(&self, message: &str);
-}
-
-/// Interactive offset search result
-#[derive(Debug, Clone)]
-pub struct InteractiveSearchResult {
-    pub offsets: OffsetsCollection,
-    pub play_type: PlayType,
 }
 
 impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
@@ -1647,28 +1587,5 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         }
 
         false
-    }
-}
-
-/// Convert i32 values to little-endian byte representation
-pub fn merge_byte_representations(values: &[i32]) -> Vec<u8> {
-    values.iter().flat_map(|v| v.to_le_bytes()).collect()
-}
-
-/// Check if a number is a power of two (used to filter out memory artifacts)
-fn is_power_of_two(n: u32) -> bool {
-    n > 0 && (n & (n - 1)) == 0
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_merge_byte_representations() {
-        let bytes = merge_byte_representations(&[1, 2]);
-        assert_eq!(bytes.len(), 8);
-        assert_eq!(bytes[0..4], [1, 0, 0, 0]);
-        assert_eq!(bytes[4..8], [2, 0, 0, 0]);
     }
 }
