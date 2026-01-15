@@ -1,12 +1,12 @@
 use anyhow::Result;
 use clap::Parser;
 use reflux_core::{
-    Config, CustomTypes, MemoryReader, OffsetSearcher, OffsetsCollection, ProcessHandle, Reflux,
-    RefluxApi, ScoreMap, SearchPrompter, export_song_list, fetch_song_database, load_offsets,
-    save_offsets,
+    Config, CustomTypes, MemoryReader, OffsetDump, OffsetSearcher, OffsetsCollection,
+    ProcessHandle, Reflux, RefluxApi, ScoreMap, SearchPrompter, export_song_list,
+    fetch_song_database, load_offsets, save_offsets,
 };
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
@@ -67,6 +67,10 @@ struct Args {
     /// Enable verbose debug output for offset detection
     #[arg(long)]
     debug_offsets: bool,
+
+    /// Dump offset information to JSON file after detection
+    #[arg(long)]
+    dump_offsets: bool,
 }
 
 #[tokio::main]
@@ -268,6 +272,19 @@ async fn main() -> Result<()> {
                             thread::sleep(Duration::from_secs(5));
                             continue;
                         }
+                    }
+                }
+
+                // Dump offset information if requested
+                if args.dump_offsets {
+                    let dump = OffsetDump::from_offsets(
+                        reflux.offsets(),
+                        process.base_address,
+                        &reader,
+                    );
+                    match dump.save(Path::new("offset_dump.json")) {
+                        Ok(()) => info!("Offset dump saved to offset_dump.json"),
+                        Err(e) => warn!("Failed to save offset dump: {}", e),
                     }
                 }
 
