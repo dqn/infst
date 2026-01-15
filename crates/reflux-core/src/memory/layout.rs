@@ -47,6 +47,14 @@ pub mod judge {
     /// Size of initial zero region in song select state (18 i32 values = 72 bytes)
     /// P1 (5) + P2 (5) + CB (2) + Fast/Slow (4) + MeasureEnd (2) = 18
     pub const INITIAL_ZERO_SIZE: usize = 72;
+
+    // Validation constants for during-play detection
+    /// Maximum total notes in a song (realistic upper bound)
+    pub const MAX_NOTES: i32 = 3000;
+    /// Maximum combo breaks in a song
+    pub const MAX_COMBO_BREAK: i32 = 500;
+    /// Maximum fast/slow count
+    pub const MAX_FAST_SLOW: i32 = 1000;
 }
 
 /// Memory layout constants for PlayData structure

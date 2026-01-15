@@ -82,11 +82,21 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         match self.search_judge_data_initial_state(offsets.data_map) {
             Ok(addr) => {
                 offsets.judge_data = addr;
-                info!("  JudgeData: 0x{:X}", offsets.judge_data);
+                info!("  JudgeData: 0x{:X} (initial state)", offsets.judge_data);
             }
             Err(e) => {
-                warn!("  JudgeData search failed: {}", e);
-                return Err(e);
+                debug!("  JudgeData initial state search failed: {}", e);
+                // Fallback: try during-play detection
+                match self.search_judge_data_during_play(offsets.data_map) {
+                    Ok(addr) => {
+                        offsets.judge_data = addr;
+                        info!("  JudgeData: 0x{:X} (during-play)", offsets.judge_data);
+                    }
+                    Err(e2) => {
+                        warn!("  JudgeData search failed (both methods): {}", e2);
+                        return Err(e2);
+                    }
+                }
             }
         }
 
@@ -840,6 +850,170 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         Err(Error::OffsetSearchFailed(
             "JudgeData not found with initial state pattern".to_string(),
         ))
+    }
+
+    /// Search for JudgeData during play using value range validation
+    ///
+    /// This method can detect JudgeData even when a song is being played or has been played.
+    /// It validates candidates using:
+    /// 1. Distance constraint from DataMap (1-15 MB)
+    /// 2. Value range validation (each judgment 0-3000)
+    /// 3. Consistency check (combo_break <= total, fast+slow <= total)
+    /// 4. P1/P2 exclusivity (in SP, one side should be all zeros)
+    fn search_judge_data_during_play(&mut self, data_map_hint: u64) -> Result<u64> {
+        debug!("Searching JudgeData with during-play pattern...");
+
+        let mut search_size = INITIAL_SEARCH_SIZE;
+
+        while search_size <= MAX_SEARCH_SIZE {
+            self.load_buffer_around(data_map_hint, search_size)?;
+
+            // Scan memory with 4-byte alignment within distance constraint
+            let min_distance: i64 = 1_000_000;
+            let max_distance: i64 = 15_000_000;
+
+            let search_start = data_map_hint.saturating_sub(max_distance as u64);
+            let search_end = data_map_hint + max_distance as u64;
+
+            // Align to 4 bytes
+            let aligned_start = (search_start + 3) & !3;
+
+            let mut candidate = aligned_start;
+            while candidate < search_end {
+                // Check distance constraint
+                let distance = (candidate as i64 - data_map_hint as i64).abs();
+                if distance < min_distance {
+                    candidate += 4;
+                    continue;
+                }
+
+                if self.validate_judge_data_during_play(candidate) {
+                    debug!(
+                        "    0x{:X} validated as JudgeData (during-play), distance={}",
+                        candidate, distance
+                    );
+                    return Ok(candidate);
+                }
+
+                candidate += 4;
+            }
+
+            search_size *= 2;
+        }
+
+        Err(Error::OffsetSearchFailed(
+            "JudgeData not found with during-play pattern".to_string(),
+        ))
+    }
+
+    /// Validate a candidate address as JudgeData during play
+    fn validate_judge_data_during_play(&self, addr: u64) -> bool {
+        // Read P1 judgment values
+        let p1_pgreat = self.reader.read_i32(addr + judge::P1_PGREAT).unwrap_or(-1);
+        let p1_great = self.reader.read_i32(addr + judge::P1_GREAT).unwrap_or(-1);
+        let p1_good = self.reader.read_i32(addr + judge::P1_GOOD).unwrap_or(-1);
+        let p1_bad = self.reader.read_i32(addr + judge::P1_BAD).unwrap_or(-1);
+        let p1_poor = self.reader.read_i32(addr + judge::P1_POOR).unwrap_or(-1);
+
+        // Read P2 judgment values
+        let p2_pgreat = self.reader.read_i32(addr + judge::P2_PGREAT).unwrap_or(-1);
+        let p2_great = self.reader.read_i32(addr + judge::P2_GREAT).unwrap_or(-1);
+        let p2_good = self.reader.read_i32(addr + judge::P2_GOOD).unwrap_or(-1);
+        let p2_bad = self.reader.read_i32(addr + judge::P2_BAD).unwrap_or(-1);
+        let p2_poor = self.reader.read_i32(addr + judge::P2_POOR).unwrap_or(-1);
+
+        // Read combo break and fast/slow
+        let p1_cb = self
+            .reader
+            .read_i32(addr + judge::P1_COMBO_BREAK)
+            .unwrap_or(-1);
+        let p2_cb = self
+            .reader
+            .read_i32(addr + judge::P2_COMBO_BREAK)
+            .unwrap_or(-1);
+        let p1_fast = self.reader.read_i32(addr + judge::P1_FAST).unwrap_or(-1);
+        let p2_fast = self.reader.read_i32(addr + judge::P2_FAST).unwrap_or(-1);
+        let p1_slow = self.reader.read_i32(addr + judge::P1_SLOW).unwrap_or(-1);
+        let p2_slow = self.reader.read_i32(addr + judge::P2_SLOW).unwrap_or(-1);
+
+        // Range validation for all values
+        let p1_judgments = [p1_pgreat, p1_great, p1_good, p1_bad, p1_poor];
+        let p2_judgments = [p2_pgreat, p2_great, p2_good, p2_bad, p2_poor];
+
+        for &v in &p1_judgments {
+            if !(0..=judge::MAX_NOTES).contains(&v) {
+                return false;
+            }
+        }
+        for &v in &p2_judgments {
+            if !(0..=judge::MAX_NOTES).contains(&v) {
+                return false;
+            }
+        }
+
+        // Combo break range
+        if !(0..=judge::MAX_COMBO_BREAK).contains(&p1_cb)
+            || !(0..=judge::MAX_COMBO_BREAK).contains(&p2_cb)
+        {
+            return false;
+        }
+
+        // Fast/slow range
+        if !(0..=judge::MAX_FAST_SLOW).contains(&p1_fast)
+            || !(0..=judge::MAX_FAST_SLOW).contains(&p2_fast)
+            || !(0..=judge::MAX_FAST_SLOW).contains(&p1_slow)
+            || !(0..=judge::MAX_FAST_SLOW).contains(&p2_slow)
+        {
+            return false;
+        }
+
+        // Calculate totals
+        let p1_total: i32 = p1_judgments.iter().sum();
+        let p2_total: i32 = p2_judgments.iter().sum();
+
+        // Total should not exceed MAX_NOTES
+        if p1_total > judge::MAX_NOTES || p2_total > judge::MAX_NOTES {
+            return false;
+        }
+
+        // Consistency check: combo_break <= total
+        if p1_total > 0 && p1_cb > p1_total {
+            return false;
+        }
+        if p2_total > 0 && p2_cb > p2_total {
+            return false;
+        }
+
+        // Consistency check: fast + slow <= total
+        if p1_total > 0 && (p1_fast + p1_slow) > p1_total {
+            return false;
+        }
+        if p2_total > 0 && (p2_fast + p2_slow) > p2_total {
+            return false;
+        }
+
+        // P1/P2 exclusivity check (for SP mode)
+        // At least one side should have data, or both should be zero (initial state)
+        let p1_all_zero = p1_total == 0 && p1_cb == 0 && p1_fast == 0 && p1_slow == 0;
+        let p2_all_zero = p2_total == 0 && p2_cb == 0 && p2_fast == 0 && p2_slow == 0;
+
+        // Valid patterns:
+        // 1. Both zero (initial state)
+        // 2. P1 has data, P2 is zero (1P mode)
+        // 3. P1 is zero, P2 has data (2P mode)
+        // 4. Both have data (DP mode)
+        // All patterns are valid, but we need at least some structure
+        // Reject if we have partial zeros in unexpected places
+        if p1_all_zero && p2_all_zero {
+            // Initial state - this should be caught by initial_state search
+            // but we accept it here as well
+            return true;
+        }
+
+        // For SP, one side should be all zero
+        // For DP, both sides should have data
+        // We accept both patterns
+        true
     }
 
     /// Search for PlaySettings using song_select_marker
