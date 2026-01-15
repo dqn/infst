@@ -281,6 +281,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
     }
 
     /// Like fetch_and_search, but returns the LAST match instead of first.
+    /// Searches the FULL memory area to find all matches, then returns the last one.
     /// This avoids false positives from earlier memory regions (e.g., 2016-build data).
     fn fetch_and_search_last(
         &mut self,
@@ -288,32 +289,26 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         pattern: &[u8],
         offset_from_match: i64,
     ) -> Result<u64> {
-        let mut search_size = INITIAL_SEARCH_SIZE;
+        // Search the full MAX_SEARCH_SIZE area to find all matches
+        self.load_buffer_around(hint, MAX_SEARCH_SIZE)?;
 
-        while search_size <= MAX_SEARCH_SIZE {
-            self.load_buffer_around(hint, search_size)?;
-
-            let matches = self.find_all_matches(pattern);
-            if !matches.is_empty() {
-                // Use last match to avoid false positives from earlier regions
-                // Safety: checked !is_empty() above
-                let last_match = *matches.last().expect("matches is non-empty");
-                let address = last_match.wrapping_add_signed(offset_from_match);
-                debug!(
-                    "  Found {} match(es), using last at 0x{:X}",
-                    matches.len(),
-                    address
-                );
-                return Ok(address);
-            }
-
-            search_size *= 2;
+        let matches = self.find_all_matches(pattern);
+        if matches.is_empty() {
+            return Err(Error::OffsetSearchFailed(format!(
+                "Pattern not found within {} MB",
+                MAX_SEARCH_SIZE / 1024 / 1024
+            )));
         }
 
-        Err(Error::OffsetSearchFailed(format!(
-            "Pattern not found within {} MB",
-            MAX_SEARCH_SIZE / 1024 / 1024
-        )))
+        // Use last match to avoid false positives from earlier regions
+        let last_match = *matches.last().expect("matches is non-empty");
+        let address = last_match.wrapping_add_signed(offset_from_match);
+        debug!(
+            "  Found {} match(es), using last at 0x{:X}",
+            matches.len(),
+            address
+        );
+        Ok(address)
     }
 
     fn fetch_and_search_alternating(
@@ -393,55 +388,50 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         (pattern_p1, pattern_p2)
     }
 
-    /// Search for version string and song list with expanding search area
+    /// Search for version string and song list
     ///
     /// Note: C# implementation comment says "first two versions appearing are
     /// referring to 2016-builds, actual version appears later". So we search
-    /// for ALL matches and use the LAST one.
+    /// the FULL memory area for ALL matches and use the LAST one.
     fn search_version_and_song_list(&mut self, base_hint: u64) -> Result<(String, u64)> {
         let pattern = b"P2D:J:B:A:";
-        let mut search_size = INITIAL_SEARCH_SIZE;
 
-        while search_size <= MAX_SEARCH_SIZE {
-            debug!(
-                "  Searching for version string in {}MB area...",
-                search_size / 1024 / 1024
-            );
-            self.load_buffer_around(base_hint, search_size)?;
+        // Search the full MAX_SEARCH_SIZE area to find all version strings
+        // (early matches are often 2016-build references, we need the last one)
+        debug!(
+            "  Searching for version string in {}MB area...",
+            MAX_SEARCH_SIZE / 1024 / 1024
+        );
+        self.load_buffer_around(base_hint, MAX_SEARCH_SIZE)?;
 
-            // Find ALL matches (first ones refer to 2016-builds, use last)
-            let matches = self.find_all_matches(pattern);
+        let matches = self.find_all_matches(pattern);
 
-            if !matches.is_empty() {
-                // Use the LAST match (actual current version)
-                // Safety: checked !is_empty() above
-                let song_list = *matches.last().expect("matches is non-empty");
-                debug!(
-                    "  Found {} version string(s), using last at 0x{:X}",
-                    matches.len(),
-                    song_list
-                );
-
-                // Extract version string
-                let pos = (song_list - self.buffer_base) as usize;
-                let end = self.buffer[pos..]
-                    .iter()
-                    .position(|&b| b == 0)
-                    .map(|p| pos + p)
-                    .unwrap_or(pos + 30);
-
-                let version_bytes = &self.buffer[pos..end.min(pos + 30)];
-                let version = String::from_utf8_lossy(version_bytes).to_string();
-
-                return Ok((version, song_list));
-            }
-
-            search_size *= 2;
+        if matches.is_empty() {
+            return Err(Error::OffsetSearchFailed(
+                "Version string not found within search area".to_string(),
+            ));
         }
 
-        Err(Error::OffsetSearchFailed(
-            "Version string not found within search area".to_string(),
-        ))
+        // Use the LAST match (actual current version)
+        let song_list = *matches.last().expect("matches is non-empty");
+        debug!(
+            "  Found {} version string(s), using last at 0x{:X}",
+            matches.len(),
+            song_list
+        );
+
+        // Extract version string
+        let pos = (song_list - self.buffer_base) as usize;
+        let end = self.buffer[pos..]
+            .iter()
+            .position(|&b| b == 0)
+            .map(|p| pos + p)
+            .unwrap_or(pos + 30);
+
+        let version_bytes = &self.buffer[pos..end.min(pos + 30)];
+        let version = String::from_utf8_lossy(version_bytes).to_string();
+
+        Ok((version, song_list))
     }
 
     fn find_pattern(&self, pattern: &[u8], ignore_address: Option<u64>) -> Option<usize> {
