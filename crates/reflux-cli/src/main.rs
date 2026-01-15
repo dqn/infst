@@ -314,10 +314,27 @@ async fn main() -> Result<()> {
                 // Load custom types
                 match CustomTypes::load("customtypes.txt") {
                     Ok(ct) => {
-                        let types: std::collections::HashMap<u32, String> = ct
-                            .iter()
-                            .filter_map(|(k, v)| k.parse::<u32>().ok().map(|id| (id, v.clone())))
-                            .collect();
+                        let mut types = std::collections::HashMap::new();
+                        let mut parse_failures = 0usize;
+                        for (k, v) in ct.iter() {
+                            match k.parse::<u32>() {
+                                Ok(id) => {
+                                    types.insert(id, v.clone());
+                                }
+                                Err(_) => {
+                                    if parse_failures == 0 {
+                                        warn!(
+                                            "Failed to parse custom type ID '{}' (further errors suppressed)",
+                                            k
+                                        );
+                                    }
+                                    parse_failures += 1;
+                                }
+                            }
+                        }
+                        if parse_failures > 1 {
+                            warn!("{} custom type IDs failed to parse", parse_failures);
+                        }
                         info!("Loaded {} custom types", types.len());
                         reflux.set_custom_types(types);
                     }
