@@ -97,3 +97,166 @@ impl Judge {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_player_judge_total_notes() {
+        let pj = PlayerJudge {
+            pgreat: 100,
+            great: 50,
+            good: 10,
+            bad: 5,
+            poor: 2,
+            ..Default::default()
+        };
+        assert_eq!(pj.total_notes(), 167);
+    }
+
+    #[test]
+    fn test_judge_is_pfc() {
+        let pfc = Judge {
+            pgreat: 1000,
+            great: 100,
+            good: 0,
+            bad: 0,
+            poor: 0,
+            ..Default::default()
+        };
+        assert!(pfc.is_pfc());
+
+        let not_pfc = Judge {
+            pgreat: 1000,
+            great: 100,
+            good: 1,
+            bad: 0,
+            poor: 0,
+            ..Default::default()
+        };
+        assert!(!not_pfc.is_pfc());
+    }
+
+    #[test]
+    fn test_judge_ex_score() {
+        let judge = Judge {
+            pgreat: 500,
+            great: 100,
+            ..Default::default()
+        };
+        assert_eq!(judge.ex_score(), 1100); // 500*2 + 100
+    }
+
+    #[test]
+    fn test_judge_miss_count() {
+        let judge = Judge {
+            bad: 5,
+            poor: 3,
+            ..Default::default()
+        };
+        assert_eq!(judge.miss_count(), 8);
+    }
+
+    #[test]
+    fn test_from_raw_data_p1() {
+        let raw = RawJudgeData {
+            p1: PlayerJudge {
+                pgreat: 100,
+                great: 50,
+                ..Default::default()
+            },
+            p2: PlayerJudge::default(),
+        };
+        let judge = Judge::from_raw_data(raw);
+        assert_eq!(judge.play_type, PlayType::P1);
+        assert_eq!(judge.pgreat, 100);
+        assert_eq!(judge.great, 50);
+    }
+
+    #[test]
+    fn test_from_raw_data_p2() {
+        let raw = RawJudgeData {
+            p1: PlayerJudge::default(),
+            p2: PlayerJudge {
+                pgreat: 200,
+                great: 100,
+                ..Default::default()
+            },
+        };
+        let judge = Judge::from_raw_data(raw);
+        assert_eq!(judge.play_type, PlayType::P2);
+        assert_eq!(judge.pgreat, 200);
+        assert_eq!(judge.great, 100);
+    }
+
+    #[test]
+    fn test_from_raw_data_dp() {
+        let raw = RawJudgeData {
+            p1: PlayerJudge {
+                pgreat: 100,
+                great: 50,
+                ..Default::default()
+            },
+            p2: PlayerJudge {
+                pgreat: 100,
+                great: 50,
+                ..Default::default()
+            },
+        };
+        let judge = Judge::from_raw_data(raw);
+        assert_eq!(judge.play_type, PlayType::Dp);
+        assert_eq!(judge.pgreat, 200);
+        assert_eq!(judge.great, 100);
+    }
+
+    #[test]
+    fn test_from_raw_data_premature_end() {
+        let raw = RawJudgeData {
+            p1: PlayerJudge {
+                pgreat: 100,
+                measure_end: 1,
+                ..Default::default()
+            },
+            p2: PlayerJudge::default(),
+        };
+        let judge = Judge::from_raw_data(raw);
+        assert!(judge.premature_end);
+
+        let raw_no_end = RawJudgeData {
+            p1: PlayerJudge {
+                pgreat: 100,
+                measure_end: 0,
+                ..Default::default()
+            },
+            p2: PlayerJudge::default(),
+        };
+        let judge_no_end = Judge::from_raw_data(raw_no_end);
+        assert!(!judge_no_end.premature_end);
+    }
+
+    #[test]
+    fn test_from_raw_data_combines_values() {
+        let raw = RawJudgeData {
+            p1: PlayerJudge {
+                pgreat: 100,
+                fast: 10,
+                slow: 5,
+                combo_break: 2,
+                ..Default::default()
+            },
+            p2: PlayerJudge {
+                pgreat: 50,
+                fast: 8,
+                slow: 3,
+                combo_break: 1,
+                ..Default::default()
+            },
+        };
+        let judge = Judge::from_raw_data(raw);
+        assert_eq!(judge.pgreat, 150);
+        assert_eq!(judge.fast, 18);
+        assert_eq!(judge.slow, 8);
+        assert_eq!(judge.combo_break, 3);
+    }
+}
