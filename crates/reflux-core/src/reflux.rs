@@ -71,6 +71,15 @@ mod settings_offsets {
     pub const SONG_SELECT_MARKER: u64 = WORD * 6;
 }
 
+/// Timing constants for polling and rate limiting
+mod timing {
+    /// Interval between game state checks in the main loop (ms)
+    pub const GAME_STATE_POLL_INTERVAL_MS: u64 = 100;
+
+    /// Delay between API requests when syncing scores to avoid server overload (ms)
+    pub const SERVER_SYNC_REQUEST_DELAY_MS: u64 = 20;
+}
+
 use crate::game::{
     AssistType, ChartInfo, Difficulty, GameState, GameStateDetector, Grade, Judge, Lamp, PlayData,
     PlayType, Settings, SongInfo, UnlockData, UnlockType, calculate_dj_points, check_version_match,
@@ -288,7 +297,7 @@ impl Reflux {
                 last_state = current_state;
             }
 
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(Duration::from_millis(timing::GAME_STATE_POLL_INTERVAL_MS));
         }
 
         // Cleanup
@@ -1034,7 +1043,7 @@ impl Reflux {
             }
 
             // Small delay to avoid overwhelming the server
-            thread::sleep(Duration::from_millis(20));
+            thread::sleep(Duration::from_millis(timing::SERVER_SYNC_REQUEST_DELAY_MS));
         }
 
         Ok(())
