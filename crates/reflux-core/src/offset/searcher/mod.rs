@@ -794,10 +794,30 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                 continue;
             }
 
+            // CurrentSong validation: check if expected position has valid song data
+            // This helps distinguish correct JudgeData from false positives
+            let current_song_addr = candidate + JUDGE_TO_CURRENT_SONG;
+            let current_song_id = self.reader.read_i32(current_song_addr).unwrap_or(-1);
+            let current_difficulty = self.reader.read_i32(current_song_addr + 4).unwrap_or(-1);
+
+            // Valid CurrentSong: either initial state (0, 0) or valid song (id >= 1000, diff 0-9)
+            let is_initial_state = current_song_id == 0 && current_difficulty == 0;
+            let is_valid_song = current_song_id >= 1000 && (0..=9).contains(&current_difficulty);
+
+            if !is_initial_state && !is_valid_song {
+                debug!(
+                    "  JudgeData candidate 0x{:X} rejected: CurrentSong invalid (song_id={}, diff={})",
+                    candidate, current_song_id, current_difficulty
+                );
+                continue;
+            }
+
             debug!(
-                "  JudgeData: {} candidates, selected 0x{:X} (narrow search)",
+                "  JudgeData: {} candidates, selected 0x{:X} (narrow search, CurrentSong: song_id={}, diff={})",
                 candidates.len(),
-                candidate
+                candidate,
+                current_song_id,
+                current_difficulty
             );
             return Ok(candidate);
         }
