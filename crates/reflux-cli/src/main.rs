@@ -3,8 +3,7 @@ use clap::Parser;
 use reflux_core::{
     Config, CustomTypes, EncodingFixes, MemoryReader, OffsetDump, OffsetSearcher,
     OffsetsCollection, ProcessHandle, Reflux, RefluxApi, ScoreMap, SearchPrompter,
-    export_song_list, fetch_song_database_with_fixes, load_from_cache, load_offsets, save_offsets,
-    save_to_cache,
+    export_song_list, fetch_song_database_with_fixes, load_offsets, save_offsets,
 };
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -221,79 +220,50 @@ async fn main() -> Result<()> {
                         _ => String::from("unknown"),
                     };
 
-                    // Step 1: Try loading from version-specific cache
-                    let cached_offsets = if args.force_interactive {
-                        info!("Skipping cache lookup (--force-interactive)");
+                    let mut searcher = OffsetSearcher::new(&reader);
+
+                    // Step 1: Try automatic detection (unless --force-interactive)
+                    let search_result = if args.force_interactive {
+                        info!("Skipping automatic detection (--force-interactive)");
                         None
                     } else {
-                        match load_from_cache(&version) {
-                            Ok(offsets) if offsets.is_valid() => {
-                                info!("Loaded valid offsets from cache for version: {}", version);
-                                Some(offsets)
-                            }
-                            Ok(_offsets) => {
-                                warn!("Cached offsets are invalid, will search for new ones");
-                                None
-                            }
-                            Err(_) => {
-                                info!("No cached offsets found for version: {}", version);
+                        info!("Attempting automatic offset detection...");
+                        match searcher.search_all() {
+                            Ok(offsets) => Some(offsets),
+                            Err(e) => {
+                                info!("Automatic offset detection failed: {}", e);
                                 None
                             }
                         }
                     };
 
-                    let final_offsets = if let Some(offsets) = cached_offsets {
-                        Some(offsets)
-                    } else {
-                        let mut searcher = OffsetSearcher::new(&reader);
+                    let final_offsets = match search_result {
+                        Some(offsets) => {
+                            info!("Automatic offset detection successful!");
+                            Some(OffsetsCollection {
+                                version: version.clone(),
+                                ..offsets
+                            })
+                        }
+                        None => {
+                            // Step 2: Fallback to interactive search
+                            if !args.force_interactive {
+                                warn!(
+                                    "Automatic detection failed. Falling back to interactive search..."
+                                );
+                            }
 
-                        // Step 2: Try automatic detection (unless --force-interactive)
-                        let search_result = if args.force_interactive {
-                            info!("Skipping automatic detection (--force-interactive)");
-                            None
-                        } else {
-                            info!("Attempting automatic offset detection...");
-                            match searcher.search_all() {
-                                Ok(offsets) => Some(offsets),
+                            let prompter = CliPrompter;
+                            let hint_offsets = OffsetsCollection::default();
+
+                            match searcher.interactive_search(&prompter, &hint_offsets, &version) {
+                                Ok(result) => {
+                                    info!("Interactive offset search completed successfully!");
+                                    Some(result.offsets)
+                                }
                                 Err(e) => {
-                                    info!("Automatic offset detection failed: {}", e);
+                                    error!("Interactive offset search also failed: {}", e);
                                     None
-                                }
-                            }
-                        };
-
-                        match search_result {
-                            Some(offsets) => {
-                                info!("Automatic offset detection successful!");
-                                Some(OffsetsCollection {
-                                    version: version.clone(),
-                                    ..offsets
-                                })
-                            }
-                            None => {
-                                // Step 3: Fallback to interactive search
-                                if !args.force_interactive {
-                                    warn!(
-                                        "Automatic detection failed. Falling back to interactive search..."
-                                    );
-                                }
-
-                                let prompter = CliPrompter;
-                                let hint_offsets = OffsetsCollection::default();
-
-                                match searcher.interactive_search(
-                                    &prompter,
-                                    &hint_offsets,
-                                    &version,
-                                ) {
-                                    Ok(result) => {
-                                        info!("Interactive offset search completed successfully!");
-                                        Some(result.offsets)
-                                    }
-                                    Err(e) => {
-                                        error!("Interactive offset search also failed: {}", e);
-                                        None
-                                    }
                                 }
                             }
                         }
@@ -306,13 +276,6 @@ async fn main() -> Result<()> {
                                 error!("Failed to save offsets: {}", e);
                             } else {
                                 info!("Saved new offsets to {:?}", args.offsets);
-                            }
-
-                            // Save to version-specific cache
-                            if let Err(e) = save_to_cache(&offsets) {
-                                warn!("Failed to save offsets to cache: {}", e);
-                            } else {
-                                info!("Saved offsets to cache for version: {}", offsets.version);
                             }
 
                             // Update reflux with new offsets

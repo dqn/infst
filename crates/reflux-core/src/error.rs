@@ -20,9 +20,6 @@ pub enum Error {
     #[error("Failed to search offset: {0}")]
     OffsetSearchFailed(String),
 
-    #[error("Cache not found: {0}")]
-    CacheNotFound(String),
-
     #[error("Invalid game state")]
     InvalidGameState,
 
