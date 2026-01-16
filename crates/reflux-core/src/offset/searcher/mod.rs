@@ -115,16 +115,14 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         // Phase 4: Search remaining offsets
         info!("Phase 4: Searching remaining offsets...");
 
-        // DataMap: search from songList → search from base
-        offsets.data_map = self
-            .search_data_map_offset(offsets.song_list)
-            .or_else(|e| {
-                info!(
-                    "  DataMap search from songList failed: {}, trying from base",
-                    e
-                );
-                self.search_data_map_offset(base)
-            })?;
+        // DataMap: search from base → search from songList
+        offsets.data_map = self.search_data_map_offset(base).or_else(|e| {
+            info!(
+                "  DataMap search from base failed: {}, trying from songList",
+                e
+            );
+            self.search_data_map_offset(offsets.song_list)
+        })?;
         info!("  DataMap: 0x{:X}", offsets.data_map);
 
         // UnlockData
@@ -764,7 +762,10 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
 
         // Search for 72-byte zero pattern (initial state) or during-play pattern
         let zero_pattern = vec![0u8; judge::INITIAL_ZERO_SIZE];
-        let candidates = self.find_all_matches(&zero_pattern);
+        let mut candidates = self.find_all_matches(&zero_pattern);
+
+        // Sort candidates by distance from expected center to prioritize closest matches
+        candidates.sort_by_key(|&c| c.abs_diff(center));
 
         // Validate each candidate
         for &candidate in &candidates {
