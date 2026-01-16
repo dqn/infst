@@ -175,13 +175,11 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
     }
 
     /// Search for data map offset
-    ///
-    /// Uses last match to avoid false positives from earlier memory regions.
     pub fn search_data_map_offset(&mut self, base_hint: u64) -> Result<u64> {
         // Pattern: 0x7FFF, 0 (markers for hash map)
         let pattern = merge_byte_representations(&[0x7FFF, 0]);
         // Offset back 3 steps in 8-byte address space
-        self.fetch_and_search_last(base_hint, &pattern, -24)
+        self.fetch_and_search(base_hint, &pattern, -24, None)
     }
 
     /// Search for judge data offset (requires play data)
