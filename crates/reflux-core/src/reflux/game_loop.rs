@@ -19,9 +19,7 @@ use crate::game::{
 use crate::memory::layout::{judge, play, settings, timing};
 use crate::memory::{MemoryReader, ProcessHandle, ReadMemory};
 use crate::network::{AddSongParams, RefluxApi};
-use crate::storage::{
-    ChartKey, TrackerInfo, export_tracker_tsv, format_play_data_console, format_post_form,
-};
+use crate::storage::{ChartKey, TrackerInfo, format_play_data_console, format_post_form};
 
 use super::{Reflux, UpdateResult};
 
@@ -339,14 +337,7 @@ impl Reflux {
 
         // Export tracker.tsv if save_local is enabled
         if self.config.record.save_local
-            && let Err(e) = export_tracker_tsv(
-                "tracker.tsv",
-                &self.tracker,
-                &self.game_data.song_db,
-                &self.game_data.unlock_state,
-                &self.game_data.score_map,
-                &self.game_data.custom_types,
-            )
+            && let Err(e) = self.export_tracker_tsv("tracker.tsv")
         {
             error!("Failed to export tracker.tsv: {}", e);
         }

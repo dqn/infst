@@ -182,6 +182,18 @@ impl Reflux {
     pub fn config(&self) -> &Config {
         &self.config
     }
+
+    /// Export tracker data to TSV file
+    pub fn export_tracker_tsv<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        crate::storage::export_tracker_tsv(
+            path,
+            &self.tracker,
+            &self.game_data.song_db,
+            &self.game_data.unlock_state,
+            &self.game_data.score_map,
+            &self.game_data.custom_types,
+        )
+    }
 }
 
 /// Result of support file updates

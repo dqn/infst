@@ -428,6 +428,13 @@ async fn main() -> Result<()> {
                     error!("Failed to save tracker: {}", e);
                 }
 
+                // Export tracker.tsv on disconnect
+                if reflux.config().record.save_local
+                    && let Err(e) = reflux.export_tracker_tsv("tracker.tsv")
+                {
+                    error!("Failed to export tracker.tsv: {}", e);
+                }
+
                 info!("Process disconnected, waiting for reconnect...");
             }
             Err(_) => {

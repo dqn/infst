@@ -31,13 +31,25 @@ impl Default for UpdateConfig {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct RecordConfig {
     pub save_remote: bool,
     pub save_local: bool,
     pub save_json: bool,
     pub save_latest_json: bool,
     pub save_latest_txt: bool,
+}
+
+impl Default for RecordConfig {
+    fn default() -> Self {
+        Self {
+            save_remote: false,
+            save_local: true,
+            save_json: false,
+            save_latest_json: false,
+            save_latest_txt: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -95,7 +107,9 @@ impl Config {
 
         // Record section
         config.record.save_remote = ini.get_bool("record", "saveremote");
-        config.record.save_local = ini.get_bool("record", "savelocal");
+        if let Some(v) = ini.get_bool_opt("record", "savelocal") {
+            config.record.save_local = v;
+        }
         config.record.save_json = ini.get_bool("record", "savejson");
         config.record.save_latest_json = ini.get_bool("record", "savelatestjson");
         config.record.save_latest_txt = ini.get_bool("record", "savelatesttxt");
@@ -190,6 +204,13 @@ impl IniParser {
             .parse::<bool>()
             .unwrap_or(false)
     }
+
+    fn get_bool_opt(&self, section: &str, key: &str) -> Option<bool> {
+        self.sections
+            .get(section)
+            .and_then(|s| s.get(key))
+            .and_then(|v| v.to_lowercase().parse::<bool>().ok())
+    }
 }
 
 #[cfg(test)]
@@ -225,6 +246,7 @@ marqueeidletext = Custom Text
     fn test_empty_config() {
         let config = Config::parse("").unwrap();
         assert!(!config.record.save_remote);
+        assert!(config.record.save_local); // default is true
         assert_eq!(config.livestream.marquee_idle_text, "INFINITAS");
     }
 }
