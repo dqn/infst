@@ -797,15 +797,29 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                 continue;
             }
 
-            // PlaySettings validation: check if expected position has valid settings
-            // This is the most reliable validation since PlaySettings has non-zero option values
+            // PlaySettings validation: search for valid settings near expected position
+            // The JUDGE_TO_PLAY_SETTINGS constant may have a fixed offset (~0xE8) from the actual
+            // position, so we search within ±0x100 (256 bytes) tolerance to find valid settings.
             let expected_play_settings = candidate.saturating_sub(JUDGE_TO_PLAY_SETTINGS);
-            if self
-                .validate_play_settings_at(expected_play_settings)
-                .is_none()
-            {
+            let search_range = 0x100u64; // Allow ±256 bytes tolerance for offset variations
+
+            let mut found_play_settings = false;
+            let search_start = expected_play_settings.saturating_sub(search_range);
+            let search_end = expected_play_settings.saturating_add(search_range);
+
+            // Search in 4-byte aligned positions
+            let mut pos = search_start & !3; // Align to 4 bytes
+            while pos <= search_end {
+                if self.validate_play_settings_at(pos).is_some() {
+                    found_play_settings = true;
+                    break;
+                }
+                pos += 4;
+            }
+
+            if !found_play_settings {
                 debug!(
-                    "  JudgeData candidate 0x{:X} rejected: PlaySettings invalid at 0x{:X}",
+                    "  JudgeData candidate 0x{:X} rejected: no valid PlaySettings near 0x{:X}",
                     candidate, expected_play_settings
                 );
                 continue;
