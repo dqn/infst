@@ -150,6 +150,10 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             debug!("  No code signature matches found (this is OK)");
         }
 
+        // Phase 7: Dump current values for verification
+        debug!("Phase 7: Dumping current values at detected offsets...");
+        self.dump_offset_values(&offsets);
+
         info!("Automatic offset detection completed successfully");
         Ok(offsets)
     }
@@ -1511,5 +1515,102 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         }
 
         false
+    }
+
+    /// Dump current values at detected offsets for verification
+    ///
+    /// This helps verify that offsets are correct by showing the actual
+    /// values read from memory.
+    fn dump_offset_values(&self, offsets: &OffsetsCollection) {
+        // JudgeData - show P1/P2 judgment counts
+        debug!("  JudgeData values:");
+        let p1_pgreat = self
+            .reader
+            .read_i32(offsets.judge_data + judge::P1_PGREAT)
+            .unwrap_or(-1);
+        let p1_great = self
+            .reader
+            .read_i32(offsets.judge_data + judge::P1_GREAT)
+            .unwrap_or(-1);
+        let p1_good = self
+            .reader
+            .read_i32(offsets.judge_data + judge::P1_GOOD)
+            .unwrap_or(-1);
+        let p1_bad = self
+            .reader
+            .read_i32(offsets.judge_data + judge::P1_BAD)
+            .unwrap_or(-1);
+        let p1_poor = self
+            .reader
+            .read_i32(offsets.judge_data + judge::P1_POOR)
+            .unwrap_or(-1);
+        debug!(
+            "    P1: PGreat={}, Great={}, Good={}, Bad={}, Poor={}",
+            p1_pgreat, p1_great, p1_good, p1_bad, p1_poor
+        );
+
+        let p2_pgreat = self
+            .reader
+            .read_i32(offsets.judge_data + judge::P2_PGREAT)
+            .unwrap_or(-1);
+        let p2_great = self
+            .reader
+            .read_i32(offsets.judge_data + judge::P2_GREAT)
+            .unwrap_or(-1);
+        let p2_good = self
+            .reader
+            .read_i32(offsets.judge_data + judge::P2_GOOD)
+            .unwrap_or(-1);
+        let p2_bad = self
+            .reader
+            .read_i32(offsets.judge_data + judge::P2_BAD)
+            .unwrap_or(-1);
+        let p2_poor = self
+            .reader
+            .read_i32(offsets.judge_data + judge::P2_POOR)
+            .unwrap_or(-1);
+        debug!(
+            "    P2: PGreat={}, Great={}, Good={}, Bad={}, Poor={}",
+            p2_pgreat, p2_great, p2_good, p2_bad, p2_poor
+        );
+
+        // PlaySettings - show option values
+        debug!("  PlaySettings values:");
+        let style = self.reader.read_i32(offsets.play_settings).unwrap_or(-1);
+        let gauge = self
+            .reader
+            .read_i32(offsets.play_settings + 4)
+            .unwrap_or(-1);
+        let assist = self
+            .reader
+            .read_i32(offsets.play_settings + 8)
+            .unwrap_or(-1);
+        let range = self
+            .reader
+            .read_i32(offsets.play_settings + 16)
+            .unwrap_or(-1);
+        debug!(
+            "    style={}, gauge={}, assist={}, range={}",
+            style, gauge, assist, range
+        );
+
+        // PlayData - show song info
+        debug!("  PlayData values:");
+        let song_id = self.reader.read_i32(offsets.play_data).unwrap_or(-1);
+        let difficulty = self.reader.read_i32(offsets.play_data + 4).unwrap_or(-1);
+        let ex_score = self.reader.read_i32(offsets.play_data + 8).unwrap_or(-1);
+        debug!(
+            "    song_id={}, difficulty={}, ex_score={}",
+            song_id, difficulty, ex_score
+        );
+
+        // CurrentSong - show selected song
+        debug!("  CurrentSong values:");
+        let current_song_id = self.reader.read_i32(offsets.current_song).unwrap_or(-1);
+        let current_difficulty = self.reader.read_i32(offsets.current_song + 4).unwrap_or(-1);
+        debug!(
+            "    song_id={}, difficulty={}",
+            current_song_id, current_difficulty
+        );
     }
 }
