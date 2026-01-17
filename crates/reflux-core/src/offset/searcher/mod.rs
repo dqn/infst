@@ -837,7 +837,8 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
 
             // Valid CurrentSong: either initial state (0, 0) or valid song (id >= 1000, diff 0-9)
             let is_initial_state = current_song_id == 0 && current_difficulty == 0;
-            let is_valid_song = current_song_id >= 1000 && (0..=9).contains(&current_difficulty);
+            let is_valid_song = (MIN_SONG_ID..=MAX_SONG_ID).contains(&current_song_id)
+                && (0..=9).contains(&current_difficulty);
 
             if !is_initial_state && !is_valid_song {
                 continue;
