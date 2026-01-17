@@ -819,23 +819,13 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
 
             let play_settings_addr = match found_play_settings_addr {
                 Some(addr) => addr,
-                None => {
-                    debug!(
-                        "  JudgeData candidate 0x{:X} rejected: no valid PlaySettings near 0x{:X}",
-                        candidate, expected_play_settings
-                    );
-                    continue;
-                }
+                None => continue,
             };
 
             // Chain validation: PlaySettings → PlayData
             // If PlaySettings is found, verify that PlayData at expected position is in initial state
             let expected_play_data = play_settings_addr + PLAY_SETTINGS_TO_PLAY_DATA;
             if !self.validate_play_data_initial_state(expected_play_data) {
-                debug!(
-                    "  JudgeData candidate 0x{:X} rejected: PlayData at 0x{:X} not in initial state",
-                    candidate, expected_play_data
-                );
                 continue;
             }
 
@@ -850,10 +840,6 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             let is_valid_song = current_song_id >= 1000 && (0..=9).contains(&current_difficulty);
 
             if !is_initial_state && !is_valid_song {
-                debug!(
-                    "  JudgeData candidate 0x{:X} rejected: CurrentSong invalid (song_id={}, diff={})",
-                    candidate, current_song_id, current_difficulty
-                );
                 continue;
             }
 
@@ -968,8 +954,30 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
 
     /// Narrow search for PlayData near PlaySettings using relative offset
     ///
-    /// Search range: ±256 bytes around expected position (playSettings + 0x2B0)
+    /// Search range: ±256 bytes around expected position (playSettings + 0x2C0)
+    ///
+    /// This method first tries known offsets (0x2C0, 0x2B0) before falling back
+    /// to a full range scan. This avoids false positives from zero-filled memory
+    /// at unexpected positions.
     fn search_play_data_near_settings_narrow(&mut self, play_settings: u64) -> Result<u64> {
+        // Known offsets from different versions (try in order of likelihood)
+        // 2025122400 and later: 0x2C0 (704 bytes)
+        // Before 2025122400: 0x2B0 (688 bytes)
+        const KNOWN_OFFSETS: &[u64] = &[0x2C0, 0x2B0];
+
+        // First, try known offsets (fast path)
+        for &offset in KNOWN_OFFSETS {
+            let addr = play_settings + offset;
+            if self.validate_play_data_at(addr, play_settings) {
+                debug!(
+                    "  PlayData: selected 0x{:X} (known offset 0x{:X})",
+                    addr, offset
+                );
+                return Ok(addr);
+            }
+        }
+
+        // Fallback: scan around expected position
         let center = play_settings + PLAY_SETTINGS_TO_PLAY_DATA;
         let range = PLAY_DATA_SEARCH_RANGE;
 
@@ -1013,7 +1021,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         let selected = candidates[0];
 
         debug!(
-            "  PlayData: {} candidates, selected 0x{:X} (distance from expected: {})",
+            "  PlayData: {} candidates, selected 0x{:X} (fallback scan, distance from expected: {})",
             candidates.len(),
             selected,
             selected.abs_diff(center)
@@ -1677,65 +1685,46 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         false
     }
 
-    /// Dump current values at detected offsets for verification
-    ///
-    /// This helps verify that offsets are correct by showing the actual
-    /// values read from memory.
+    /// Dump current values at detected offsets for verification (compact format)
     fn dump_offset_values(&self, offsets: &OffsetsCollection) {
-        // JudgeData - show P1/P2 judgment counts
-        debug!("  JudgeData values:");
-        let p1_pgreat = self
-            .reader
-            .read_i32(offsets.judge_data + judge::P1_PGREAT)
-            .unwrap_or(-1);
-        let p1_great = self
-            .reader
-            .read_i32(offsets.judge_data + judge::P1_GREAT)
-            .unwrap_or(-1);
-        let p1_good = self
-            .reader
-            .read_i32(offsets.judge_data + judge::P1_GOOD)
-            .unwrap_or(-1);
-        let p1_bad = self
-            .reader
-            .read_i32(offsets.judge_data + judge::P1_BAD)
-            .unwrap_or(-1);
-        let p1_poor = self
-            .reader
-            .read_i32(offsets.judge_data + judge::P1_POOR)
-            .unwrap_or(-1);
-        debug!(
-            "    P1: PGreat={}, Great={}, Good={}, Bad={}, Poor={}",
-            p1_pgreat, p1_great, p1_good, p1_bad, p1_poor
-        );
+        // JudgeData - P1/P2 judgment counts in compact format
+        let p1 = [
+            self.reader
+                .read_i32(offsets.judge_data + judge::P1_PGREAT)
+                .unwrap_or(-1),
+            self.reader
+                .read_i32(offsets.judge_data + judge::P1_GREAT)
+                .unwrap_or(-1),
+            self.reader
+                .read_i32(offsets.judge_data + judge::P1_GOOD)
+                .unwrap_or(-1),
+            self.reader
+                .read_i32(offsets.judge_data + judge::P1_BAD)
+                .unwrap_or(-1),
+            self.reader
+                .read_i32(offsets.judge_data + judge::P1_POOR)
+                .unwrap_or(-1),
+        ];
+        let p2 = [
+            self.reader
+                .read_i32(offsets.judge_data + judge::P2_PGREAT)
+                .unwrap_or(-1),
+            self.reader
+                .read_i32(offsets.judge_data + judge::P2_GREAT)
+                .unwrap_or(-1),
+            self.reader
+                .read_i32(offsets.judge_data + judge::P2_GOOD)
+                .unwrap_or(-1),
+            self.reader
+                .read_i32(offsets.judge_data + judge::P2_BAD)
+                .unwrap_or(-1),
+            self.reader
+                .read_i32(offsets.judge_data + judge::P2_POOR)
+                .unwrap_or(-1),
+        ];
+        debug!("  JudgeData: P1={:?} P2={:?}", p1, p2);
 
-        let p2_pgreat = self
-            .reader
-            .read_i32(offsets.judge_data + judge::P2_PGREAT)
-            .unwrap_or(-1);
-        let p2_great = self
-            .reader
-            .read_i32(offsets.judge_data + judge::P2_GREAT)
-            .unwrap_or(-1);
-        let p2_good = self
-            .reader
-            .read_i32(offsets.judge_data + judge::P2_GOOD)
-            .unwrap_or(-1);
-        let p2_bad = self
-            .reader
-            .read_i32(offsets.judge_data + judge::P2_BAD)
-            .unwrap_or(-1);
-        let p2_poor = self
-            .reader
-            .read_i32(offsets.judge_data + judge::P2_POOR)
-            .unwrap_or(-1);
-        debug!(
-            "    P2: PGreat={}, Great={}, Good={}, Bad={}, Poor={}",
-            p2_pgreat, p2_great, p2_good, p2_bad, p2_poor
-        );
-
-        // PlaySettings - show option values
-        debug!("  PlaySettings values:");
+        // PlaySettings
         let style = self.reader.read_i32(offsets.play_settings).unwrap_or(-1);
         let gauge = self
             .reader
@@ -1750,27 +1739,25 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             .read_i32(offsets.play_settings + 16)
             .unwrap_or(-1);
         debug!(
-            "    style={}, gauge={}, assist={}, range={}",
+            "  PlaySettings: style={}, gauge={}, assist={}, range={}",
             style, gauge, assist, range
         );
 
-        // PlayData - show song info
-        debug!("  PlayData values:");
+        // PlayData
         let song_id = self.reader.read_i32(offsets.play_data).unwrap_or(-1);
         let difficulty = self.reader.read_i32(offsets.play_data + 4).unwrap_or(-1);
         let ex_score = self.reader.read_i32(offsets.play_data + 8).unwrap_or(-1);
         debug!(
-            "    song_id={}, difficulty={}, ex_score={}",
+            "  PlayData: song_id={}, diff={}, ex={}",
             song_id, difficulty, ex_score
         );
 
-        // CurrentSong - show selected song
-        debug!("  CurrentSong values:");
+        // CurrentSong
         let current_song_id = self.reader.read_i32(offsets.current_song).unwrap_or(-1);
-        let current_difficulty = self.reader.read_i32(offsets.current_song + 4).unwrap_or(-1);
+        let current_diff = self.reader.read_i32(offsets.current_song + 4).unwrap_or(-1);
         debug!(
-            "    song_id={}, difficulty={}",
-            current_song_id, current_difficulty
+            "  CurrentSong: song_id={}, diff={}",
+            current_song_id, current_diff
         );
     }
 }
