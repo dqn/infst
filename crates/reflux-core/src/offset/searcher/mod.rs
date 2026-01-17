@@ -1066,17 +1066,19 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
 
     /// Validate if the given address contains valid CurrentSong data
     fn validate_current_song_at(&self, addr: u64, play_data: u64) -> bool {
-        // Read song_id from both addresses - they should match
         let current_song_id = self.reader.read_i32(addr).unwrap_or(-1);
         let play_data_song_id = self.reader.read_i32(play_data).unwrap_or(-2);
 
-        // Accept initial state (both are zeros) - common when not in song select
+        // Accept initial state (both are zeros)
         if current_song_id == 0 && play_data_song_id == 0 {
             return true;
         }
 
-        // Song IDs should match and be valid
-        current_song_id > 0 && current_song_id == play_data_song_id
+        // Song IDs should match, be in valid range (1000-50000), and not be power of 2
+        let is_valid_range = (1000..=50000).contains(&current_song_id);
+        let is_power_of_two = is_power_of_two(current_song_id as u32);
+
+        is_valid_range && !is_power_of_two && current_song_id == play_data_song_id
     }
 
     /// Search for JudgeData using initial state pattern (72 zero bytes)
