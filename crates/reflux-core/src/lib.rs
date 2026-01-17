@@ -20,8 +20,9 @@ pub use game::{
 pub use memory::{MemoryReader, ProcessHandle};
 pub use network::{HttpClient, KamaitachiClient, RefluxApi};
 pub use offset::{
-    InteractiveSearchResult, JudgeInput, OffsetDump, OffsetSearcher, OffsetsCollection,
-    SearchPrompter, SearchResult, load_offsets, save_offsets,
+    CodeSignature, InteractiveSearchResult, JudgeInput, OffsetDump, OffsetSearcher,
+    OffsetSignatureEntry, OffsetSignatureSet, OffsetsCollection, SearchPrompter, SearchResult,
+    load_offsets, load_signatures, save_offsets, save_signatures,
 };
 pub use reflux::{GameData, Reflux, UpdateResult};
 pub use storage::{

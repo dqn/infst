@@ -128,9 +128,41 @@ C# のコメント「最初の2つは2016-build参照」が常に正しいわけ
 
 自動検出の信頼性が低いため、インタラクティブ検索のみをサポートし、結果を offsets.txt に保存するシンプルな構成に戻す。
 
+### アプローチ D: コードシグネチャ（AOB）で検出する
+
+データパターンではなく、コード中の RIP 相対参照を使ってオフセットを復元する方式。
+構造体サイズの変化に強く、誤検出も大幅に減る。
+
+`offset-signatures.json` の例:
+
+```json
+{
+  "version": "P2D:J:B:A:2025122400",
+  "entries": [
+    {
+      "name": "songList",
+      "signatures": [
+        { "pattern": "48 8D 0D ?? ?? ?? ??", "instr_offset": 0, "disp_offset": 3, "instr_len": 7, "deref": false, "addend": 0 }
+      ]
+    },
+    {
+      "name": "judgeData",
+      "signatures": [
+        { "pattern": "48 8B 0D ?? ?? ?? ??", "instr_offset": 0, "disp_offset": 3, "instr_len": 7, "deref": true, "addend": 0 }
+      ]
+    }
+  ]
+}
+```
+
+- `deref=true` は `mov r?, [rip+disp]` で指す「ポインタの先」を使う場合に指定
+- `addend` は最終アドレスに足す調整値
+- 検索対象のファイルは `offset-signatures.json`（優先）か `.agent/offset-signatures.json`
+
 ## 関連ファイル
 
-- `crates/reflux-core/src/offset/searcher.rs` - 検索ロジック
+- `crates/reflux-core/src/offset/searcher/mod.rs` - 検索ロジック
+- `crates/reflux-core/src/offset/signature.rs` - AOB シグネチャ定義
 - `crates/reflux-core/src/offset/dump.rs` - 診断ダンプ
 - `crates/reflux-cli/src/main.rs` - CLI エントリポイント
 - 参照: https://github.com/olji/Reflux/commits/master/Reflux/offsets.txt

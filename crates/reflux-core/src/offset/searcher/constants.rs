@@ -42,6 +42,12 @@ pub const INITIAL_SEARCH_SIZE: usize = 2 * 1024 * 1024;
 /// Maximum buffer size for memory search (300MB)
 pub const MAX_SEARCH_SIZE: usize = 300 * 1024 * 1024;
 
+/// Code scan chunk size for signature search (4MB)
+pub const CODE_SCAN_CHUNK_SIZE: usize = 4 * 1024 * 1024;
+
+/// Maximum range to scan from base address for signatures (128MB)
+pub const CODE_SCAN_LIMIT: usize = 128 * 1024 * 1024;
+
 /// Minimum number of songs expected in INFINITAS (for validation)
 pub const MIN_EXPECTED_SONGS: usize = 1000;
 
@@ -91,6 +97,22 @@ pub const JUDGE_TO_CURRENT_SONG: u64 = 0x160;
 ///
 /// This is ~16x the measured variation to ensure reliable detection.
 pub const CURRENT_SONG_SEARCH_RANGE: usize = 0x100;
+
+// ============================================================================
+// DataMap validation
+// ============================================================================
+
+/// DataMap hash table minimum size (bytes)
+pub const DATA_MAP_MIN_TABLE_BYTES: usize = 0x1000;
+
+/// DataMap hash table maximum size (bytes)
+pub const DATA_MAP_MAX_TABLE_BYTES: usize = 256 * 1024 * 1024;
+
+/// DataMap hash table scan size (bytes)
+pub const DATA_MAP_SCAN_BYTES: usize = 0x4000;
+
+/// DataMap node validation samples
+pub const DATA_MAP_NODE_SAMPLES: usize = 32;
 
 /// Search range for judgeData when searching from SongList (±64KB)
 ///

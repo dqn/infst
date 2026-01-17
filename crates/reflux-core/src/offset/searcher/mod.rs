@@ -10,12 +10,30 @@ use crate::error::{Error, Result};
 use crate::game::{PlayType, SongInfo};
 use crate::memory::ReadMemory;
 use crate::memory::layout::judge;
-use crate::offset::OffsetsCollection;
+use crate::offset::{CodeSignature, OffsetSignatureSet, OffsetsCollection};
 
 use constants::*;
 pub use types::*;
 use utils::is_power_of_two;
 pub use utils::merge_byte_representations;
+
+#[derive(Debug, Clone)]
+struct DataMapProbe {
+    addr: u64,
+    table_start: u64,
+    table_end: u64,
+    table_size: usize,
+    scanned_entries: usize,
+    non_null_entries: usize,
+    valid_nodes: usize,
+}
+
+impl DataMapProbe {
+    fn is_better_than(&self, other: &Self) -> bool {
+        (self.valid_nodes, self.non_null_entries, usize::MAX - self.table_size)
+            > (other.valid_nodes, other.non_null_entries, usize::MAX - other.table_size)
+    }
+}
 
 pub struct OffsetSearcher<'a, R: ReadMemory> {
     reader: &'a R,
@@ -158,6 +176,85 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         Ok(offsets)
     }
 
+    /// Search for all offsets using code signatures (AOB scan)
+    ///
+    /// This method relies on RIP-relative code references instead of data patterns,
+    /// making it more resilient to data layout changes.
+    pub fn search_all_with_signatures(
+        &mut self,
+        signatures: &OffsetSignatureSet,
+    ) -> Result<OffsetsCollection> {
+        info!("Starting signature-based offset detection...");
+        let mut offsets = OffsetsCollection::default();
+
+        offsets.version = if signatures.version.trim().is_empty() {
+            "unknown".to_string()
+        } else {
+            signatures.version.clone()
+        };
+
+        // Phase 1: SongList (anchor)
+        info!("Phase 1: Searching SongList via signatures...");
+        offsets.song_list = self.search_song_list_by_signature(signatures)?;
+        info!("  SongList: 0x{:X}", offsets.song_list);
+
+        // Phase 2: JudgeData
+        info!("Phase 2: Searching JudgeData via signatures...");
+        offsets.judge_data =
+            self.search_offset_by_signature(signatures, "judgeData", |this, addr| {
+                this.validate_judge_data_candidate(addr)
+            })?;
+        info!("  JudgeData: 0x{:X}", offsets.judge_data);
+
+        // Phase 3: PlaySettings
+        info!("Phase 3: Searching PlaySettings via signatures...");
+        offsets.play_settings =
+            self.search_offset_by_signature(signatures, "playSettings", |this, addr| {
+                this.validate_play_settings_at(addr).is_some()
+            })?;
+        info!("  PlaySettings: 0x{:X}", offsets.play_settings);
+
+        // Phase 4: PlayData
+        info!("Phase 4: Searching PlayData via signatures...");
+        offsets.play_data =
+            self.search_offset_by_signature(signatures, "playData", |this, addr| {
+                this.validate_play_data_address(addr).unwrap_or(false)
+            })?;
+        info!("  PlayData: 0x{:X}", offsets.play_data);
+
+        // Phase 5: CurrentSong
+        info!("Phase 5: Searching CurrentSong via signatures...");
+        offsets.current_song =
+            self.search_offset_by_signature(signatures, "currentSong", |this, addr| {
+                this.validate_current_song_address(addr).unwrap_or(false)
+            })?;
+        info!("  CurrentSong: 0x{:X}", offsets.current_song);
+
+        // Phase 6: DataMap / UnlockData (pattern search, using SongList as hint)
+        info!("Phase 6: Searching remaining offsets with patterns...");
+        let base = self.reader.base_address();
+        offsets.data_map = self.search_data_map_offset(base).or_else(|e| {
+            info!(
+                "  DataMap search from base failed: {}, trying from SongList",
+                e
+            );
+            self.search_data_map_offset(offsets.song_list)
+        })?;
+        info!("  DataMap: 0x{:X}", offsets.data_map);
+
+        offsets.unlock_data = self.search_unlock_data_offset(offsets.song_list)?;
+        info!("  UnlockData: 0x{:X}", offsets.unlock_data);
+
+        if !offsets.is_valid() {
+            return Err(Error::OffsetSearchFailed(
+                "Validation failed: some offsets are zero".to_string(),
+            ));
+        }
+
+        debug!("Signature-based offset detection completed successfully");
+        Ok(offsets)
+    }
+
     /// Search for song list offset using version string pattern
     pub fn search_song_list_offset(&mut self, base_hint: u64) -> Result<u64> {
         self.load_buffer_around(base_hint, INITIAL_SEARCH_SIZE)?;
@@ -180,8 +277,59 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
     pub fn search_data_map_offset(&mut self, base_hint: u64) -> Result<u64> {
         // Pattern: 0x7FFF, 0 (markers for hash map)
         let pattern = merge_byte_representations(&[0x7FFF, 0]);
-        // Offset back 3 steps in 8-byte address space
-        self.fetch_and_search(base_hint, &pattern, -24, None)
+        let mut search_size = INITIAL_SEARCH_SIZE;
+        let mut best: Option<DataMapProbe> = None;
+        let mut fallback: Option<u64> = None;
+
+        while search_size <= MAX_SEARCH_SIZE {
+            if self.load_buffer_around(base_hint, search_size).is_err() {
+                break;
+            }
+
+            let matches = self.find_all_matches(&pattern);
+            for match_addr in matches {
+                let candidate = match_addr.wrapping_add_signed(-24);
+                if fallback.is_none() {
+                    fallback = Some(candidate);
+                }
+
+                let Some(probe) = self.probe_data_map_candidate(candidate) else {
+                    continue;
+                };
+
+                let is_better = match &best {
+                    None => true,
+                    Some(current) => probe.is_better_than(current),
+                };
+
+                if is_better {
+                    best = Some(probe);
+                }
+            }
+
+            search_size *= 2;
+        }
+
+        if let Some(probe) = best {
+            debug!(
+                "  DataMap: selected 0x{:X} (valid_nodes={}, non_null_entries={}, table_size={})",
+                probe.addr, probe.valid_nodes, probe.non_null_entries, probe.table_size
+            );
+            return Ok(probe.addr);
+        }
+
+        if let Some(addr) = fallback {
+            warn!(
+                "  DataMap validation failed; falling back to first match 0x{:X}",
+                addr
+            );
+            return Ok(addr);
+        }
+
+        Err(Error::OffsetSearchFailed(format!(
+            "Pattern not found within {} MB",
+            MAX_SEARCH_SIZE / 1024 / 1024
+        )))
     }
 
     /// Search for judge data offset (requires play data)
@@ -259,6 +407,331 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         self.buffer_base = start;
         self.buffer = self.reader.read_bytes(start, distance * 2)?;
         Ok(())
+    }
+
+    fn probe_data_map_candidate(&self, addr: u64) -> Option<DataMapProbe> {
+        let base = self.reader.base_address();
+        let null_obj = self.reader.read_u64(addr.wrapping_sub(16)).ok()?;
+        let table_start = self.reader.read_u64(addr).ok()?;
+        let table_end = self.reader.read_u64(addr + 8).ok()?;
+
+        if table_end <= table_start {
+            return None;
+        }
+
+        if table_start < base || table_end < base {
+            return None;
+        }
+
+        let table_size = (table_end - table_start) as usize;
+        if table_size < DATA_MAP_MIN_TABLE_BYTES || table_size > DATA_MAP_MAX_TABLE_BYTES {
+            return None;
+        }
+        if table_size % 8 != 0 {
+            return None;
+        }
+
+        let scan_size = table_size.min(DATA_MAP_SCAN_BYTES);
+        let buffer = self.reader.read_bytes(table_start, scan_size).ok()?;
+
+        let mut non_null_entries = 0usize;
+        let mut entry_points = Vec::new();
+        let scanned_entries = buffer.len() / 8;
+
+        for i in 0..scanned_entries {
+            let addr = u64::from_le_bytes([
+                buffer[i * 8],
+                buffer[i * 8 + 1],
+                buffer[i * 8 + 2],
+                buffer[i * 8 + 3],
+                buffer[i * 8 + 4],
+                buffer[i * 8 + 5],
+                buffer[i * 8 + 6],
+                buffer[i * 8 + 7],
+            ]);
+
+            if addr != 0 && addr != null_obj && addr != 0x494fdce0 {
+                non_null_entries += 1;
+                entry_points.push(addr);
+            }
+        }
+
+        let mut valid_nodes = 0usize;
+        for entry in entry_points.iter().take(DATA_MAP_NODE_SAMPLES) {
+            if self.validate_data_map_node(*entry) {
+                valid_nodes += 1;
+            }
+        }
+
+        Some(DataMapProbe {
+            addr,
+            table_start,
+            table_end,
+            table_size,
+            scanned_entries,
+            non_null_entries,
+            valid_nodes,
+        })
+    }
+
+    fn validate_data_map_node(&self, addr: u64) -> bool {
+        let buffer = match self.reader.read_bytes(addr, 64) {
+            Ok(bytes) => bytes,
+            Err(_) => return false,
+        };
+
+        if buffer.len() < 52 {
+            return false;
+        }
+
+        let diff = i32::from_le_bytes([buffer[16], buffer[17], buffer[18], buffer[19]]);
+        let song_id = i32::from_le_bytes([buffer[20], buffer[21], buffer[22], buffer[23]]);
+        let playtype = i32::from_le_bytes([buffer[24], buffer[25], buffer[26], buffer[27]]);
+        let score = u32::from_le_bytes([buffer[32], buffer[33], buffer[34], buffer[35]]);
+        let miss_count = u32::from_le_bytes([buffer[36], buffer[37], buffer[38], buffer[39]]);
+        let lamp = i32::from_le_bytes([buffer[48], buffer[49], buffer[50], buffer[51]]);
+
+        if !(0..=4).contains(&diff) {
+            return false;
+        }
+        if !(0..=1).contains(&playtype) {
+            return false;
+        }
+        if !(MIN_SONG_ID..=MAX_SONG_ID).contains(&song_id) {
+            return false;
+        }
+        if score > 200_000 {
+            return false;
+        }
+        if miss_count > 10_000 && miss_count != u32::MAX {
+            return false;
+        }
+        if !(0..=7).contains(&lamp) {
+            return false;
+        }
+
+        true
+    }
+
+    fn search_song_list_by_signature(
+        &self,
+        signatures: &OffsetSignatureSet,
+    ) -> Result<u64> {
+        let entry = signatures.entry("songList").ok_or_else(|| {
+            Error::OffsetSearchFailed("Signature entry 'songList' not found".to_string())
+        })?;
+
+        for signature in &entry.signatures {
+            let candidates = self.resolve_signature_targets(signature)?;
+            let mut best: Option<(u64, usize)> = None;
+
+            for addr in candidates {
+                if addr % 4 != 0 {
+                    continue;
+                }
+                let song_count = self.count_songs_at_address(addr);
+                if song_count < MIN_EXPECTED_SONGS {
+                    continue;
+                }
+
+                let is_better = match best {
+                    Some((_, best_count)) => song_count > best_count,
+                    None => true,
+                };
+
+                if is_better {
+                    best = Some((addr, song_count));
+                }
+            }
+
+            if let Some((addr, count)) = best {
+                debug!(
+                    "  SongList: selected 0x{:X} ({} songs, signature: {})",
+                    addr, count, signature.pattern
+                );
+                return Ok(addr);
+            }
+        }
+
+        Err(Error::OffsetSearchFailed(
+            "SongList not found via signatures".to_string(),
+        ))
+    }
+
+    fn search_offset_by_signature<F>(
+        &self,
+        signatures: &OffsetSignatureSet,
+        name: &str,
+        validate: F,
+    ) -> Result<u64>
+    where
+        F: Fn(&Self, u64) -> bool,
+    {
+        let entry = signatures.entry(name).ok_or_else(|| {
+            Error::OffsetSearchFailed(format!("Signature entry '{}' not found", name))
+        })?;
+
+        for signature in &entry.signatures {
+            let candidates = self.resolve_signature_targets(signature)?;
+            let mut valid: Vec<u64> = candidates
+                .into_iter()
+                .filter(|addr| *addr % 4 == 0)
+                .filter(|addr| validate(self, *addr))
+                .collect();
+
+            if !valid.is_empty() {
+                valid.sort_unstable();
+                let selected = valid[0];
+                debug!(
+                    "  {}: selected 0x{:X} (signature: {}, candidates: {})",
+                    name,
+                    selected,
+                    signature.pattern,
+                    valid.len()
+                );
+                return Ok(selected);
+            }
+        }
+
+        Err(Error::OffsetSearchFailed(format!(
+            "No valid candidates found for {} via signatures",
+            name
+        )))
+    }
+
+    fn validate_judge_data_candidate(&self, addr: u64) -> bool {
+        if addr % 4 != 0 {
+            return false;
+        }
+
+        let marker1 = self
+            .reader
+            .read_i32(addr + judge::STATE_MARKER_1)
+            .unwrap_or(-1);
+        let marker2 = self
+            .reader
+            .read_i32(addr + judge::STATE_MARKER_2)
+            .unwrap_or(-1);
+
+        (0..=100).contains(&marker1) && (0..=100).contains(&marker2)
+    }
+
+    fn resolve_signature_targets(&self, signature: &CodeSignature) -> Result<Vec<u64>> {
+        let pattern = signature.pattern_bytes()?;
+        let matches = self.scan_code_for_pattern(&pattern)?;
+        let mut targets = Vec::new();
+
+        for match_addr in matches {
+            let instr_addr = match_addr + signature.instr_offset as u64;
+            let disp_addr = instr_addr + signature.disp_offset as u64;
+
+            let disp_bytes = match self.reader.read_bytes(disp_addr, 4) {
+                Ok(bytes) => bytes,
+                Err(_) => continue,
+            };
+
+            let disp = i32::from_le_bytes([disp_bytes[0], disp_bytes[1], disp_bytes[2], disp_bytes[3]]);
+            let next_ip = instr_addr + signature.instr_len as u64;
+            let mut target = next_ip.wrapping_add_signed(disp as i64);
+
+            if signature.deref {
+                match self.reader.read_u64(target) {
+                    Ok(ptr) => target = ptr,
+                    Err(_) => continue,
+                }
+            }
+
+            if signature.addend != 0 {
+                target = target.wrapping_add_signed(signature.addend);
+            }
+
+            if target != 0 {
+                targets.push(target);
+            }
+        }
+
+        targets.sort_unstable();
+        targets.dedup();
+        Ok(targets)
+    }
+
+    fn scan_code_for_pattern(&self, pattern: &[Option<u8>]) -> Result<Vec<u64>> {
+        let base = self.reader.base_address();
+        let mut results: Vec<u64> = Vec::new();
+        let mut offset: u64 = 0;
+        let mut scanned: usize = 0;
+        let mut tail: Vec<u8> = Vec::new();
+
+        while scanned < CODE_SCAN_LIMIT {
+            let remaining = CODE_SCAN_LIMIT - scanned;
+            let read_size = remaining.min(CODE_SCAN_CHUNK_SIZE);
+            let addr = base + offset;
+
+            let chunk = match self.reader.read_bytes(addr, read_size) {
+                Ok(bytes) => bytes,
+                Err(e) => {
+                    if scanned == 0 {
+                        return Err(Error::OffsetSearchFailed(format!(
+                            "Failed to read code section: {}",
+                            e
+                        )));
+                    }
+                    break;
+                }
+            };
+
+            let mut data = Vec::with_capacity(tail.len() + chunk.len());
+            data.extend_from_slice(&tail);
+            data.extend_from_slice(&chunk);
+
+            let data_base = addr.saturating_sub(tail.len() as u64);
+            results.extend(self.find_matches_with_wildcards(&data, data_base, pattern));
+
+            if pattern.len() > 1 {
+                let keep = pattern.len() - 1;
+                if data.len() >= keep {
+                    tail = data[data.len() - keep..].to_vec();
+                } else {
+                    tail = data;
+                }
+            } else {
+                tail.clear();
+            }
+
+            scanned += read_size;
+            offset += read_size as u64;
+        }
+
+        results.sort_unstable();
+        results.dedup();
+        Ok(results)
+    }
+
+    fn find_matches_with_wildcards(
+        &self,
+        buffer: &[u8],
+        base_addr: u64,
+        pattern: &[Option<u8>],
+    ) -> Vec<u64> {
+        if pattern.is_empty() || buffer.len() < pattern.len() {
+            return Vec::new();
+        }
+
+        let mut results = Vec::new();
+        let last = buffer.len() - pattern.len();
+
+        'outer: for i in 0..=last {
+            for (j, byte) in pattern.iter().enumerate() {
+                if let Some(value) = byte {
+                    if buffer[i + j] != *value {
+                        continue 'outer;
+                    }
+                }
+            }
+            results.push(base_addr + i as u64);
+        }
+
+        results
     }
 
     fn fetch_and_search(

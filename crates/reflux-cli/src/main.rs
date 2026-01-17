@@ -3,7 +3,7 @@ use clap::Parser;
 use reflux_core::{
     Config, CustomTypes, EncodingFixes, MemoryReader, OffsetDump, OffsetSearcher,
     OffsetsCollection, ProcessHandle, Reflux, RefluxApi, ScoreMap, SearchPrompter,
-    export_song_list, fetch_song_database_with_fixes, load_offsets, save_offsets,
+    export_song_list, fetch_song_database_with_fixes, load_offsets, load_signatures, save_offsets,
 };
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -223,17 +223,77 @@ async fn main() -> Result<()> {
 
                     let mut searcher = OffsetSearcher::new(&reader);
 
-                    // Step 1: Try automatic detection (unless --force-interactive)
-                    let search_result = if args.force_interactive {
-                        info!("Skipping automatic detection (--force-interactive)");
+                    // Step 1: Try signature-based detection (unless --force-interactive)
+                    let signature_result = if args.force_interactive {
+                        info!("Skipping signature-based detection (--force-interactive)");
                         None
                     } else {
-                        info!("Attempting automatic offset detection...");
-                        match searcher.search_all() {
-                            Ok(offsets) => Some(offsets),
-                            Err(e) => {
-                                info!("Automatic offset detection failed: {}", e);
+                        let signature_paths = ["offset-signatures.json", ".agent/offset-signatures.json"];
+                        let mut loaded = None;
+
+                        for path in signature_paths {
+                            match load_signatures(path) {
+                                Ok(signatures) => {
+                                    loaded = Some((path, signatures));
+                                    break;
+                                }
+                                Err(e) => {
+                                    if !e.is_not_found() {
+                                        warn!("Failed to load signature file {}: {}", path, e);
+                                    }
+                                }
+                            }
+                        }
+
+                        match loaded {
+                            Some((signature_path, signatures)) => {
+                                let signature_version = signatures.version.trim();
+                                let version_matches = signature_version.is_empty()
+                                    || signature_version == "*"
+                                    || signature_version == version;
+
+                                if !version_matches {
+                                    warn!(
+                                        "Signature file version mismatch (file: {}, game: {}), skipping",
+                                        signature_version, version
+                                    );
+                                    None
+                                } else {
+                                    info!(
+                                        "Attempting signature-based offset detection ({}).",
+                                        signature_path
+                                    );
+                                    match searcher.search_all_with_signatures(&signatures) {
+                                        Ok(offsets) => Some(offsets),
+                                        Err(e) => {
+                                            info!(
+                                                "Signature-based offset detection failed: {}",
+                                                e
+                                            );
+                                            None
+                                        }
+                                    }
+                                }
+                            }
+                            None => {
+                                info!("Signature file not found, skipping");
                                 None
+                            }
+                        }
+                    };
+
+                    // Step 2: Try automatic detection (unless --force-interactive)
+                    let search_result = match signature_result {
+                        Some(offsets) => Some(offsets),
+                        None if args.force_interactive => None,
+                        None => {
+                            info!("Attempting automatic offset detection...");
+                            match searcher.search_all() {
+                                Ok(offsets) => Some(offsets),
+                                Err(e) => {
+                                    info!("Automatic offset detection failed: {}", e);
+                                    None
+                                }
                             }
                         }
                     };
