@@ -55,7 +55,8 @@ impl GameStateDetector {
         judge_marker_55: i32,
         song_select_marker: i32,
     ) -> GameState {
-        let detected_state = self.detect_raw(judge_marker_54, judge_marker_55, song_select_marker);
+        let detected_state =
+            self.detect_raw(judge_marker_54, judge_marker_55, song_select_marker, self.last_state);
 
         // Validate state transition
         if !Self::is_valid_transition(self.last_state, detected_state) {
@@ -76,6 +77,7 @@ impl GameStateDetector {
         judge_marker_54: i32,
         judge_marker_55: i32,
         song_select_marker: i32,
+        last_state: GameState,
     ) -> GameState {
         // Check if playing (both markers must be non-zero)
         if judge_marker_54 != 0 && judge_marker_55 != 0 {
@@ -87,8 +89,12 @@ impl GameStateDetector {
             return GameState::SongSelect;
         }
 
-        // Default to result screen when not playing and not in song select
-        GameState::ResultScreen
+        // Playing から遷移した場合のみ ResultScreen とみなす
+        if last_state == GameState::Playing {
+            return GameState::ResultScreen;
+        }
+
+        GameState::Unknown
     }
 
     /// Reset state (e.g., when reconnecting to process)
@@ -177,6 +183,13 @@ mod tests {
         // song_select_marker == 1 means song select
         let state = detector.detect(0, 0, 1);
         assert_eq!(state, GameState::SongSelect);
+    }
+
+    #[test]
+    fn test_detect_unknown_when_idle() {
+        let mut detector = GameStateDetector::new();
+        let state = detector.detect(0, 0, 0);
+        assert_eq!(state, GameState::Unknown);
     }
 
     #[test]
