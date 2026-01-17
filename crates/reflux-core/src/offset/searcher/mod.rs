@@ -410,16 +410,11 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
     }
 
     fn probe_data_map_candidate(&self, addr: u64) -> Option<DataMapProbe> {
-        let base = self.reader.base_address();
         let null_obj = self.reader.read_u64(addr.wrapping_sub(16)).ok()?;
         let table_start = self.reader.read_u64(addr).ok()?;
         let table_end = self.reader.read_u64(addr + 8).ok()?;
 
         if table_end <= table_start {
-            return None;
-        }
-
-        if table_start < base || table_end < base {
             return None;
         }
 

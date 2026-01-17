@@ -188,18 +188,7 @@ impl OffsetDump {
             });
         }
 
-        if table_start < base || table_end < base {
-            return Some(DataMapDiagnostics {
-                status: "invalid range (below base)".to_string(),
-                null_obj: format!("0x{:X}", null_obj),
-                table_start: format!("0x{:X}", table_start),
-                table_end: format!("0x{:X}", table_end),
-                table_size: (table_end - table_start) as usize,
-                scanned_entries: 0,
-                non_null_entries: 0,
-                valid_node_samples: 0,
-            });
-        }
+        let below_base = table_start < base || table_end < base;
 
         let table_size = (table_end - table_start) as usize;
         let scan_size = table_size.min(0x4000);
@@ -249,8 +238,14 @@ impl OffsetDump {
             }
         }
 
+        let status = if below_base {
+            "ok (below base)".to_string()
+        } else {
+            "ok".to_string()
+        };
+
         Some(DataMapDiagnostics {
-            status: "ok".to_string(),
+            status,
             null_obj: format!("0x{:X}", null_obj),
             table_start: format!("0x{:X}", table_start),
             table_end: format!("0x{:X}", table_end),
