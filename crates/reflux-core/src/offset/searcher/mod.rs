@@ -966,9 +966,12 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         const KNOWN_OFFSETS: &[u64] = &[0x2C0, 0x2B0];
 
         // First, try known offsets (fast path)
+        // Use validate_play_data_address() which doesn't check distance from play_settings.
+        // This is necessary because known offsets (e.g., 0x2C0 = 704 bytes) may exceed
+        // the distance threshold in validate_play_data_at().
         for &offset in KNOWN_OFFSETS {
             let addr = play_settings + offset;
-            if self.validate_play_data_at(addr, play_settings) {
+            if let Ok(true) = self.validate_play_data_address(addr) {
                 debug!(
                     "  PlayData: selected 0x{:X} (known offset 0x{:X})",
                     addr, offset
