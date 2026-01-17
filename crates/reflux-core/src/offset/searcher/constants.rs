@@ -18,7 +18,7 @@
 //! │                                          │               │
 //! │                                          │ ~0x94E000     │
 //! │                                          ▼               │
-//! │  PlaySettings  ◄──── 0x2ACE00 ────► JudgeData ◄──(2)    │
+//! │  PlaySettings  ◄──── 0x2ACEE8 ────► JudgeData ◄──(2)    │
 //! │       │                                  │               │
 //! │       │ 0x2B0                           │ 0x1E4         │
 //! │       ▼                                  ▼               │
@@ -49,10 +49,10 @@ pub const MIN_EXPECTED_SONGS: usize = 1000;
 // Relative Offsets (derived from historical analysis of 9 versions)
 // ============================================================================
 
-/// Expected offset: judgeData - playSettings ≈ 0x2ACE00
+/// Expected offset: judgeData - playSettings ≈ 0x2ACEE8
 ///
 /// Historical variation: ±0x100 (256 bytes)
-pub const JUDGE_TO_PLAY_SETTINGS: u64 = 0x2ACE00;
+pub const JUDGE_TO_PLAY_SETTINGS: u64 = 0x2ACEE8;
 
 /// Search range for playSettings (±8KB)
 ///

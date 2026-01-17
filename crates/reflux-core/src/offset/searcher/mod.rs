@@ -803,7 +803,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             let expected_play_settings = candidate.saturating_sub(JUDGE_TO_PLAY_SETTINGS);
             let search_range = 0x100u64; // Allow ±256 bytes tolerance for offset variations
 
-            let mut found_play_settings = false;
+            let mut found_play_settings_addr: Option<u64> = None;
             let search_start = expected_play_settings.saturating_sub(search_range);
             let search_end = expected_play_settings.saturating_add(search_range);
 
@@ -811,16 +811,30 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             let mut pos = search_start & !3; // Align to 4 bytes
             while pos <= search_end {
                 if self.validate_play_settings_at(pos).is_some() {
-                    found_play_settings = true;
+                    found_play_settings_addr = Some(pos);
                     break;
                 }
                 pos += 4;
             }
 
-            if !found_play_settings {
+            let play_settings_addr = match found_play_settings_addr {
+                Some(addr) => addr,
+                None => {
+                    debug!(
+                        "  JudgeData candidate 0x{:X} rejected: no valid PlaySettings near 0x{:X}",
+                        candidate, expected_play_settings
+                    );
+                    continue;
+                }
+            };
+
+            // Chain validation: PlaySettings → PlayData
+            // If PlaySettings is found, verify that PlayData at expected position is in initial state
+            let expected_play_data = play_settings_addr + PLAY_SETTINGS_TO_PLAY_DATA;
+            if !self.validate_play_data_initial_state(expected_play_data) {
                 debug!(
-                    "  JudgeData candidate 0x{:X} rejected: no valid PlaySettings near 0x{:X}",
-                    candidate, expected_play_settings
+                    "  JudgeData candidate 0x{:X} rejected: PlayData at 0x{:X} not in initial state",
+                    candidate, expected_play_data
                 );
                 continue;
             }
@@ -1062,6 +1076,20 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         // Song ID should be positive and reasonable (< 100000)
         // Difficulty should be 0-9 (10 difficulty levels)
         song_id > 0 && song_id < 100000 && (0..=9).contains(&difficulty)
+    }
+
+    /// Validate if the given address contains PlayData in initial state (all zeros)
+    ///
+    /// This is used for chain validation during JudgeData detection.
+    /// In song select state, PlayData should be all zeros.
+    fn validate_play_data_initial_state(&self, addr: u64) -> bool {
+        let song_id = self.reader.read_i32(addr).unwrap_or(-1);
+        let difficulty = self.reader.read_i32(addr + 4).unwrap_or(-1);
+        let ex_score = self.reader.read_i32(addr + 8).unwrap_or(-1);
+        let miss_count = self.reader.read_i32(addr + 12).unwrap_or(-1);
+
+        // Initial state: all fields are zero
+        song_id == 0 && difficulty == 0 && ex_score == 0 && miss_count == 0
     }
 
     /// Validate if the given address contains valid CurrentSong data
