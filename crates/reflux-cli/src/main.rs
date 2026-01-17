@@ -48,6 +48,67 @@ impl SearchPrompter for CliPrompter {
     }
 }
 
+fn load_song_database_with_retry(
+    reader: &MemoryReader,
+    song_list: u64,
+    encoding_fixes: Option<&EncodingFixes>,
+) -> std::collections::HashMap<u32, reflux_core::SongInfo> {
+    const RETRY_DELAY_MS: u64 = 5000;
+    const EXTRA_DELAY_MS: u64 = 1000;
+    const MIN_EXPECTED_SONGS: usize = 1000;
+    const READY_SONG_ID: u32 = 80003;
+    const READY_DIFF_INDEX: usize = 3; // SPB, SPN, SPH, SPA, ...
+    const READY_MIN_NOTES: u32 = 10;
+
+    loop {
+        // データ初期化のタイミングに合わせて少し待つ
+        thread::sleep(Duration::from_millis(EXTRA_DELAY_MS));
+
+        match fetch_song_database_with_fixes(reader, song_list, encoding_fixes) {
+            Ok(db) => {
+                if db.len() < MIN_EXPECTED_SONGS {
+                    warn!(
+                        "Song list not fully populated ({} songs), retrying in {}s",
+                        db.len(),
+                        RETRY_DELAY_MS / 1000
+                    );
+                    thread::sleep(Duration::from_millis(RETRY_DELAY_MS));
+                    continue;
+                }
+
+                if let Some(song) = db.get(&READY_SONG_ID) {
+                    let notes = song.total_notes.get(READY_DIFF_INDEX).copied().unwrap_or(0);
+                    if notes < READY_MIN_NOTES {
+                        warn!(
+                            "Notecount data seems bad (song {}, notes {}), retrying in {}s",
+                            READY_SONG_ID,
+                            notes,
+                            RETRY_DELAY_MS / 1000
+                        );
+                        thread::sleep(Duration::from_millis(RETRY_DELAY_MS));
+                        continue;
+                    }
+                } else {
+                    warn!(
+                        "Song {} not found in song list, accepting current list",
+                        READY_SONG_ID
+                    );
+                }
+
+                return db;
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to load song database ({}), retrying in {}s",
+                    e,
+                    RETRY_DELAY_MS / 1000
+                );
+                thread::sleep(Duration::from_millis(RETRY_DELAY_MS));
+            }
+        }
+    }
+}
+
 #[derive(Parser)]
 #[command(name = "reflux")]
 #[command(about = "INFINITAS score tracker", version)]
@@ -380,20 +441,12 @@ async fn main() -> Result<()> {
 
                 // Load song database from game memory
                 info!("Loading song database...");
-                let song_db = match fetch_song_database_with_fixes(
+                let song_db = load_song_database_with_retry(
                     &reader,
                     reflux.offsets().song_list,
                     encoding_fixes.as_ref(),
-                ) {
-                    Ok(db) => {
-                        info!("Loaded {} songs", db.len());
-                        db
-                    }
-                    Err(e) => {
-                        warn!("Failed to load song database: {}", e);
-                        std::collections::HashMap::new()
-                    }
-                };
+                );
+                info!("Loaded {} songs", song_db.len());
                 reflux.set_song_db(song_db.clone());
 
                 // Output song list for debugging if configured
