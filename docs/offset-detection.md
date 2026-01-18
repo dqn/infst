@@ -1,168 +1,53 @@
-# オフセット自動検出の挑戦記録
+# オフセット自動検出（現行実装）
 
 ## 概要
 
-beatmania IIDX INFINITAS のスコアトラッカー reflux-rs において、ゲーム更新時に必要な offsets.txt の手動更新を自動化しようと試みた記録。
+reflux-rs の CLI は、**組み込みシグネチャ（AOB スキャン）**で主要オフセットを検出し、
+残りは **データパターン検索**で補います。`offsets.txt` は CLI では読み込まれません。
 
-## 実装したもの（v0.1.19 時点）
+## CLI の挙動
 
-### CLI オプション
-- `--debug-offsets`: 詳細なデバッグログ出力
-- `--dump-offsets`: オフセット情報を JSON 出力
-- `--force-interactive`: 自動検出をスキップしてインタラクティブ検索を強制
+- オフセットが無効な場合に署名ベース検出を実行（初回接続時は必ず実行）
+- `offsets.txt` は未使用、CLI 引数も未実装
+- 検出に失敗するとエラー終了
+- バージョン検出に成功した場合、検出結果の `version` に反映
 
-### 自動検出の構造（search_all）
+## 検出フェーズ（`search_all_with_signatures`）
 
-```
-Phase 1: 静的パターン検索（高信頼度）
-  - SongList: "P2D:J:B:A:" パターン（最後のマッチ）
-  - UnlockData: (1000, 1, 462) パターン
-  - DataMap: (0x7FFFF, 0) パターン
+1. **SongList（署名）**
+   - 候補を取得し、**曲数が 1000 以上**かで検証
+2. **JudgeData（署名）**
+   - `STATE_MARKER` が 0〜100 に収まるかで検証
+3. **PlaySettings（署名）**
+   - スタイル/ゲージ/アシスト等が有効範囲にあるかで検証
+4. **PlayData（署名）**
+   - 曲 ID / 難易度 / EX / ミス数が妥当かを検証（全ゼロは許容）
+5. **CurrentSong（署名）**
+   - 曲 ID / 難易度の範囲と「2 の冪」を除外するヒューリスティック
+6. **DataMap / UnlockData（パターン）**
+   - DataMap: base から探索、失敗時は SongList 近傍を探索
+   - UnlockData: 固定パターンの **最後の一致**を採用
 
-Phase 2: 初期状態パターン検索（中信頼度）
-  - JudgeData: 72バイトゼロ + STATE_MARKER検証
-  - PlaySettings: 1i32 マーカー + 範囲検証
+## 検証ロジック（`validate_signature_offsets`）
 
-Phase 3: 固定オフセット計算
-  - PlayData = PlaySettings + 0x2B0
-  - CurrentSong = JudgeData + 0x1F4
+以下の**相対オフセット**に近いことを確認します（値は `constants.rs` で定義）。
 
-Phase 4-5: 検証
-```
+- `judgeData - playSettings ≈ 0x2ACEE8`（±0x2000）
+- `songList - judgeData ≈ 0x94E3C8`（±0x10000）
+- `playData - playSettings ≈ 0x2C0`（±0x100）
+  - 2025122400 以降: 0x2C0
+  - それ以前: 0x2B0
+- `currentSong - judgeData ≈ 0x160`（±0x100）
 
-## 発見した問題
+## 既知の制約
 
-### 1. 固定オフセットはバージョンで変わる
-
-**過去バージョン（2024〜2025前半）:**
-```
-playData - playSettings = 0x2B0 (688)
-currentSong - judgeData = 0x1F4 (500)
-```
-
-**2025122400（最新）:**
-```
-playData - playSettings = 0x2C0 (704)  ← 変わった！
-currentSong - judgeData = 0x1E4 (484)  ← 変わった！
-```
-
-### 2. 「最後のマッチ」戦略が常に正しいわけではない
-
-自動検出と正しい値の比較:
-```
-SongList:
-  自動検出: 0x14353AF38（最後のマッチ）
-  正しい値: 0x14315A380（最後ではない）
-```
-
-C# のコメント「最初の2つは2016-build参照」が常に正しいわけではない。
-
-### 3. JudgeData の72バイトゼロパターンは誤検出しやすい
-
-- 2MB 範囲で 1,766,666 個の候補が見つかる
-- STATE_MARKER 検証でも絞り切れない
-- DataMap との距離検証（1-15MB）も不正確
-
-### 4. 自動検出が「成功」しても間違っている
-
-検出は完了するが、以下の問題が発生:
-- `Loaded 1 songs`（本来は数千曲）
-- `capacity overflow` でクラッシュ
-
-## データ比較
-
-### 自動検出 vs インタラクティブ（2025122400）
-
-| オフセット | 自動検出（❌） | インタラクティブ（✓） |
-|-----------|--------------|---------------------|
-| song_list | 0x14353AF38 | 0x14315A380 |
-| judge_data | 0x143CD1966 | 0x14280C00C |
-| play_settings | 0x143E7F488 | 0x14255F124 |
-| play_data | 0x143E7F738 | 0x14255F3E4 |
-| current_song | 0x143CD1B5A | 0x14280C1F0 |
-
-### オフセット関係の変遷
-
-| バージョン | playData - playSettings | currentSong - judgeData |
-|-----------|------------------------|------------------------|
-| 2024042400 | 0x2B0 | 0x1F4 |
-| 2024052200 | 0x2B0 | 0x1F4 |
-| 2025082000 | 0x2B0 | 0x1F4 |
-| 2025101500 | 0x2B0 | 0x1F4 |
-| **2025122400** | **0x2C0** | **0x1E4** |
-
-## 学んだこと
-
-1. **固定オフセットは信用できない** - ゲーム更新で構造体サイズが変わる
-2. **パターン検索は誤検出が多い** - 特にゼロパターンは大量にマッチする
-3. **「最後のマッチ」は万能ではない** - バージョンによって変わる
-4. **検出成功 ≠ 正しい検出** - 検証が不十分だと間違った値で進んでしまう
-5. **診断ツールは必須** - `--dump-offsets` なしでは問題特定が困難
-
-## 次のセッションへの提案
-
-### アプローチ A: バージョン別ヒントファイル
-
-```json
-{
-  "P2D:J:B:A:2025122400": {
-    "play_data_from_play_settings": 704,
-    "current_song_from_judge_data": 484
-  },
-  "P2D:J:B:A:2025101500": {
-    "play_data_from_play_settings": 688,
-    "current_song_from_judge_data": 500
-  }
-}
-```
-
-新バージョンではインタラクティブ検索 → 結果をヒントファイルに追加。
-
-### アプローチ B: 検証強化
-
-1. SongList 検出後、実際に曲を読み込んでみて数千曲あるか確認
-2. 数曲しか読めない場合は検出失敗として別のマッチを試す
-3. 全マッチを記録し、検証に通るものを選択
-
-### アプローチ C: インタラクティブ検索のみに戻す
-
-自動検出の信頼性が低いため、インタラクティブ検索のみをサポートし、結果を offsets.txt に保存するシンプルな構成に戻す。
-
-### アプローチ D: コードシグネチャ（AOB）で検出する
-
-データパターンではなく、コード中の RIP 相対参照を使ってオフセットを復元する方式。
-構造体サイズの変化に強く、誤検出も大幅に減る。
-
-`offset-signatures.json` の例:
-
-```json
-{
-  "version": "P2D:J:B:A:2025122400",
-  "entries": [
-    {
-      "name": "songList",
-      "signatures": [
-        { "pattern": "48 8D 0D ?? ?? ?? ??", "instr_offset": 0, "disp_offset": 3, "instr_len": 7, "deref": false, "addend": 0 }
-      ]
-    },
-    {
-      "name": "judgeData",
-      "signatures": [
-        { "pattern": "48 8B 0D ?? ?? ?? ??", "instr_offset": 0, "disp_offset": 3, "instr_len": 7, "deref": true, "addend": 0 }
-      ]
-    }
-  ]
-}
-```
-
-- `deref=true` は `mov r?, [rip+disp]` で指す「ポインタの先」を使う場合に指定
-- `addend` は最終アドレスに足す調整値
-- 検索対象のファイルは `offset-signatures.json`（優先）か `.agent/offset-signatures.json`
+- DataMap / UnlockData はデータパターン依存のため誤検出リスクが残る
+- CLI は外部 `offset-signatures.json` を読み込まない（`load_signatures` はライブラリ側に存在）
+- インタラクティブ検索はライブラリにあるが、CLI からは未配線
 
 ## 関連ファイル
 
-- `crates/reflux-core/src/offset/searcher/mod.rs` - 検索ロジック
-- `crates/reflux-core/src/offset/signature.rs` - AOB シグネチャ定義
-- `crates/reflux-core/src/offset/dump.rs` - 診断ダンプ
-- `crates/reflux-cli/src/main.rs` - CLI エントリポイント
-- 参照: https://github.com/olji/Reflux/commits/master/Reflux/offsets.txt
+- `crates/reflux-core/src/offset/searcher/mod.rs`
+- `crates/reflux-core/src/offset/searcher/constants.rs`
+- `crates/reflux-core/src/offset/signature.rs`
+- `crates/reflux-core/src/offset/loader.rs`

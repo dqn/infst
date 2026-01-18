@@ -8,11 +8,11 @@
 
 - **メモリ読み取り**: INFINITAS プロセスから直接ゲームデータを読み取り
 - **スコア記録**: 判定、スコア、クリアランプを含むプレイ結果を記録
-- **オフセット自動検索**: ゲームアップデート時にメモリオフセットを自動検出
-- **ローカル保存**: TSV/JSON ファイルにスコアを保存
-- **リモート同期**: リモートサーバにスコアを同期
-- **Kamaitachi 連携**: [Kamaitachi](https://kamai.tachi.ac/) へのスコア送信に対応
-- **OBS 配信対応**: 現在の楽曲情報やプレイ状態をテキストファイルに出力
+- **署名ベースのオフセット検出**: AOB スキャン + 残りはパターン検索
+- **ローカル保存**: TSV セッション（デフォルト）、tracker.db、tracker.tsv、unlockdb
+- **任意の出力**: JSON セッション、latest-*.txt、楽曲情報ファイル（設定で有効化）
+- **リモート同期（任意）**: カスタムサーバ API（設定で有効化）
+- **サポートファイル**: `encodingfixes.txt` / `customtypes.txt`（任意）
 
 ## 本家 Reflux との機能比較
 
@@ -20,24 +20,24 @@
 |----------|------|-----------|---------------|------|
 | **コア** | メモリ読み取り | ✅ | ✅ | |
 | | ゲーム状態検出 | ✅ | ✅ | |
-| | オフセット自動検索 | ✅ | ✅ | 多段階検索で強化 |
+| | オフセット自動検索 | ✅ | ✅ | 署名 (AOB) + パターン検索 |
 | | バージョン検出 | ✅ | ✅ | |
 | **データ** | プレイデータ | ✅ | ✅ | スコア、ランプ、グレード |
 | | 判定データ | ✅ | ✅ | P1/P2、Fast/Slow |
 | | 設定 | ✅ | ✅ | スタイル、ゲージ、アシスト、H-RAN |
 | | アンロック追跡 | ✅ | ✅ | |
 | **保存** | TSV セッション | ✅ | ✅ | |
-| | JSON セッション | ✅ | ✅ | |
+| | JSON セッション | ✅ | ✅ | 設定で有効化 |
 | | トラッカー DB | ✅ | ✅ | ベストスコア |
 | | アンロック DB | ✅ | ✅ | |
 | **リモート** | サーバー同期 | ✅ | ✅ | |
-| | ファイル更新 | ✅ | ✅ | オフセット、サポートファイル |
-| | Kamaitachi | ⚠️ | ⚠️ | 楽曲検索のみ |
+| | ファイル更新 | ✅ | ⚠️ | API はあるが CLI から未呼び出し |
+| | Kamaitachi | ⚠️ | ⚠️ | 楽曲検索ヘルパーのみ（ライブラリ） |
 | **配信** | playstate/marquee | ✅ | ✅ | |
-| | latest-*.txt | ✅ | ✅ | |
-| | 楽曲情報ファイル | ✅ | ✅ | |
-| **設定** | INI 設定 | ✅ | ✅ | 全セクション |
-| **追加** | GitHub 更新チェック | ❌ | ✅ | Rust のみ |
+| | latest-*.txt | ✅ | ✅ | 設定で有効化 |
+| | 楽曲情報ファイル | ✅ | ✅ | 設定で有効化 |
+| **設定** | INI 設定 | ✅ | ⚠️ | パーサのみ、CLI はデフォルト固定 |
+| **追加** | GitHub 更新チェック | ❌ | ❌ | 未配線 |
 
 ✅ = 実装済み, ⚠️ = 部分実装, ❌ = 未実装
 
@@ -65,51 +65,53 @@ cargo build --release
 # デフォルト設定で実行
 reflux
 
-# 設定ファイルとオフセットファイルを指定
-reflux --config config.ini --offsets offsets.txt
-
 # ヘルプを表示
 reflux --help
 ```
 
-### コマンドラインオプション
+現在の CLI について:
+- CLI 引数は未定義で、常にデフォルト設定で動きます。
+- `config.ini` は **読み込まれません**（パーサは core にあります）。
+- オフセットは組み込みシグネチャで解決し、`offsets.txt` は読み込みません。
 
-| オプション | デフォルト | 説明 |
-|-----------|-----------|------|
-| `-c, --config` | `config.ini` | 設定ファイルのパス |
-| `-o, --offsets` | `offsets.txt` | オフセットファイルのパス |
-| `-t, --tracker` | `tracker.db` | トラッカーデータベースのパス |
+CLI が使うファイル:
+- トラッカー DB: `tracker.db`
+- トラッカー出力: `tracker.tsv`（選曲画面と切断時に出力）
+- アンロック DB: `unlockdb`
+- セッション: `sessions/Session_YYYY_MM_DD_HH_MM_SS.tsv`
+- 任意のサポートファイル: `encodingfixes.txt`, `customtypes.txt`
+- 任意のデバッグ出力: `songs.tsv`（`debug.outputdb = true`）
 
-## 設定
+## 設定（パーサはあるが CLI では未使用）
 
-`config.ini` ファイルを作成:
+`Config::load` で読み込めますが、現状の CLI は `Config::default()` 固定です。
 
 ```ini
 [Update]
 updatefiles = true
-updateserver = https://example.com
+updateserver = https://raw.githubusercontent.com/olji/Reflux/master/Reflux
 
 [Record]
 saveremote = false
 savelocal = true
-savejson = true
+savejson = false
 savelatestjson = false
-savelatesttxt = true
+savelatesttxt = false
 
 [RemoteRecord]
-serveraddress = https://example.com
+serveraddress =
 apikey = your-api-key
 
 [LocalRecord]
-songinfo = true
-chartdetails = true
-resultdetails = true
-judge = true
-settings = true
+songinfo = false
+chartdetails = false
+resultdetails = false
+judge = false
+settings = false
 
 [Livestream]
-playstate = true
-marquee = true
+playstate = false
+marquee = false
 fullsonginfo = false
 marqueeidletext = INFINITAS
 
@@ -117,9 +119,12 @@ marqueeidletext = INFINITAS
 outputdb = false
 ```
 
-## オフセットファイル
+## オフセット
 
-`offsets.txt` ファイルにはゲームデータを読み取るためのメモリアドレスが含まれます:
+CLI は組み込みシグネチャでオフセットを検出し、`offsets.txt` は読み込みません。
+core ライブラリでは `load_offsets`/`save_offsets` が利用できます。
+
+`offsets.txt` の形式（先頭行はバージョン）:
 
 ```
 P2D:J:B:A:2025010100
@@ -132,7 +137,7 @@ unlockData = 0x12345678
 currentSong = 0x12345678
 ```
 
-ゲームがアップデートされてオフセットが変わった場合、Reflux は自動的に新しいオフセットを検索します。
+CLI は起動時にオフセットが無効な場合、署名ベースで検出を試みます。
 
 ## プロジェクト構成
 
@@ -149,7 +154,8 @@ reflux-rs/
 │   │       ├── offset/     # オフセット管理
 │   │       ├── storage/    # ローカル永続化
 │   │       ├── stream/     # OBS 配信出力
-│   │       └── reflux.rs   # メイントラッカーロジック
+│   │       ├── reflux/     # メイントラッカーロジック
+│   │       └── error.rs    # エラー型
 │   │
 │   └── reflux-cli/         # CLI アプリケーション
 │       └── src/main.rs
@@ -160,16 +166,27 @@ reflux-rs/
 ### セッションファイル
 
 プレイデータは `sessions/Session_YYYY_MM_DD_HH_MM_SS.tsv` に保存されます。
+`savejson = true` の場合、`sessions/Session_YYYY_MM_DD_HH_MM_SS.json` も出力されます。
 
-### 配信用ファイル（OBS 用）
+### 配信用ファイル（OBS 用、設定で有効化）
 
 | ファイル | 説明 |
 |---------|------|
 | `playstate.txt` | 現在の状態: `menu`、`play`、`off` |
 | `marquee.txt` | 現在の楽曲タイトルまたはステータス |
-| `latest.txt` | 最新のプレイ結果 |
+| `latest.json` | 最新のプレイ結果（post form JSON） |
+| `latest.txt` | 最新のプレイ結果（3 行: タイトル/グレード/ランプ） |
 | `latest-grade.txt` | 最新のグレード（AAA、AA など） |
-| `latest-lamp.txt` | 最新のクリアランプ |
+| `latest-lamp.txt` | 最新のクリアランプ（展開名） |
+| `latest-difficulty.txt` | 最新の難易度短縮名 |
+| `latest-difficulty-color.txt` | 難易度カラーコード |
+| `latest-titleenglish.txt` | 英題 |
+| `title.txt` | 曲名 |
+| `artist.txt` | アーティスト |
+| `englishtitle.txt` | 英題 |
+| `genre.txt` | ジャンル |
+| `folder.txt` | フォルダ番号 |
+| `level.txt` | レベル |
 
 ## 開発
 

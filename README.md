@@ -8,11 +8,11 @@ A Rust reimplementation of [Reflux](https://github.com/olji/Reflux), a score tra
 
 - **Memory Reading**: Reads game data directly from the INFINITAS process
 - **Score Tracking**: Records play results including judgments, scores, and clear lamps
-- **Auto Offset Search**: Automatically finds memory offsets when game updates
-- **Local Storage**: Saves scores to TSV/JSON files
-- **Remote Sync**: Syncs scores to remote servers
-- **Kamaitachi Integration**: Supports [Kamaitachi](https://kamai.tachi.ac/) score submission
-- **OBS Streaming**: Outputs current song info and play state to text files for OBS
+- **Signature-based Offset Detection**: AOB scan + pattern search for remaining offsets
+- **Local Storage**: TSV sessions (default), tracker.db, tracker.tsv, unlockdb
+- **Optional Outputs**: JSON sessions, latest-*.txt, and full song info files (config)
+- **Remote Sync (optional)**: Custom server API (config)
+- **Support Files**: Optional `encodingfixes.txt` / `customtypes.txt`
 
 ## Feature Comparison with Original Reflux
 
@@ -20,24 +20,24 @@ A Rust reimplementation of [Reflux](https://github.com/olji/Reflux), a score tra
 |----------|---------|---------------|-------------|-------|
 | **Core** | Memory reading | ✅ | ✅ | |
 | | Game state detection | ✅ | ✅ | |
-| | Auto offset search | ✅ | ✅ | Enhanced multi-phase search |
+| | Auto offset search | ✅ | ✅ | Signature (AOB) + pattern search |
 | | Version detection | ✅ | ✅ | |
 | **Data** | Play data | ✅ | ✅ | Score, lamp, grade |
 | | Judge data | ✅ | ✅ | P1/P2, Fast/Slow |
 | | Settings | ✅ | ✅ | Style, gauge, assist, H-RAN |
 | | Unlock tracking | ✅ | ✅ | |
 | **Storage** | TSV session | ✅ | ✅ | |
-| | JSON session | ✅ | ✅ | |
+| | JSON session | ✅ | ✅ | Optional (config) |
 | | Tracker DB | ✅ | ✅ | Best scores |
 | | Unlock DB | ✅ | ✅ | |
 | **Remote** | Server sync | ✅ | ✅ | |
-| | File updates | ✅ | ✅ | Offsets, support files |
-| | Kamaitachi | ⚠️ | ⚠️ | Song search only |
+| | File updates | ✅ | ⚠️ | API exists, CLI does not call it |
+| | Kamaitachi | ⚠️ | ⚠️ | Song search helper only (library) |
 | **Stream** | playstate/marquee | ✅ | ✅ | |
-| | latest-*.txt | ✅ | ✅ | |
-| | Song info files | ✅ | ✅ | |
-| **Config** | INI config | ✅ | ✅ | All sections |
-| **Extra** | GitHub update check | ❌ | ✅ | Rust only |
+| | latest-*.txt | ✅ | ✅ | Optional (config) |
+| | Song info files | ✅ | ✅ | Optional (config) |
+| **Config** | INI config | ✅ | ⚠️ | Parser exists, CLI uses defaults |
+| **Extra** | GitHub update check | ❌ | ❌ | Not wired |
 
 ✅ = Implemented, ⚠️ = Partial, ❌ = Not implemented
 
@@ -65,51 +65,54 @@ The binary will be at `target/release/reflux.exe`.
 # Run with default settings
 reflux
 
-# Specify config and offsets files
-reflux --config config.ini --offsets offsets.txt
-
 # Show help
 reflux --help
 ```
 
-### Command Line Options
+Current CLI notes:
+- No CLI flags are defined yet; the binary always uses built-in defaults.
+- `config.ini` is **not** read by the CLI (parser exists in the core library).
+- Offsets are resolved via built-in signatures; `offsets.txt` is not loaded.
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `-c, --config` | `config.ini` | Path to configuration file |
-| `-o, --offsets` | `offsets.txt` | Path to offsets file |
-| `-t, --tracker` | `tracker.db` | Path to tracker database |
+Default file paths used by the CLI:
+- Tracker DB: `tracker.db`
+- Tracker export: `tracker.tsv` (exported on song select and on disconnect)
+- Unlock DB: `unlockdb`
+- Sessions: `sessions/Session_YYYY_MM_DD_HH_MM_SS.tsv`
+- Optional support files: `encodingfixes.txt`, `customtypes.txt`
+- Optional debug output: `songs.tsv` (requires `debug.outputdb = true` in config)
 
-## Configuration
+## Configuration (parser exists, CLI does not load it yet)
 
-Create a `config.ini` file:
+You can parse this format via `Config::load`, but the current CLI always uses
+`Config::default()` and never reads `config.ini`.
 
 ```ini
 [Update]
 updatefiles = true
-updateserver = https://example.com
+updateserver = https://raw.githubusercontent.com/olji/Reflux/master/Reflux
 
 [Record]
 saveremote = false
 savelocal = true
-savejson = true
+savejson = false
 savelatestjson = false
-savelatesttxt = true
+savelatesttxt = false
 
 [RemoteRecord]
-serveraddress = https://example.com
+serveraddress =
 apikey = your-api-key
 
 [LocalRecord]
-songinfo = true
-chartdetails = true
-resultdetails = true
-judge = true
-settings = true
+songinfo = false
+chartdetails = false
+resultdetails = false
+judge = false
+settings = false
 
 [Livestream]
-playstate = true
-marquee = true
+playstate = false
+marquee = false
 fullsonginfo = false
 marqueeidletext = INFINITAS
 
@@ -117,9 +120,13 @@ marqueeidletext = INFINITAS
 outputdb = false
 ```
 
-## Offsets File
+## Offsets
 
-The `offsets.txt` file contains memory addresses for reading game data:
+The CLI resolves offsets using built-in code signatures (AOB scan) and pattern
+search. It does **not** load `offsets.txt` at runtime. The core library can
+parse/save the file if you wire it in.
+
+`offsets.txt` format (first line is version):
 
 ```
 P2D:J:B:A:2025010100
@@ -132,7 +139,7 @@ unlockData = 0x12345678
 currentSong = 0x12345678
 ```
 
-When the game updates and offsets change, Reflux will attempt to automatically find new offsets.
+On startup, the CLI attempts signature-based detection whenever offsets are invalid.
 
 ## Project Structure
 
@@ -149,7 +156,8 @@ reflux-rs/
 │   │       ├── offset/     # Offset management
 │   │       ├── storage/    # Local persistence
 │   │       ├── stream/     # OBS streaming output
-│   │       └── reflux.rs   # Main tracker logic
+│   │       ├── reflux/     # Main tracker logic
+│   │       └── error.rs    # Error types
 │   │
 │   └── reflux-cli/         # CLI application
 │       └── src/main.rs
@@ -160,16 +168,28 @@ reflux-rs/
 ### Session Files
 
 Play data is saved to `sessions/Session_YYYY_MM_DD_HH_MM_SS.tsv`.
+When `savejson = true`, a JSON session is also written to
+`sessions/Session_YYYY_MM_DD_HH_MM_SS.json`.
 
-### Streaming Files (for OBS)
+### Streaming/OBS Files (only when enabled in config)
 
 | File | Description |
 |------|-------------|
 | `playstate.txt` | Current state: `menu`, `play`, or `off` |
 | `marquee.txt` | Current song title or status |
-| `latest.txt` | Latest play result |
+| `latest.json` | Latest play result (post form JSON) |
+| `latest.txt` | Latest play result (3 lines: title/grade/lamp) |
 | `latest-grade.txt` | Latest grade (AAA, AA, etc.) |
-| `latest-lamp.txt` | Latest clear lamp |
+| `latest-lamp.txt` | Latest clear lamp (expanded name) |
+| `latest-difficulty.txt` | Latest difficulty short name |
+| `latest-difficulty-color.txt` | Difficulty color code |
+| `latest-titleenglish.txt` | English title |
+| `title.txt` | Song title |
+| `artist.txt` | Artist |
+| `englishtitle.txt` | English title |
+| `genre.txt` | Genre |
+| `folder.txt` | Folder number |
+| `level.txt` | Difficulty level |
 
 ## Development
 
