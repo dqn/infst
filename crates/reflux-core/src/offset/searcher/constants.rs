@@ -39,7 +39,7 @@
 
 /// Initial buffer size for memory search (2MB)
 pub const INITIAL_SEARCH_SIZE: usize = 2 * 1024 * 1024;
-/// Maximum buffer size for memory search (300MB)
+/// Maximum half-window size for memory search (total read size is 2x)
 pub const MAX_SEARCH_SIZE: usize = 300 * 1024 * 1024;
 
 /// Code scan chunk size for signature search (4MB)

@@ -62,13 +62,16 @@ pub fn parse_pattern(pattern: &str) -> Result<Vec<Option<u8>>> {
             continue;
         }
 
-        let value = u8::from_str_radix(token, 16)
-            .map_err(|e| Error::InvalidOffset(format!("Invalid signature token '{}': {}", token, e)))?;
+        let value = u8::from_str_radix(token, 16).map_err(|e| {
+            Error::InvalidOffset(format!("Invalid signature token '{}': {}", token, e))
+        })?;
         bytes.push(Some(value));
     }
 
     if bytes.is_empty() {
-        return Err(Error::InvalidOffset("Signature pattern is empty".to_string()));
+        return Err(Error::InvalidOffset(
+            "Signature pattern is empty".to_string(),
+        ));
     }
 
     Ok(bytes)

@@ -139,7 +139,7 @@ impl OffsetDump {
                     scanned_entries: 0,
                     non_null_entries: 0,
                     valid_node_samples: 0,
-                })
+                });
             }
         };
 
@@ -155,7 +155,7 @@ impl OffsetDump {
                     scanned_entries: 0,
                     non_null_entries: 0,
                     valid_node_samples: 0,
-                })
+                });
             }
         };
 
@@ -171,7 +171,7 @@ impl OffsetDump {
                     scanned_entries: 0,
                     non_null_entries: 0,
                     valid_node_samples: 0,
-                })
+                });
             }
         };
 
@@ -205,7 +205,7 @@ impl OffsetDump {
                     scanned_entries: 0,
                     non_null_entries: 0,
                     valid_node_samples: 0,
-                })
+                });
             }
         };
 

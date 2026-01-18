@@ -55,8 +55,12 @@ impl GameStateDetector {
         judge_marker_55: i32,
         song_select_marker: i32,
     ) -> GameState {
-        let detected_state =
-            self.detect_raw(judge_marker_54, judge_marker_55, song_select_marker, self.last_state);
+        let detected_state = self.detect_raw(
+            judge_marker_54,
+            judge_marker_55,
+            song_select_marker,
+            self.last_state,
+        );
 
         // Validate state transition
         if !Self::is_valid_transition(self.last_state, detected_state) {

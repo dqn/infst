@@ -18,6 +18,7 @@ use utils::is_power_of_two;
 pub use utils::merge_byte_representations;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct DataMapProbe {
     addr: u64,
     table_start: u64,
@@ -30,8 +31,15 @@ struct DataMapProbe {
 
 impl DataMapProbe {
     fn is_better_than(&self, other: &Self) -> bool {
-        (self.valid_nodes, self.non_null_entries, usize::MAX - self.table_size)
-            > (other.valid_nodes, other.non_null_entries, usize::MAX - other.table_size)
+        (
+            self.valid_nodes,
+            self.non_null_entries,
+            usize::MAX - self.table_size,
+        ) > (
+            other.valid_nodes,
+            other.non_null_entries,
+            usize::MAX - other.table_size,
+        )
     }
 }
 
@@ -59,12 +67,14 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         signatures: &OffsetSignatureSet,
     ) -> Result<OffsetsCollection> {
         info!("Starting signature-based offset detection...");
-        let mut offsets = OffsetsCollection::default();
-
-        offsets.version = if signatures.version.trim().is_empty() {
+        let version = if signatures.version.trim().is_empty() {
             "unknown".to_string()
         } else {
             signatures.version.clone()
+        };
+        let mut offsets = OffsetsCollection {
+            version,
+            ..Default::default()
         };
 
         // Phase 1: SongList (anchor)
@@ -145,13 +155,22 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         if !self.validate_judge_data_candidate(offsets.judge_data) {
             return false;
         }
-        if self.validate_play_settings_at(offsets.play_settings).is_none() {
+        if self
+            .validate_play_settings_at(offsets.play_settings)
+            .is_none()
+        {
             return false;
         }
-        if !self.validate_play_data_address(offsets.play_data).unwrap_or(false) {
+        if !self
+            .validate_play_data_address(offsets.play_data)
+            .unwrap_or(false)
+        {
             return false;
         }
-        if !self.validate_current_song_address(offsets.current_song).unwrap_or(false) {
+        if !self
+            .validate_current_song_address(offsets.current_song)
+            .unwrap_or(false)
+        {
             return false;
         }
 
@@ -274,7 +293,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         }
 
         Err(Error::OffsetSearchFailed(format!(
-            "Pattern not found within {} MB",
+            "Pattern not found within +/-{} MB",
             MAX_SEARCH_SIZE / 1024 / 1024
         )))
     }
@@ -366,10 +385,10 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         }
 
         let table_size = (table_end - table_start) as usize;
-        if table_size < DATA_MAP_MIN_TABLE_BYTES || table_size > DATA_MAP_MAX_TABLE_BYTES {
+        if !(DATA_MAP_MIN_TABLE_BYTES..=DATA_MAP_MAX_TABLE_BYTES).contains(&table_size) {
             return None;
         }
-        if table_size % 8 != 0 {
+        if !table_size.is_multiple_of(8) {
             return None;
         }
 
@@ -455,10 +474,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         true
     }
 
-    fn search_song_list_by_signature(
-        &self,
-        signatures: &OffsetSignatureSet,
-    ) -> Result<u64> {
+    fn search_song_list_by_signature(&self, signatures: &OffsetSignatureSet) -> Result<u64> {
         let entry = signatures.entry("songList").ok_or_else(|| {
             Error::OffsetSearchFailed("Signature entry 'songList' not found".to_string())
         })?;
@@ -468,7 +484,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             let mut best: Option<(u64, usize)> = None;
 
             for addr in candidates {
-                if addr % 4 != 0 {
+                if !addr.is_multiple_of(4) {
                     continue;
                 }
                 let song_count = self.count_songs_at_address(addr);
@@ -517,7 +533,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             let candidates = self.resolve_signature_targets(signature)?;
             let mut valid: Vec<u64> = candidates
                 .into_iter()
-                .filter(|addr| *addr % 4 == 0)
+                .filter(|addr| addr.is_multiple_of(4))
                 .filter(|addr| validate(self, *addr))
                 .collect();
 
@@ -542,7 +558,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
     }
 
     fn validate_judge_data_candidate(&self, addr: u64) -> bool {
-        if addr % 4 != 0 {
+        if !addr.is_multiple_of(4) {
             return false;
         }
 
@@ -572,7 +588,8 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                 Err(_) => continue,
             };
 
-            let disp = i32::from_le_bytes([disp_bytes[0], disp_bytes[1], disp_bytes[2], disp_bytes[3]]);
+            let disp =
+                i32::from_le_bytes([disp_bytes[0], disp_bytes[1], disp_bytes[2], disp_bytes[3]]);
             let next_ip = instr_addr + signature.instr_len as u64;
             let mut target = next_ip.wrapping_add_signed(disp as i64);
 
@@ -664,10 +681,10 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
 
         'outer: for i in 0..=last {
             for (j, byte) in pattern.iter().enumerate() {
-                if let Some(value) = byte {
-                    if buffer[i + j] != *value {
-                        continue 'outer;
-                    }
+                if let Some(value) = byte
+                    && buffer[i + j] != *value
+                {
+                    continue 'outer;
                 }
             }
             results.push(base_addr + i as u64);
@@ -698,7 +715,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         }
 
         Err(Error::OffsetSearchFailed(format!(
-            "Pattern not found within {} MB",
+            "Pattern not found within +/-{} MB",
             MAX_SEARCH_SIZE / 1024 / 1024
         )))
     }
@@ -731,7 +748,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
 
         if last_matches.is_empty() {
             return Err(Error::OffsetSearchFailed(format!(
-                "Pattern not found within {} MB",
+                "Pattern not found within +/-{} MB",
                 MAX_SEARCH_SIZE / 1024 / 1024
             )));
         }
@@ -769,7 +786,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         }
 
         Err(Error::OffsetSearchFailed(format!(
-            "None of {} patterns found within {} MB",
+            "None of {} patterns found within +/-{} MB",
             patterns.len(),
             MAX_SEARCH_SIZE / 1024 / 1024
         )))
@@ -1141,14 +1158,15 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
     // Code signature search (AOB scan) for validation
     // ==========================================================================
 
-    /// Validate offsets by searching for code references
-    ///
-    /// This searches for x64 RIP-relative addressing instructions (LEA, MOV)
-    /// that reference the found offsets. If found, it increases confidence.
+    // Validate offsets by searching for code references
+    //
+    // This searches for x64 RIP-relative addressing instructions (LEA, MOV)
+    // that reference the found offsets. If found, it increases confidence.
 
     /// Search for code that references a specific data address
     ///
     /// Looks for x64 RIP-relative LEA/MOV instructions.
+    #[allow(dead_code)]
     fn find_code_reference(&self, target_addr: u64) -> bool {
         // Search for LEA rcx/rdx/rax, [rip+disp32] patterns
         // 48 8D 0D xx xx xx xx  (LEA rcx, [rip+disp32])
@@ -1189,5 +1207,5 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         false
     }
 
-    /// Dump current values at detected offsets for verification (compact format)
+    // Dump current values at detected offsets for verification (compact format)
 }
