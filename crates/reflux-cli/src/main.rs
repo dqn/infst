@@ -2,8 +2,10 @@ use anyhow::Result;
 use clap::Parser;
 use reflux_core::{
     Config, CustomTypes, EncodingFixes, MemoryReader, OffsetDump, OffsetSearcher,
-    OffsetsCollection, ProcessHandle, Reflux, RefluxApi, ScoreMap, SearchPrompter,
-    export_song_list, fetch_song_database_with_fixes, load_offsets, load_signatures, save_offsets,
+    OffsetSignatureSet, OffsetsCollection, ProcessHandle, Reflux, RefluxApi, ScoreMap,
+    SearchPrompter,
+    builtin_signatures, export_song_list, fetch_song_database_with_fixes, load_offsets,
+    load_signatures, save_offsets,
 };
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -289,13 +291,14 @@ async fn main() -> Result<()> {
                         info!("Skipping signature-based detection (--force-interactive)");
                         None
                     } else {
-                        let signature_paths = ["offset-signatures.json", ".agent/offset-signatures.json"];
-                        let mut loaded = None;
+                        let signature_paths =
+                            ["offset-signatures.json", ".agent/offset-signatures.json"];
+                        let mut loaded: Option<(String, OffsetSignatureSet)> = None;
 
                         for path in signature_paths {
                             match load_signatures(path) {
                                 Ok(signatures) => {
-                                    loaded = Some((path, signatures));
+                                    loaded = Some((path.to_string(), signatures));
                                     break;
                                 }
                                 Err(e) => {
@@ -306,33 +309,64 @@ async fn main() -> Result<()> {
                             }
                         }
 
-                        match loaded {
-                            Some((signature_path, signatures)) => {
-                                let signature_version = signatures.version.trim();
-                                let version_matches = signature_version.is_empty()
-                                    || signature_version == "*"
-                                    || signature_version == version;
+                        let mut signature_source: Option<String> = None;
+                        let mut signatures: Option<OffsetSignatureSet> = None;
 
-                                if !version_matches {
-                                    warn!(
-                                        "Signature file version mismatch (file: {}, game: {}), skipping",
-                                        signature_version, version
-                                    );
-                                    None
-                                } else {
-                                    info!(
-                                        "Attempting signature-based offset detection ({}).",
-                                        signature_path
-                                    );
-                                    match searcher.search_all_with_signatures(&signatures) {
-                                        Ok(offsets) => Some(offsets),
-                                        Err(e) => {
-                                            info!(
-                                                "Signature-based offset detection failed: {}",
-                                                e
+                        if let Some((signature_path, signatures_file)) = loaded {
+                            let signature_version = signatures_file.version.trim();
+                            let version_matches = signature_version.is_empty()
+                                || signature_version == "*"
+                                || signature_version == version;
+
+                            if version_matches {
+                                signature_source = Some(signature_path);
+                                signatures = Some(signatures_file);
+                            } else {
+                                warn!(
+                                    "Signature file version mismatch (file: {}, game: {}), skipping",
+                                    signature_version, version
+                                );
+                            }
+                        }
+
+                        if signatures.is_none() {
+                            let builtin = builtin_signatures();
+                            let signature_version = builtin.version.trim();
+                            let version_matches = signature_version.is_empty()
+                                || signature_version == "*"
+                                || signature_version == version;
+                            if version_matches {
+                                signature_source = Some("builtin".to_string());
+                                signatures = Some(builtin);
+                            }
+                        }
+
+                        match signatures {
+                            Some(signatures) => {
+                                let source = signature_source
+                                    .as_deref()
+                                    .unwrap_or("builtin");
+                                info!(
+                                    "Attempting signature-based offset detection ({}).",
+                                    source
+                                );
+                                match searcher.search_all_with_signatures(&signatures) {
+                                    Ok(offsets) => {
+                                        if searcher.validate_signature_offsets(&offsets) {
+                                            Some(offsets)
+                                        } else {
+                                            warn!(
+                                                "Signature-based offsets failed validation, falling back"
                                             );
                                             None
                                         }
+                                    }
+                                    Err(e) => {
+                                        info!(
+                                            "Signature-based offset detection failed: {}",
+                                            e
+                                        );
+                                        None
                                     }
                                 }
                             }
@@ -343,25 +377,11 @@ async fn main() -> Result<()> {
                         }
                     };
 
-                    // Step 2: Try automatic detection (unless --force-interactive)
-                    let search_result = match signature_result {
-                        Some(offsets) => Some(offsets),
-                        None if args.force_interactive => None,
-                        None => {
-                            info!("Attempting automatic offset detection...");
-                            match searcher.search_all() {
-                                Ok(offsets) => Some(offsets),
-                                Err(e) => {
-                                    info!("Automatic offset detection failed: {}", e);
-                                    None
-                                }
-                            }
-                        }
-                    };
+                    let search_result = signature_result;
 
                     let final_offsets = match search_result {
                         Some(offsets) => {
-                            info!("Automatic offset detection successful!");
+                            info!("Signature-based offset detection successful!");
                             Some(OffsetsCollection {
                                 version: version.clone(),
                                 ..offsets
@@ -371,7 +391,7 @@ async fn main() -> Result<()> {
                             // Step 2: Fallback to interactive search
                             if !args.force_interactive {
                                 warn!(
-                                    "Automatic detection failed. Falling back to interactive search..."
+                                    "Signature-based detection failed. Falling back to interactive search..."
                                 );
                             }
 
