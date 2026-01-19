@@ -85,33 +85,69 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         // Phase 2: JudgeData
         info!("Phase 2: Searching JudgeData via signatures...");
         offsets.judge_data =
-            self.search_offset_by_signature(signatures, "judgeData", |this, addr| {
+            match self.search_offset_by_signature(signatures, "judgeData", |this, addr| {
                 this.validate_judge_data_candidate(addr)
-            })?;
+            }) {
+                Ok(addr) => addr,
+                Err(e) => {
+                    warn!(
+                        "JudgeData signature search failed: {}. Falling back to relative search...",
+                        e
+                    );
+                    self.search_judge_data_near_song_list(offsets.song_list)?
+                }
+            };
         info!("  JudgeData: 0x{:X}", offsets.judge_data);
 
         // Phase 3: PlaySettings
         info!("Phase 3: Searching PlaySettings via signatures...");
         offsets.play_settings =
-            self.search_offset_by_signature(signatures, "playSettings", |this, addr| {
+            match self.search_offset_by_signature(signatures, "playSettings", |this, addr| {
                 this.validate_play_settings_at(addr).is_some()
-            })?;
+            }) {
+                Ok(addr) => addr,
+                Err(e) => {
+                    warn!(
+                        "PlaySettings signature search failed: {}. Falling back to relative search...",
+                        e
+                    );
+                    self.search_play_settings_near_judge_data(offsets.judge_data)?
+                }
+            };
         info!("  PlaySettings: 0x{:X}", offsets.play_settings);
 
         // Phase 4: PlayData
         info!("Phase 4: Searching PlayData via signatures...");
         offsets.play_data =
-            self.search_offset_by_signature(signatures, "playData", |this, addr| {
+            match self.search_offset_by_signature(signatures, "playData", |this, addr| {
                 this.validate_play_data_address(addr).unwrap_or(false)
-            })?;
+            }) {
+                Ok(addr) => addr,
+                Err(e) => {
+                    warn!(
+                        "PlayData signature search failed: {}. Falling back to relative search...",
+                        e
+                    );
+                    self.search_play_data_near_play_settings(offsets.play_settings)?
+                }
+            };
         info!("  PlayData: 0x{:X}", offsets.play_data);
 
         // Phase 5: CurrentSong
         info!("Phase 5: Searching CurrentSong via signatures...");
         offsets.current_song =
-            self.search_offset_by_signature(signatures, "currentSong", |this, addr| {
+            match self.search_offset_by_signature(signatures, "currentSong", |this, addr| {
                 this.validate_current_song_address(addr).unwrap_or(false)
-            })?;
+            }) {
+                Ok(addr) => addr,
+                Err(e) => {
+                    warn!(
+                        "CurrentSong signature search failed: {}. Falling back to relative search...",
+                        e
+                    );
+                    self.search_current_song_near_judge_data(offsets.judge_data)?
+                }
+            };
         info!("  CurrentSong: 0x{:X}", offsets.current_song);
 
         // Phase 6: DataMap / UnlockData (pattern search, using SongList as hint)
@@ -555,6 +591,87 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             "No valid candidates found for {} via signatures",
             name
         )))
+    }
+
+    fn search_near_expected<F>(&self, expected: u64, range: usize, validate: F) -> Option<u64>
+    where
+        F: Fn(&Self, u64) -> bool,
+    {
+        let range = range as u64;
+        let step = 4u64;
+        let mut delta = 0u64;
+
+        while delta <= range {
+            if delta == 0 {
+                if expected.is_multiple_of(4) && validate(self, expected) {
+                    return Some(expected);
+                }
+            } else {
+                if expected >= delta {
+                    let addr = expected - delta;
+                    if addr.is_multiple_of(4) && validate(self, addr) {
+                        return Some(addr);
+                    }
+                }
+
+                let addr = expected + delta;
+                if addr.is_multiple_of(4) && validate(self, addr) {
+                    return Some(addr);
+                }
+            }
+
+            delta += step;
+        }
+
+        None
+    }
+
+    fn search_judge_data_near_song_list(&self, song_list: u64) -> Result<u64> {
+        let expected = song_list.wrapping_sub(JUDGE_TO_SONG_LIST);
+        self.search_near_expected(expected, JUDGE_DATA_SEARCH_RANGE, |this, addr| {
+            this.validate_judge_data_candidate(addr)
+        })
+        .ok_or_else(|| {
+            Error::OffsetSearchFailed(
+                "No valid candidates found for judgeData near SongList".to_string(),
+            )
+        })
+    }
+
+    fn search_play_settings_near_judge_data(&self, judge_data: u64) -> Result<u64> {
+        let expected = judge_data.wrapping_sub(JUDGE_TO_PLAY_SETTINGS);
+        self.search_near_expected(expected, PLAY_SETTINGS_SEARCH_RANGE, |this, addr| {
+            this.validate_play_settings_at(addr).is_some()
+        })
+        .ok_or_else(|| {
+            Error::OffsetSearchFailed(
+                "No valid candidates found for playSettings near JudgeData".to_string(),
+            )
+        })
+    }
+
+    fn search_play_data_near_play_settings(&self, play_settings: u64) -> Result<u64> {
+        let expected = play_settings.wrapping_add(PLAY_SETTINGS_TO_PLAY_DATA);
+        self.search_near_expected(expected, PLAY_DATA_SEARCH_RANGE, |this, addr| {
+            this.validate_play_data_address(addr).unwrap_or(false)
+        })
+        .ok_or_else(|| {
+            Error::OffsetSearchFailed(
+                "No valid candidates found for playData near PlaySettings".to_string(),
+            )
+        })
+    }
+
+    fn search_current_song_near_judge_data(&self, judge_data: u64) -> Result<u64> {
+        let expected = judge_data.wrapping_add(JUDGE_TO_CURRENT_SONG);
+        self.search_near_expected(expected, CURRENT_SONG_SEARCH_RANGE, |this, addr| {
+            this.validate_current_song_address(addr).unwrap_or(false)
+        })
+        .ok_or_else(|| {
+            Error::OffsetSearchFailed(
+                "No valid candidates found for currentSong near JudgeData".to_string(),
+            )
+        })
     }
 
     fn validate_judge_data_candidate(&self, addr: u64) -> bool {
