@@ -1199,15 +1199,23 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         let style = self.reader.read_i32(addr).ok()?;
         let gauge = self.reader.read_i32(addr + 4).ok()?;
         let assist = self.reader.read_i32(addr + 8).ok()?;
-        let unknown = self.reader.read_i32(addr + 12).ok()?;
+        let flip = self.reader.read_i32(addr + 12).ok()?;
         let range = self.reader.read_i32(addr + 16).ok()?;
 
-        // Valid ranges check for settings fields
-        if !(0..=7).contains(&style)
-            || !(0..=5).contains(&gauge)
-            || !(0..=3).contains(&assist)
-            || !(0..=1).contains(&unknown)
-            || !(0..=4).contains(&range)
+        // Valid ranges check (aligned with C# implementation)
+        // style: OFF(0), RANDOM(1), R-RANDOM(2), S-RANDOM(3), MIRROR(4),
+        //        SYNCHRONIZE RANDOM(5), SYMMETRY RANDOM(6)
+        // gauge: OFF(0), ASSIST EASY(1), EASY(2), HARD(3), EX HARD(4)
+        // assist: OFF(0), AUTO SCRATCH(1), 5KEYS(2), LEGACY NOTE(3),
+        //         KEY ASSIST(4), ANY KEY(5)
+        // flip: OFF(0), ON(1)
+        // range: OFF(0), SUDDEN+(1), HIDDEN+(2), SUD+ & HID+(3),
+        //        LIFT(4), LIFT & SUD+(5)
+        if !(0..=6).contains(&style)
+            || !(0..=4).contains(&gauge)
+            || !(0..=5).contains(&assist)
+            || !(0..=1).contains(&flip)
+            || !(0..=5).contains(&range)
         {
             return None;
         }
