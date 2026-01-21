@@ -98,6 +98,45 @@ fn load_song_database_with_retry(
     }
 }
 
+fn search_offsets_with_retry(
+    reader: &MemoryReader,
+    game_version: Option<&String>,
+) -> Result<OffsetsCollection> {
+    const RETRY_DELAY_MS: u64 = 5000;
+
+    let signatures = builtin_signatures();
+
+    loop {
+        thread::sleep(Duration::from_millis(RETRY_DELAY_MS));
+
+        let mut searcher = OffsetSearcher::new(reader);
+
+        match searcher.search_all_with_signatures(&signatures) {
+            Ok(mut offsets) => {
+                if let Some(version) = game_version {
+                    offsets.version = version.clone();
+                }
+
+                if searcher.validate_signature_offsets(&offsets) {
+                    return Ok(offsets);
+                }
+
+                warn!(
+                    "Offset validation failed, retrying in {}s...",
+                    RETRY_DELAY_MS / 1000
+                );
+            }
+            Err(e) => {
+                warn!(
+                    "Offset detection failed ({}), retrying in {}s...",
+                    e,
+                    RETRY_DELAY_MS / 1000
+                );
+            }
+        }
+    }
+}
+
 #[derive(Parser)]
 #[command(name = "reflux")]
 #[command(about = "INFINITAS score tracker", version)]
@@ -169,33 +208,10 @@ async fn main() -> Result<()> {
                 if !reflux.offsets().is_valid() {
                     warn!("Invalid offsets detected. Attempting signature search...");
 
-                    let mut searcher = OffsetSearcher::new(&reader);
-                    let signatures = builtin_signatures();
-
-                    let mut offsets = match searcher.search_all_with_signatures(&signatures) {
-                        Ok(offsets) => offsets,
-                        Err(e) => {
-                            error!("Signature-based offset detection failed: {}", e);
-                            bail!("Signature-based offset detection failed: {}", e);
-                        }
-                    };
-
-                    if let Some(version) = &game_version {
-                        offsets.version = version.clone();
-                    }
-
-                    if !searcher.validate_signature_offsets(&offsets) {
-                        error!("Signature-based offsets failed validation");
-                        bail!("Signature-based offsets failed validation");
-                    }
+                    let offsets = search_offsets_with_retry(&reader, game_version.as_ref())?;
 
                     info!("Signature-based offset detection successful!");
                     reflux.update_offsets(offsets);
-                }
-
-                if !reflux.offsets().is_valid() {
-                    error!("Invalid offsets detected. Exiting.");
-                    bail!("Invalid offsets detected");
                 }
 
                 // Load encoding fixes
