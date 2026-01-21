@@ -5,7 +5,6 @@ use std::path::Path;
 use serde::Serialize;
 use serde_json::{Value as JsonValue, json};
 
-use crate::config::LocalRecordConfig;
 use crate::error::Result;
 use crate::game::{
     Difficulty, Grade, Lamp, PlayData, SongInfo, UnlockData, UnlockType, calculate_dj_points,
@@ -34,100 +33,83 @@ pub fn format_tsv_header() -> String {
     .join("\t")
 }
 
-/// Generate dynamic TSV header based on config flags
-pub fn format_dynamic_tsv_header(config: &LocalRecordConfig) -> String {
-    let mut columns = vec!["title", "difficulty"];
-
-    if config.song_info {
-        columns.extend(["title2", "bpm", "artist", "genre"]);
-    }
-    if config.chart_details {
-        columns.extend(["notecount", "level"]);
-    }
-
-    columns.extend(["playtype", "grade", "lamp", "misscount"]);
-
-    if config.result_details {
-        columns.extend(["gaugepercent", "exscore"]);
-    }
-    if config.judge {
-        columns.extend([
-            "pgreat",
-            "great",
-            "good",
-            "bad",
-            "poor",
-            "combobreak",
-            "fast",
-            "slow",
-        ]);
-    }
-    if config.settings {
-        columns.extend(["style", "style2", "gauge", "assist", "range"]);
-    }
-
-    columns.push("date");
+/// Generate TSV header with all columns
+pub fn format_full_tsv_header() -> String {
+    let columns = vec![
+        "title",
+        "difficulty",
+        "title2",
+        "bpm",
+        "artist",
+        "genre",
+        "notecount",
+        "level",
+        "playtype",
+        "grade",
+        "lamp",
+        "misscount",
+        "gaugepercent",
+        "exscore",
+        "pgreat",
+        "great",
+        "good",
+        "bad",
+        "poor",
+        "combobreak",
+        "fast",
+        "slow",
+        "style",
+        "style2",
+        "gauge",
+        "assist",
+        "range",
+        "date",
+    ];
 
     columns.join("\t")
 }
 
-/// Generate dynamic TSV row based on config flags
-pub fn format_dynamic_tsv_row(play_data: &PlayData, config: &LocalRecordConfig) -> String {
-    let mut values: Vec<String> = vec![
+/// Generate TSV row with all columns
+pub fn format_full_tsv_row(play_data: &PlayData) -> String {
+    let values: Vec<String> = vec![
         play_data.chart.title.to_string(),
         play_data.chart.difficulty.short_name().to_string(),
+        play_data.chart.title_english.to_string(),
+        play_data.chart.bpm.to_string(),
+        play_data.chart.artist.to_string(),
+        play_data.chart.genre.to_string(),
+        play_data.chart.total_notes.to_string(),
+        play_data.chart.level.to_string(),
+        play_data.judge.play_type.short_name().to_string(),
+        play_data.grade.short_name().to_string(),
+        play_data.lamp.short_name().to_string(),
+        if play_data.miss_count_valid() {
+            play_data.miss_count().to_string()
+        } else {
+            "-".to_string()
+        },
+        play_data.gauge.to_string(),
+        play_data.ex_score.to_string(),
+        play_data.judge.pgreat.to_string(),
+        play_data.judge.great.to_string(),
+        play_data.judge.good.to_string(),
+        play_data.judge.bad.to_string(),
+        play_data.judge.poor.to_string(),
+        play_data.judge.combo_break.to_string(),
+        play_data.judge.fast.to_string(),
+        play_data.judge.slow.to_string(),
+        play_data.settings.style.as_str().to_string(),
+        play_data
+            .settings
+            .style2
+            .map(|s| s.as_str())
+            .unwrap_or("OFF")
+            .to_string(),
+        play_data.settings.gauge.as_str().to_string(),
+        play_data.settings.assist.as_str().to_string(),
+        play_data.settings.range.as_str().to_string(),
+        play_data.timestamp.to_rfc3339(),
     ];
-
-    if config.song_info {
-        values.push(play_data.chart.title_english.to_string());
-        values.push(play_data.chart.bpm.to_string());
-        values.push(play_data.chart.artist.to_string());
-        values.push(play_data.chart.genre.to_string());
-    }
-    if config.chart_details {
-        values.push(play_data.chart.total_notes.to_string());
-        values.push(play_data.chart.level.to_string());
-    }
-
-    values.push(play_data.judge.play_type.short_name().to_string());
-    values.push(play_data.grade.short_name().to_string());
-    values.push(play_data.lamp.short_name().to_string());
-    values.push(if play_data.miss_count_valid() {
-        play_data.miss_count().to_string()
-    } else {
-        "-".to_string()
-    });
-
-    if config.result_details {
-        values.push(play_data.gauge.to_string());
-        values.push(play_data.ex_score.to_string());
-    }
-    if config.judge {
-        values.push(play_data.judge.pgreat.to_string());
-        values.push(play_data.judge.great.to_string());
-        values.push(play_data.judge.good.to_string());
-        values.push(play_data.judge.bad.to_string());
-        values.push(play_data.judge.poor.to_string());
-        values.push(play_data.judge.combo_break.to_string());
-        values.push(play_data.judge.fast.to_string());
-        values.push(play_data.judge.slow.to_string());
-    }
-    if config.settings {
-        values.push(play_data.settings.style.as_str().to_string());
-        values.push(
-            play_data
-                .settings
-                .style2
-                .map(|s| s.as_str())
-                .unwrap_or("OFF")
-                .to_string(),
-        );
-        values.push(play_data.settings.gauge.as_str().to_string());
-        values.push(play_data.settings.assist.as_str().to_string());
-        values.push(play_data.settings.range.as_str().to_string());
-    }
-
-    values.push(play_data.timestamp.to_rfc3339());
 
     values.join("\t")
 }
@@ -168,88 +150,6 @@ pub fn format_json_entry(play_data: &PlayData) -> JsonValue {
     }
 
     entry
-}
-
-/// Generate post form data for remote server
-pub fn format_post_form(play_data: &PlayData, api_key: &str) -> HashMap<String, String> {
-    let mut form = HashMap::new();
-
-    form.insert("apikey".to_string(), api_key.to_string());
-    form.insert(
-        "songid".to_string(),
-        format!("{:05}", play_data.chart.song_id),
-    );
-    form.insert("title".to_string(), play_data.chart.title.to_string());
-    form.insert(
-        "title2".to_string(),
-        play_data.chart.title_english.to_string(),
-    );
-    form.insert("bpm".to_string(), play_data.chart.bpm.to_string());
-    form.insert("artist".to_string(), play_data.chart.artist.to_string());
-    form.insert("genre".to_string(), play_data.chart.genre.to_string());
-    form.insert(
-        "notecount".to_string(),
-        play_data.chart.total_notes.to_string(),
-    );
-    form.insert(
-        "diff".to_string(),
-        play_data.chart.difficulty.short_name().to_string(),
-    );
-    form.insert("level".to_string(), play_data.chart.level.to_string());
-    form.insert("unlocked".to_string(), play_data.chart.unlocked.to_string());
-    form.insert(
-        "grade".to_string(),
-        play_data.grade.short_name().to_string(),
-    );
-    form.insert("gaugepercent".to_string(), play_data.gauge.to_string());
-    form.insert("lamp".to_string(), play_data.lamp.short_name().to_string());
-    form.insert("exscore".to_string(), play_data.ex_score.to_string());
-    form.insert(
-        "prematureend".to_string(),
-        play_data.judge.premature_end.to_string(),
-    );
-    form.insert("pgreat".to_string(), play_data.judge.pgreat.to_string());
-    form.insert("great".to_string(), play_data.judge.great.to_string());
-    form.insert("good".to_string(), play_data.judge.good.to_string());
-    form.insert("bad".to_string(), play_data.judge.bad.to_string());
-    form.insert("poor".to_string(), play_data.judge.poor.to_string());
-    form.insert("fast".to_string(), play_data.judge.fast.to_string());
-    form.insert("slow".to_string(), play_data.judge.slow.to_string());
-    form.insert(
-        "combobreak".to_string(),
-        play_data.judge.combo_break.to_string(),
-    );
-    form.insert(
-        "playtype".to_string(),
-        play_data.judge.play_type.short_name().to_string(),
-    );
-    form.insert(
-        "style".to_string(),
-        play_data.settings.style.as_str().to_string(),
-    );
-    form.insert(
-        "style2".to_string(),
-        play_data
-            .settings
-            .style2
-            .map(|s| s.as_str())
-            .unwrap_or("OFF")
-            .to_string(),
-    );
-    form.insert(
-        "gauge".to_string(),
-        play_data.settings.gauge.as_str().to_string(),
-    );
-    form.insert(
-        "assist".to_string(),
-        play_data.settings.assist.as_str().to_string(),
-    );
-    form.insert(
-        "range".to_string(),
-        play_data.settings.range.as_str().to_string(),
-    );
-
-    form
 }
 
 pub struct TsvRowData<'a> {

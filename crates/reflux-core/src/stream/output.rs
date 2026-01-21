@@ -1,6 +1,5 @@
 use crate::error::Result;
-use crate::game::{Difficulty, GameState, PlayData, SongInfo};
-use crate::storage::format_post_form;
+use crate::game::{Difficulty, GameState, SongInfo};
 use std::fs;
 use std::path::Path;
 
@@ -73,56 +72,6 @@ impl StreamOutput {
     fn write_file(&self, filename: &str, content: &str) -> Result<()> {
         let path = Path::new(&self.base_dir).join(filename);
         fs::write(path, content)?;
-        Ok(())
-    }
-
-    /// Write all latest play files (for OBS and external tools)
-    pub fn write_latest_files(
-        &self,
-        play_data: &PlayData,
-        api_key: &str,
-        write_json: bool,
-        write_text: bool,
-    ) -> Result<()> {
-        if write_json {
-            // latest.json - post form format
-            let form = format_post_form(play_data, api_key);
-            let json = serde_json::to_string_pretty(&form)?;
-            self.write_file("latest.json", &json)?;
-        }
-
-        if write_text {
-            // latest-grade.txt
-            self.write_file("latest-grade.txt", play_data.grade.short_name())?;
-
-            // latest-lamp.txt - expanded form
-            self.write_file("latest-lamp.txt", play_data.lamp.expand_name())?;
-
-            // latest-difficulty.txt
-            self.write_file(
-                "latest-difficulty.txt",
-                play_data.chart.difficulty.short_name(),
-            )?;
-
-            // latest-difficulty-color.txt
-            self.write_file(
-                "latest-difficulty-color.txt",
-                play_data.chart.difficulty.color_code(),
-            )?;
-
-            // latest-titleenglish.txt
-            self.write_file("latest-titleenglish.txt", &play_data.chart.title_english)?;
-
-            // latest.txt - combined format (title\ngrade\nlamp)
-            let combined = format!(
-                "{}\n{}\n{}",
-                play_data.chart.title_english,
-                play_data.grade.short_name(),
-                play_data.lamp.short_name()
-            );
-            self.write_file("latest.txt", &combined)?;
-        }
-
         Ok(())
     }
 

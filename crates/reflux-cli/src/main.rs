@@ -2,9 +2,8 @@ use anyhow::{Result, bail};
 use clap::Parser;
 use reflux_core::game::find_game_version;
 use reflux_core::{
-    Config, CustomTypes, EncodingFixes, MemoryReader, OffsetSearcher, OffsetsCollection,
-    ProcessHandle, Reflux, ScoreMap, builtin_signatures, export_song_list,
-    fetch_song_database_with_fixes,
+    CustomTypes, EncodingFixes, MemoryReader, OffsetSearcher, OffsetsCollection, ProcessHandle,
+    Reflux, ScoreMap, builtin_signatures, fetch_song_database_with_fixes,
 };
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -142,8 +141,7 @@ fn search_offsets_with_retry(
 #[command(about = "INFINITAS score tracker", version)]
 struct Args {}
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     Args::parse();
 
     // Initialize logging (RUST_LOG がなければ info を既定にする)
@@ -163,12 +161,8 @@ async fn main() -> Result<()> {
     let current_version = env!("CARGO_PKG_VERSION");
     info!("Reflux-RS {}", current_version);
 
-    // Load config
-    let config = Config::default();
-    info!("Using default config");
-
     // Create Reflux instance
-    let mut reflux = Reflux::new(config, OffsetsCollection::default());
+    let mut reflux = Reflux::new(OffsetsCollection::default());
 
     // Load tracker
     if let Err(e) = reflux.load_tracker("tracker.db") {
@@ -240,14 +234,6 @@ async fn main() -> Result<()> {
                 info!("Loaded {} songs", song_db.len());
                 reflux.set_song_db(song_db.clone());
 
-                // Output song list for debugging if configured
-                if reflux.config().debug.output_db {
-                    info!("Outputting song list to songs.tsv...");
-                    if let Err(e) = export_song_list("songs.tsv", &song_db) {
-                        warn!("Failed to export song list: {}", e);
-                    }
-                }
-
                 // Load score map from game memory
                 info!("Loading score map...");
                 let score_map = match ScoreMap::load_from_memory(
@@ -310,14 +296,6 @@ async fn main() -> Result<()> {
                     warn!("Failed to load unlock state: {}", e);
                 }
 
-                // Sync with server
-                if reflux.config().record.save_remote {
-                    info!("Syncing with server...");
-                    if let Err(e) = reflux.sync_with_server().await {
-                        warn!("Server sync failed: {}", e);
-                    }
-                }
-
                 // Run tracker loop
                 if let Err(e) = reflux.run(&process) {
                     error!("Tracker error: {}", e);
@@ -334,9 +312,7 @@ async fn main() -> Result<()> {
                 }
 
                 // Export tracker.tsv on disconnect
-                if reflux.config().record.save_local
-                    && let Err(e) = reflux.export_tracker_tsv("tracker.tsv")
-                {
+                if let Err(e) = reflux.export_tracker_tsv("tracker.tsv") {
                     error!("Failed to export tracker.tsv: {}", e);
                 }
 

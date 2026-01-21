@@ -2,8 +2,6 @@
 //!
 //! This module contains the main tracking loop and game state handling methods.
 
-use std::path::Path;
-use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -13,15 +11,13 @@ use tracing::{debug, error, info, warn};
 use crate::error::Result;
 use crate::game::{
     AssistType, ChartInfo, Difficulty, GameState, Grade, Judge, Lamp, PlayData, PlayType,
-    PlayerJudge, RawJudgeData, Settings, SongInfo, UnlockType, check_version_match,
-    find_game_version, get_unlock_state_for_difficulty, get_unlock_states,
+    PlayerJudge, RawJudgeData, Settings, check_version_match, find_game_version, get_unlock_states,
 };
 use crate::memory::layout::{judge, play, settings, timing};
 use crate::memory::{MemoryReader, ProcessHandle, ReadMemory};
-use crate::network::{AddSongParams, RefluxApi};
-use crate::storage::{ChartKey, TrackerInfo, format_play_data_console, format_post_form};
+use crate::storage::{ChartKey, TrackerInfo, format_play_data_console};
 
-use super::{Reflux, UpdateResult};
+use super::Reflux;
 
 impl Reflux {
     /// Run the main tracking loop
@@ -31,35 +27,11 @@ impl Reflux {
 
         info!("Starting tracker loop...");
 
-        if self.config.record.save_local || self.config.record.save_json {
-            self.session_manager = crate::storage::SessionManager::new("sessions");
-
-            if self.config.record.save_local {
-                match self
-                    .session_manager
-                    .start_session_with_header(&self.config.local_record)
-                {
-                    Ok(path) => info!("Started TSV session at {:?}", path),
-                    Err(e) => warn!("Failed to start TSV session: {}", e),
-                }
-            }
-
-            if self.config.record.save_json {
-                match self.session_manager.start_json_session() {
-                    Ok(path) => info!("Started JSON session at {:?}", path),
-                    Err(e) => warn!("Failed to start JSON session: {}", e),
-                }
-            }
-        }
-
-        // Initialize streaming files
-        if self.config.livestream.show_play_state {
-            let _ = self.stream_output.write_play_state(GameState::SongSelect);
-        }
-        if self.config.livestream.enable_marquee {
-            let _ = self
-                .stream_output
-                .write_marquee(&self.config.livestream.marquee_idle_text);
+        // Start TSV session
+        self.session_manager = crate::storage::SessionManager::new("sessions");
+        match self.session_manager.start_tsv_session() {
+            Ok(path) => info!("Started TSV session at {:?}", path),
+            Err(e) => warn!("Failed to start TSV session: {}", e),
         }
 
         // Retry configuration for memory reads.
@@ -111,27 +83,6 @@ impl Reflux {
             }
 
             thread::sleep(Duration::from_millis(timing::GAME_STATE_POLL_INTERVAL_MS));
-        }
-
-        // Cleanup
-        if self.config.livestream.show_play_state {
-            let _ = self.stream_output.write_play_state(GameState::Unknown);
-        }
-        if self.config.livestream.enable_marquee {
-            let _ = self.stream_output.write_marquee("NO SIGNAL");
-        }
-
-        // Report failed remote API calls if any
-        let failed_count = self.api_error_tracker.count();
-        if failed_count > 0 {
-            warn!(
-                "{} remote API call(s) failed during this session",
-                failed_count
-            );
-            // Log summary by endpoint
-            for (endpoint, count) in self.api_error_tracker.summary() {
-                warn!("  - {}: {} failure(s)", endpoint, count);
-            }
         }
 
         Ok(())
@@ -224,162 +175,33 @@ impl Reflux {
 
         // Save to session files
         self.save_session_data(play_data);
-
-        // Send to remote server
-        self.send_to_remote(play_data);
-
-        // Write latest files for OBS/streaming
-        self.write_latest_files(play_data);
-
-        // Update streaming files
-        self.update_result_stream_files(play_data);
     }
 
-    /// Save play data to session files (TSV and JSON)
+    /// Save play data to session file (TSV)
     fn save_session_data(&mut self, play_data: &PlayData) {
-        if self.config.record.save_local
-            && let Err(e) = self
-                .session_manager
-                .append_tsv_row(play_data, &self.config.local_record)
-        {
+        if let Err(e) = self.session_manager.append_tsv_row(play_data) {
             error!("Failed to append TSV row: {}", e);
-        }
-
-        if self.config.record.save_json
-            && let Err(e) = self.session_manager.append_json_entry(play_data)
-        {
-            error!("Failed to append JSON entry: {}", e);
-        }
-    }
-
-    /// Send play data to remote server
-    fn send_to_remote(&self, play_data: &PlayData) {
-        if self.config.record.save_remote
-            && let Some(api) = self.api.clone()
-            && let Some(handle) = &self.runtime_handle
-        {
-            let form = format_post_form(play_data, &self.config.remote_record.api_key);
-            let error_tracker = Arc::clone(&self.api_error_tracker);
-
-            // Capture payload summary for error logging
-            let payload_summary = format!(
-                "song_id={}, title={}, diff={}, ex_score={}",
-                play_data.chart.song_id,
-                play_data.chart.title,
-                play_data.chart.difficulty.short_name(),
-                play_data.ex_score
-            );
-
-            // Spawn async task to report play data to the remote server.
-            // Errors are recorded in error_tracker and logged here rather than being
-            // returned, as this is a fire-and-forget operation that shouldn't block
-            // the main game loop. The error_tracker aggregates all API errors and
-            // reports a summary at session end (see run() method).
-            handle.spawn(async move {
-                if let Err(e) = api.report_play(form).await {
-                    error_tracker.record("report_play", e.to_string(), &payload_summary);
-                    tracing::error!(
-                        "Failed to report play to remote: {} (payload: {})",
-                        e,
-                        payload_summary
-                    );
-                }
-            });
-        }
-    }
-
-    /// Write latest play files for OBS
-    fn write_latest_files(&mut self, play_data: &PlayData) {
-        let write_json = self.config.record.save_latest_json;
-        let write_txt = self.config.record.save_latest_txt;
-
-        if (write_json || write_txt)
-            && let Err(e) = self.stream_output.write_latest_files(
-                play_data,
-                &self.config.remote_record.api_key,
-                write_json,
-                write_txt,
-            )
-        {
-            error!("Failed to write latest files: {}", e);
-        }
-    }
-
-    /// Update streaming files for result screen
-    fn update_result_stream_files(&mut self, play_data: &PlayData) {
-        if self.config.livestream.show_play_state {
-            let _ = self.stream_output.write_play_state(GameState::ResultScreen);
-        }
-
-        if self.config.livestream.enable_marquee {
-            let status = if play_data.lamp == Lamp::Failed {
-                "FAIL!"
-            } else {
-                "CLEAR!"
-            };
-            let _ = self
-                .stream_output
-                .write_marquee(&format!("{} {}", play_data.chart.title_english, status));
         }
     }
 
     /// Handle transition to song select screen
     fn handle_song_select(&mut self, reader: &MemoryReader) {
-        // Update streaming files
-        if self.config.livestream.show_play_state {
-            let _ = self.stream_output.write_play_state(GameState::SongSelect);
-        }
-        if self.config.livestream.enable_marquee {
-            let _ = self
-                .stream_output
-                .write_marquee(&self.config.livestream.marquee_idle_text);
-        }
-
-        // Clear full song info files
-        if self.config.livestream.enable_full_song_info {
-            let _ = self.stream_output.clear_full_song_info();
-        }
-
-        // Poll unlock state changes and report to server
+        // Poll unlock state changes
         self.poll_unlock_changes(reader);
 
-        // Export tracker.tsv if save_local is enabled
-        if self.config.record.save_local
-            && let Err(e) = self.export_tracker_tsv("tracker.tsv")
-        {
+        // Export tracker.tsv
+        if let Err(e) = self.export_tracker_tsv("tracker.tsv") {
             error!("Failed to export tracker.tsv: {}", e);
         }
     }
 
     /// Handle transition to playing state
-    fn handle_playing(&mut self, reader: &MemoryReader) {
-        if let Ok((song_id, difficulty)) = self.fetch_current_chart(reader)
-            && let Some(song) = self.game_data.song_db.get(&song_id)
-        {
-            let chart_name = format!("{} {}", song.title_english, difficulty.short_name());
-
-            if self.config.livestream.show_play_state {
-                let _ = self.stream_output.write_play_state(GameState::Playing);
-            }
-            if self.config.livestream.enable_marquee {
-                let _ = self.stream_output.write_marquee(&chart_name.to_uppercase());
-            }
-
-            // Write full song info files for OBS
-            if self.config.livestream.enable_full_song_info
-                && let Err(e) = self.stream_output.write_full_song_info(song, difficulty)
-            {
-                error!("Failed to write full song info: {}", e);
-            }
-        }
+    fn handle_playing(&mut self, _reader: &MemoryReader) {
+        // No streaming output in this version
     }
 
-    /// Poll for unlock state changes and report to server
+    /// Poll for unlock state changes
     fn poll_unlock_changes(&mut self, reader: &MemoryReader) {
-        if !self.config.record.save_remote || self.api.is_none() {
-            return;
-        }
-
         if self.game_data.song_db.is_empty() {
             return;
         }
@@ -401,24 +223,8 @@ impl Reflux {
         if !changes.is_empty() {
             info!("Detected {} unlock state changes", changes.len());
 
-            // Report changes to server
+            // Update local state
             for (&song_id, unlock_data) in &changes {
-                if let Some(api) = &self.api
-                    && let Some(handle) = &self.runtime_handle
-                {
-                    let api_clone = api.clone();
-                    let error_tracker = Arc::clone(&self.api_error_tracker);
-                    let song_id_str = format!("{:05}", song_id);
-                    let unlocks = unlock_data.unlocks;
-                    handle.spawn(async move {
-                        if let Err(e) = api_clone.report_unlock(&song_id_str, unlocks).await {
-                            error_tracker.record("report_unlock", e.to_string(), &song_id_str);
-                            tracing::error!("Failed to report unlock for {}: {}", song_id_str, e);
-                        }
-                    });
-                }
-
-                // Update local state
                 self.unlock_db.update_from_data(song_id, unlock_data);
             }
         }
@@ -427,6 +233,8 @@ impl Reflux {
         self.game_data.unlock_state = current_state;
     }
 
+    /// Fetch current chart selection (for future stream output feature)
+    #[allow(dead_code)]
     fn fetch_current_chart(&self, reader: &MemoryReader) -> Result<(u32, Difficulty)> {
         let song_id = reader.read_i32(self.offsets.current_song)? as u32;
         let diff = reader.read_i32(self.offsets.current_song + 4)?;
@@ -618,200 +426,6 @@ impl Reflux {
         Ok(())
     }
 
-    /// Sync with remote server
-    ///
-    /// This function:
-    /// 1. Compares song_db with unlock_db to find new songs
-    /// 2. Uploads new songs and their charts
-    /// 3. Reports unlock type changes
-    /// 4. Reports unlock state changes
-    pub async fn sync_with_server(&mut self) -> Result<()> {
-        let api = match &self.api {
-            Some(api) => api,
-            None => {
-                info!("Remote saving disabled, skipping server sync");
-                return Ok(());
-            }
-        };
-
-        info!("Checking for songs/charts to update at remote...");
-
-        // Count new songs (not in unlock_db)
-        let new_songs: Vec<_> = self
-            .game_data
-            .song_db
-            .keys()
-            .filter(|id| !self.unlock_db.contains(**id))
-            .copied()
-            .collect();
-
-        if !new_songs.is_empty() {
-            info!("Found {} songs to upload to remote", new_songs.len());
-        }
-
-        for (i, &song_id) in self.game_data.song_db.keys().enumerate() {
-            let Some(song) = self.game_data.song_db.get(&song_id) else {
-                continue;
-            };
-
-            // Report progress for new songs
-            if !new_songs.is_empty() && (i % 100 == 0 || i == self.game_data.song_db.len() - 1) {
-                let percent = (i * 100) / self.game_data.song_db.len();
-                info!("Sync progress: {}%", percent);
-            }
-
-            // Upload new songs
-            if !self.unlock_db.contains(song_id) {
-                self.upload_song_info(api, song_id, song).await?;
-            }
-
-            // Check for unlock type/state changes
-            if let Some(unlock_data) = self.game_data.unlock_state.get(&song_id) {
-                let current_type = match unlock_data.unlock_type {
-                    UnlockType::Base => 1,
-                    UnlockType::Bits => 2,
-                    UnlockType::Sub => 3,
-                };
-
-                // Check unlock type change
-                if self
-                    .unlock_db
-                    .has_unlock_type_changed(song_id, current_type)
-                {
-                    info!("Unlock type changed for {:05}: updating remote", song_id);
-                    let song_id_str = format!("{:05}", song_id);
-                    if let Err(e) = api
-                        .update_chart_unlock_type(&song_id_str, current_type as u8)
-                        .await
-                    {
-                        error!("Failed to update unlock type for {:05}: {}", song_id, e);
-                    }
-                }
-
-                // Check unlock state change
-                if self
-                    .unlock_db
-                    .has_unlocks_changed(song_id, unlock_data.unlocks)
-                {
-                    info!(
-                        "Unlock state changed for {:05}: reporting to remote",
-                        song_id
-                    );
-                    let song_id_str = format!("{:05}", song_id);
-                    if let Err(e) = api.report_unlock(&song_id_str, unlock_data.unlocks).await {
-                        error!("Failed to report unlock for {:05}: {}", song_id, e);
-                    }
-                }
-
-                // Update local unlock_db
-                self.unlock_db.update_from_data(song_id, unlock_data);
-            }
-        }
-
-        info!("Server sync completed");
-        Ok(())
-    }
-
-    /// Upload song info and charts to remote server
-    async fn upload_song_info(&self, api: &RefluxApi, song_id: u32, song: &SongInfo) -> Result<()> {
-        let song_id_str = format!("{:05}", song_id);
-        let unlock_type = self
-            .game_data
-            .unlock_state
-            .get(&song_id)
-            .map(|u| match u.unlock_type {
-                UnlockType::Base => 1,
-                UnlockType::Bits => 2,
-                UnlockType::Sub => 3,
-            })
-            .unwrap_or(1);
-
-        // Add song
-        let params = AddSongParams {
-            song_id: &song_id_str,
-            title: &song.title,
-            title_english: &song.title_english,
-            artist: &song.artist,
-            genre: &song.genre,
-            bpm: &song.bpm,
-            unlock_type,
-        };
-
-        if let Err(e) = api.add_song(params).await {
-            error!("Failed to add song {:05}: {}", song_id, e);
-            return Ok(());
-        }
-
-        // Add charts for each difficulty (skip SPB=0 and DPB=5)
-        for diff_idx in [1, 2, 3, 4, 6, 7, 8, 9] {
-            let level = song.levels.get(diff_idx).copied().unwrap_or(0);
-            if level == 0 {
-                continue;
-            }
-
-            let difficulty = match Difficulty::from_u8(diff_idx as u8) {
-                Some(d) => d,
-                None => continue,
-            };
-
-            let total_notes = song.total_notes.get(diff_idx).copied().unwrap_or(0);
-            let unlocked = get_unlock_state_for_difficulty(
-                &self.game_data.unlock_state,
-                &self.game_data.song_db,
-                song_id,
-                difficulty,
-            );
-
-            if let Err(e) = api
-                .add_chart(&song_id_str, diff_idx as u8, level, total_notes, unlocked)
-                .await
-            {
-                error!(
-                    "Failed to add chart {:05}[{}]: {}",
-                    song_id,
-                    difficulty.short_name(),
-                    e
-                );
-            }
-
-            // Post initial score from score map
-            if let Some(score_data) = self.game_data.score_map.get(song_id) {
-                let ex_score = score_data.score[diff_idx];
-                let miss_count = score_data.miss_count[diff_idx].unwrap_or(0);
-                let lamp = score_data.lamp[diff_idx];
-                let grade = if total_notes > 0 {
-                    PlayData::calculate_grade(ex_score, total_notes)
-                } else {
-                    Grade::NoPlay
-                };
-
-                if let Err(e) = api
-                    .post_score(
-                        &song_id_str,
-                        diff_idx as u8,
-                        ex_score,
-                        miss_count,
-                        grade.short_name(),
-                        lamp.short_name(),
-                    )
-                    .await
-                {
-                    error!(
-                        "Failed to post score {:05}[{}]: {}",
-                        song_id,
-                        difficulty.short_name(),
-                        e
-                    );
-                }
-            }
-
-            // Small delay to avoid overwhelming the server
-            thread::sleep(Duration::from_millis(timing::SERVER_SYNC_REQUEST_DELAY_MS));
-        }
-
-        Ok(())
-    }
-
     /// Check game version and compare with offsets version
     ///
     /// Returns (game_version, matches) where matches is true if versions match
@@ -828,74 +442,5 @@ impl Reflux {
         };
 
         Ok((game_version, matches))
-    }
-
-    /// Update support files from update server
-    ///
-    /// Updates offsets.txt (if version matches), encodingfixes.txt, and customtypes.txt
-    pub async fn update_support_files<P: AsRef<Path>>(
-        &self,
-        game_version: &str,
-        base_dir: P,
-    ) -> Result<UpdateResult> {
-        if !self.config.update.update_files {
-            info!("Support file updates disabled in config");
-            return Ok(UpdateResult::default());
-        }
-
-        let update_server = &self.config.update.update_server;
-        if update_server.is_empty() {
-            warn!("No update server configured");
-            return Ok(UpdateResult::default());
-        }
-
-        // Create API client for update server
-        let api = RefluxApi::new(update_server.clone(), String::new())?;
-
-        let base = base_dir.as_ref();
-        let mut result = UpdateResult::default();
-
-        // Try to update offsets for the game version
-        let offsets_path = base.join("offsets.txt");
-        match api.update_offsets(game_version, &offsets_path).await {
-            Ok(true) => {
-                info!("Updated offsets.txt to version {}", game_version);
-                result.offsets_updated = true;
-            }
-            Ok(false) => {
-                info!("No matching offsets available for version {}", game_version);
-            }
-            Err(e) => {
-                warn!("Failed to check offsets update: {}", e);
-            }
-        }
-
-        // Update encoding fixes
-        let fixes_path = base.join("encodingfixes.txt");
-        match api.update_support_file("encodingfixes", &fixes_path).await {
-            Ok(true) => {
-                info!("Updated encodingfixes.txt");
-                result.encoding_fixes_updated = true;
-            }
-            Ok(false) => {}
-            Err(e) => {
-                warn!("Failed to update encodingfixes.txt: {}", e);
-            }
-        }
-
-        // Update custom types
-        let types_path = base.join("customtypes.txt");
-        match api.update_support_file("customtypes", &types_path).await {
-            Ok(true) => {
-                info!("Updated customtypes.txt");
-                result.custom_types_updated = true;
-            }
-            Ok(false) => {}
-            Err(e) => {
-                warn!("Failed to update customtypes.txt: {}", e);
-            }
-        }
-
-        Ok(result)
     }
 }

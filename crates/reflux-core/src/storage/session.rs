@@ -1,9 +1,6 @@
-use crate::config::LocalRecordConfig;
 use crate::error::Result;
 use crate::game::PlayData;
-use crate::storage::format::{
-    format_dynamic_tsv_header, format_dynamic_tsv_row, format_json_entry,
-};
+use crate::storage::format::{format_full_tsv_header, format_full_tsv_row, format_json_entry};
 use chrono::{DateTime, Local};
 use serde_json::{Value as JsonValue, json};
 use std::fs::{self};
@@ -39,8 +36,8 @@ impl SessionManager {
         Ok(session_file)
     }
 
-    /// Start a session with dynamic TSV header based on config
-    pub fn start_session_with_header(&mut self, config: &LocalRecordConfig) -> Result<PathBuf> {
+    /// Start a session with TSV header
+    pub fn start_tsv_session(&mut self) -> Result<PathBuf> {
         let now: DateTime<Local> = Local::now();
         fs::create_dir_all(&self.base_dir)?;
 
@@ -50,7 +47,7 @@ impl SessionManager {
             .join(format!("Session_{}.tsv", now.format("%Y_%m_%d_%H_%M_%S")));
 
         // Write header
-        let header = format_dynamic_tsv_header(config);
+        let header = format_full_tsv_header();
         fs::write(&tsv_file, format!("{}\n", header))?;
 
         self.current_tsv_session = Some(tsv_file.clone());
@@ -85,9 +82,9 @@ impl SessionManager {
     }
 
     /// Append a TSV row to the session file
-    pub fn append_tsv_row(&self, play_data: &PlayData, config: &LocalRecordConfig) -> Result<()> {
+    pub fn append_tsv_row(&self, play_data: &PlayData) -> Result<()> {
         if let Some(ref path) = self.current_tsv_session {
-            let row = format_dynamic_tsv_row(play_data, config);
+            let row = format_full_tsv_row(play_data);
             let mut file = fs::OpenOptions::new().append(true).open(path)?;
             writeln!(file, "{}", row)?;
         }

@@ -1,15 +1,12 @@
-pub mod config;
 pub mod error;
 pub mod game;
 pub mod memory;
-pub mod network;
 pub mod offset;
 pub mod reflux;
 pub mod storage;
 pub mod stream;
 
-pub use config::Config;
-pub use error::{ApiErrorRecord, ApiErrorTracker, Error, Result};
+pub use error::{Error, Result};
 pub use game::{
     AssistType, Chart, ChartInfo, CustomTypes, Difficulty, EncodingFixes, GameState,
     GameStateDetector, GaugeType, Grade, Judge, Lamp, PlayData, PlayType, RangeType, Settings,
@@ -18,13 +15,12 @@ pub use game::{
     get_unlock_states,
 };
 pub use memory::{MemoryReader, ProcessHandle};
-pub use network::{HttpClient, KamaitachiClient, RefluxApi};
 pub use offset::{
     CodeSignature, InteractiveSearchResult, JudgeInput, OffsetDump, OffsetSearcher,
     OffsetSignatureEntry, OffsetSignatureSet, OffsetsCollection, SearchPrompter, SearchResult,
     builtin_signatures, load_offsets, load_signatures, save_offsets, save_signatures,
 };
-pub use reflux::{GameData, Reflux, UpdateResult};
+pub use reflux::{GameData, Reflux};
 pub use storage::{
     ChartKey, ScoreData, ScoreMap, SessionManager, Tracker, TrackerInfo, TsvRowData, UnlockDb,
     export_song_list, export_tracker_tsv, format_tracker_tsv_header,

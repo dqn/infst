@@ -2,15 +2,11 @@ mod game_loop;
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
 
-use tokio::runtime::Handle;
 use tracing::{info, warn};
 
-use crate::config::Config;
-use crate::error::{ApiErrorTracker, Result};
+use crate::error::Result;
 use crate::game::{GameStateDetector, SongInfo, UnlockData};
-use crate::network::RefluxApi;
 use crate::offset::OffsetsCollection;
 use crate::storage::{ScoreMap, SessionManager, Tracker, UnlockDb};
 use crate::stream::StreamOutput;
@@ -40,64 +36,31 @@ impl GameData {
 
 /// Main Reflux application
 pub struct Reflux {
-    pub(crate) config: Config,
     pub(crate) offsets: OffsetsCollection,
     /// Game data from memory
     pub(crate) game_data: GameData,
     pub(crate) tracker: Tracker,
     pub(crate) state_detector: GameStateDetector,
     pub(crate) session_manager: SessionManager,
+    /// Stream output for OBS integration (not yet implemented)
+    #[allow(dead_code)]
     pub(crate) stream_output: StreamOutput,
-    pub(crate) api: Option<RefluxApi>,
     /// Persistent unlock state storage (from file)
     pub(crate) unlock_db: UnlockDb,
-    /// Tokio runtime handle for spawning async tasks
-    pub(crate) runtime_handle: Option<Handle>,
-    /// Tracker for API errors during session
-    pub(crate) api_error_tracker: Arc<ApiErrorTracker>,
 }
 
 impl Reflux {
-    pub fn new(config: Config, offsets: OffsetsCollection) -> Self {
-        let stream_output = StreamOutput::new(
-            config.livestream.show_play_state
-                || config.livestream.enable_marquee
-                || config.livestream.enable_full_song_info
-                || config.record.save_latest_json
-                || config.record.save_latest_txt,
-            ".".to_string(),
-        );
-
-        let api = if config.record.save_remote {
-            match RefluxApi::new(
-                config.remote_record.server_address.clone(),
-                config.remote_record.api_key.clone(),
-            ) {
-                Ok(api) => Some(api),
-                Err(e) => {
-                    warn!("Failed to create API client: {}, remote saving disabled", e);
-                    None
-                }
-            }
-        } else {
-            None
-        };
-
-        // Try to get the current tokio runtime handle if one exists
-        let runtime_handle = Handle::try_current().ok();
+    pub fn new(offsets: OffsetsCollection) -> Self {
+        let stream_output = StreamOutput::new(false, ".".to_string());
 
         Self {
-            config,
             offsets,
             game_data: GameData::new(),
             tracker: Tracker::new(),
             state_detector: GameStateDetector::new(),
             session_manager: SessionManager::new("sessions"),
             stream_output,
-            api,
             unlock_db: UnlockDb::new(),
-            runtime_handle,
-            api_error_tracker: Arc::new(ApiErrorTracker::new()),
         }
     }
 
@@ -178,11 +141,6 @@ impl Reflux {
         &self.offsets.version
     }
 
-    /// Get a reference to the config
-    pub fn config(&self) -> &Config {
-        &self.config
-    }
-
     /// Update offsets while preserving tracker and game data
     ///
     /// This method updates the offsets without creating a new Reflux instance,
@@ -202,12 +160,4 @@ impl Reflux {
             &self.game_data.custom_types,
         )
     }
-}
-
-/// Result of support file updates
-#[derive(Debug, Default)]
-pub struct UpdateResult {
-    pub offsets_updated: bool,
-    pub encoding_fixes_updated: bool,
-    pub custom_types_updated: bool,
 }

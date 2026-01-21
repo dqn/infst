@@ -26,26 +26,14 @@ pub enum Error {
     #[error("Song database not loaded")]
     SongDatabaseNotLoaded,
 
-    #[error("Config parse error: {0}")]
-    ConfigParseError(String),
-
-    #[error("Network error: {0}")]
-    NetworkError(String),
-
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 
-    #[error("{0}")]
-    Http(String),
-
     #[error("Encoding error: {0}")]
     EncodingError(String),
-
-    #[error("API call failed: {endpoint} - {message}")]
-    ApiError { endpoint: String, message: String },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -57,158 +45,9 @@ impl Error {
     }
 }
 
-impl From<reqwest::Error> for Error {
-    fn from(e: reqwest::Error) -> Self {
-        let message = if e.is_timeout() {
-            format!("Request timed out: {}", e)
-        } else if e.is_connect() {
-            format!("Connection failed: {}", e)
-        } else if e.is_request() {
-            format!("Request error: {}", e)
-        } else if let Some(status) = e.status() {
-            format!("HTTP {} error: {}", status.as_u16(), e)
-        } else {
-            format!("HTTP error: {}", e)
-        };
-        Error::Http(message)
-    }
-}
-
-/// Tracks API errors during a session for summary reporting
-#[derive(Debug, Default)]
-pub struct ApiErrorTracker {
-    errors: std::sync::Mutex<Vec<ApiErrorRecord>>,
-}
-
-/// Record of a single API error
-#[derive(Debug, Clone)]
-pub struct ApiErrorRecord {
-    pub endpoint: String,
-    pub message: String,
-    pub context: String,
-}
-
-impl ApiErrorTracker {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Record an API error
-    pub fn record(
-        &self,
-        endpoint: impl Into<String>,
-        message: impl Into<String>,
-        context: impl Into<String>,
-    ) {
-        match self.errors.lock() {
-            Ok(mut errors) => {
-                errors.push(ApiErrorRecord {
-                    endpoint: endpoint.into(),
-                    message: message.into(),
-                    context: context.into(),
-                });
-            }
-            Err(e) => {
-                // Mutex is poisoned - another thread panicked while holding the lock.
-                // Log and continue; we don't want to propagate the panic.
-                tracing::warn!("ApiErrorTracker mutex poisoned, error not recorded: {}", e);
-            }
-        }
-    }
-
-    /// Get the number of recorded errors
-    pub fn count(&self) -> usize {
-        match self.errors.lock() {
-            Ok(e) => e.len(),
-            Err(e) => {
-                tracing::warn!("ApiErrorTracker mutex poisoned in count(): {}", e);
-                0
-            }
-        }
-    }
-
-    /// Get a summary of errors grouped by endpoint
-    pub fn summary(&self) -> Vec<(String, usize)> {
-        let errors = match self.errors.lock() {
-            Ok(e) => e,
-            Err(e) => {
-                tracing::warn!("ApiErrorTracker mutex poisoned in summary(): {}", e);
-                return Vec::new();
-            }
-        };
-
-        let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
-        for error in errors.iter() {
-            *counts.entry(error.endpoint.clone()).or_insert(0) += 1;
-        }
-
-        let mut result: Vec<_> = counts.into_iter().collect();
-        result.sort_by(|a, b| b.1.cmp(&a.1));
-        result
-    }
-
-    /// Clear all recorded errors
-    pub fn clear(&self) {
-        match self.errors.lock() {
-            Ok(mut errors) => errors.clear(),
-            Err(e) => {
-                tracing::warn!("ApiErrorTracker mutex poisoned in clear(): {}", e);
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_api_error_tracker_new() {
-        let tracker = ApiErrorTracker::new();
-        assert_eq!(tracker.count(), 0);
-    }
-
-    #[test]
-    fn test_api_error_tracker_record() {
-        let tracker = ApiErrorTracker::new();
-        tracker.record("endpoint1", "error message", "context");
-        assert_eq!(tracker.count(), 1);
-    }
-
-    #[test]
-    fn test_api_error_tracker_summary() {
-        let tracker = ApiErrorTracker::new();
-        tracker.record("endpoint1", "error1", "ctx1");
-        tracker.record("endpoint1", "error2", "ctx2");
-        tracker.record("endpoint2", "error3", "ctx3");
-
-        let summary = tracker.summary();
-        assert_eq!(summary.len(), 2);
-
-        // endpoint1 should have 2 errors
-        let endpoint1_count = summary
-            .iter()
-            .find(|(e, _)| e == "endpoint1")
-            .map(|(_, c)| *c);
-        assert_eq!(endpoint1_count, Some(2));
-
-        // endpoint2 should have 1 error
-        let endpoint2_count = summary
-            .iter()
-            .find(|(e, _)| e == "endpoint2")
-            .map(|(_, c)| *c);
-        assert_eq!(endpoint2_count, Some(1));
-    }
-
-    #[test]
-    fn test_api_error_tracker_clear() {
-        let tracker = ApiErrorTracker::new();
-        tracker.record("endpoint", "error", "ctx");
-        assert_eq!(tracker.count(), 1);
-
-        tracker.clear();
-        assert_eq!(tracker.count(), 0);
-    }
 
     #[test]
     fn test_error_is_not_found() {

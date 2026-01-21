@@ -7,14 +7,11 @@ license.workspace = true
 [dependencies]
 anyhow.workspace = true
 thiserror.workspace = true
-tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-reqwest.workspace = true
 encoding_rs.workspace = true
 tracing.workspace = true
 chrono.workspace = true
-urlencoding.workspace = true
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows.workspace = true
