@@ -159,6 +159,12 @@ impl Reflux {
     /// This method updates the offsets without creating a new Reflux instance,
     /// preserving the loaded tracker data and game state.
     pub fn update_offsets(&mut self, offsets: OffsetsCollection) {
+        if offsets.has_state_detection_offsets() {
+            info!(
+                "Updated state detection offsets: judge_data=0x{:X}, play_settings=0x{:X}",
+                offsets.judge_data, offsets.play_settings
+            );
+        }
         self.offsets = offsets;
     }
 

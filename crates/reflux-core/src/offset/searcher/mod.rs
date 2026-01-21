@@ -9,7 +9,7 @@ use tracing::{debug, info, warn};
 use crate::error::{Error, Result};
 use crate::game::{PlayType, SongInfo};
 use crate::memory::ReadMemory;
-use crate::memory::layout::judge;
+use crate::memory::layout::{judge, settings};
 use crate::offset::{CodeSignature, OffsetSignatureSet, OffsetsCollection};
 
 use constants::*;
@@ -1202,17 +1202,28 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         let unknown = self.reader.read_i32(addr + 12).ok()?;
         let range = self.reader.read_i32(addr + 16).ok()?;
 
-        // Valid ranges check
-        if (0..=7).contains(&style)
-            && (0..=5).contains(&gauge)
-            && (0..=3).contains(&assist)
-            && (0..=1).contains(&unknown)
-            && (0..=4).contains(&range)
+        // Valid ranges check for settings fields
+        if !(0..=7).contains(&style)
+            || !(0..=5).contains(&gauge)
+            || !(0..=3).contains(&assist)
+            || !(0..=1).contains(&unknown)
+            || !(0..=4).contains(&range)
         {
-            Some(addr)
-        } else {
-            None
+            return None;
         }
+
+        // Additional validation: song_select_marker should be 0 or 1
+        // This prevents false positives from addresses that happen to have
+        // valid-looking settings but incorrect song_select_marker
+        let song_select_marker = self
+            .reader
+            .read_i32(addr.wrapping_sub(settings::SONG_SELECT_MARKER))
+            .ok()?;
+        if !(0..=1).contains(&song_select_marker) {
+            return None;
+        }
+
+        Some(addr)
     }
 
     /// Validate if an address contains valid PlayData
