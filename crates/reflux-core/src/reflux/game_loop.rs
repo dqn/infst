@@ -280,16 +280,22 @@ impl Reflux {
     }
 
     fn fetch_play_data(&self, reader: &MemoryReader) -> Result<PlayData> {
-        // Read basic play data
+        // Read data in same order as C# implementation:
+        // 1. Judge data first (updates earliest on result screen)
+        // 2. Settings
+        // 3. PlayData last (song_id, difficulty, lamp)
+        // This ordering ensures we get consistent data when transitioning to result screen,
+        // since judge data updates before play data in the game.
+        let judge = self.fetch_judge_data(reader)?;
+        let settings = self.fetch_settings(reader, judge.play_type)?;
+
+        // Read basic play data (after judge/settings to match C# timing)
         let song_id = reader.read_i32(self.offsets.play_data + play::SONG_ID)? as u32;
         let difficulty_val = reader.read_i32(self.offsets.play_data + play::DIFFICULTY)?;
         let lamp_val = reader.read_i32(self.offsets.play_data + play::LAMP)?;
 
         let difficulty = Difficulty::from_u8(difficulty_val as u8).unwrap_or(Difficulty::SpN);
         let mut lamp = Lamp::from_u8(lamp_val as u8).unwrap_or(Lamp::NoPlay);
-
-        // Fetch judge data
-        let judge = self.fetch_judge_data(reader)?;
 
         // Upgrade to PFC if applicable
         if judge.is_pfc() && lamp == Lamp::FullCombo {
@@ -298,9 +304,6 @@ impl Reflux {
 
         // Calculate EX score
         let ex_score = judge.ex_score();
-
-        // Fetch settings
-        let settings = self.fetch_settings(reader, judge.play_type)?;
         let data_available =
             !settings.h_ran && !settings.battle && settings.assist == AssistType::Off;
 
@@ -351,20 +354,22 @@ impl Reflux {
 
     /// Read gauge value from memory based on play type
     fn read_gauge(&self, reader: &MemoryReader, play_type: PlayType) -> u8 {
-        match play_type {
+        let raw_value = match play_type {
             PlayType::P1 | PlayType::Dp => {
                 // For P1 and DP, use P1 gauge (DP has same value on both sides)
                 reader
                     .read_i32(self.offsets.judge_data + judge::P1_GAUGE)
-                    .unwrap_or(0) as u8
+                    .unwrap_or(0)
             }
             PlayType::P2 => {
                 // For P2, use P2 gauge
                 reader
                     .read_i32(self.offsets.judge_data + judge::P2_GAUGE)
-                    .unwrap_or(0) as u8
+                    .unwrap_or(0)
             }
-        }
+        };
+        // Clamp to valid range (0-100%)
+        raw_value.clamp(0, 100) as u8
     }
 
     fn fetch_judge_data(&self, reader: &MemoryReader) -> Result<Judge> {
