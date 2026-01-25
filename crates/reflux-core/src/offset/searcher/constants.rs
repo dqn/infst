@@ -20,7 +20,7 @@
 //! │                                          ▼               │
 //! │  PlaySettings  ◄──── 0x2ACEE8 ────► JudgeData ◄──(2)    │
 //! │       │                                  │               │
-//! │       │ 0x2F0                           │ 0x160         │
+//! │       │ 0x2C0                           │ 0x160         │
 //! │       ▼                                  ▼               │
 //! │   PlayData ◄──(4)                   CurrentSong ◄──(5)  │
 //! │       ▲                                                  │
@@ -76,12 +76,12 @@ pub const PLAY_SETTINGS_SEARCH_RANGE: usize = 0x2000;
 /// Historical variation: ±0x600 (1.5KB)
 pub const JUDGE_TO_SONG_LIST: u64 = 0x94E3C8;
 
-/// Expected offset: playData - playSettings ≈ 0x2F0
+/// Expected offset: playData - playSettings ≈ 0x2C0
 ///
-/// Historical variation: ±0x30 (48 bytes)
-/// - 2025122400 and later: 0x2F0 (752 bytes)
-/// - Before 2025122400: 0x2C0 (704 bytes)
-pub const PLAY_SETTINGS_TO_PLAY_DATA: u64 = 0x2F0;
+/// Historical variation: ±0x10 (16 bytes)
+/// - 2025122400 and later: 0x2C0 (704 bytes)
+/// - Before 2025122400: 0x2B0 (688 bytes)
+pub const PLAY_SETTINGS_TO_PLAY_DATA: u64 = 0x2C0;
 
 /// Search range for playData (±256 bytes)
 ///
