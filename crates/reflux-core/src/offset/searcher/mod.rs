@@ -4,7 +4,7 @@ mod constants;
 mod types;
 mod utils;
 
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 use crate::error::{Error, Result};
 use crate::game::{PlayType, SongInfo};
@@ -125,7 +125,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             }) {
                 Ok(addr) => addr,
                 Err(e) => {
-                    warn!(
+                    info!(
                         "PlayData signature search failed: {}. Falling back to relative search...",
                         e
                     );
