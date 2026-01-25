@@ -6,7 +6,7 @@ use std::thread;
 use std::time::Duration;
 
 use chrono::Utc;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 
 // =============================================================================
 // Retry and polling configuration
@@ -172,7 +172,7 @@ impl Reflux {
                     }
                     // Data not ready yet, continue polling
                     if attempt == POLL_DELAYS_MS.len() - 1 {
-                        warn!(
+                        info!(
                             "Play data notes count is zero after {} attempts",
                             POLL_DELAYS_MS.len()
                         );
