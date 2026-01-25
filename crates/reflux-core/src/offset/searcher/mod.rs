@@ -596,6 +596,15 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
 
         for signature in &entry.signatures {
             let candidates = self.resolve_signature_targets(signature)?;
+            if !candidates.is_empty() {
+                debug!(
+                    "  {}: signature {} found {} raw candidates: {:X?}",
+                    name,
+                    signature.pattern,
+                    candidates.len(),
+                    &candidates[..candidates.len().min(5)]
+                );
+            }
             let mut valid: Vec<u64> = candidates
                 .into_iter()
                 .filter(|addr| addr.is_multiple_of(4))
