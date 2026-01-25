@@ -476,13 +476,13 @@ pub fn format_play_data_console(play_data: &PlayData) -> String {
     let judge = &play_data.judge;
     let line2 = format!(
         "  Judge: {}/{}/{}/{}/{}  Fast/Slow: {}/{}  CB: {}",
-        judge.pgreat,
-        judge.great,
-        judge.good,
-        judge.bad,
-        judge.poor,
-        judge.fast,
-        judge.slow,
+        judge.pgreat.cyan(),
+        judge.great.yellow(),
+        judge.good.truecolor(255, 200, 0), // gold (between yellow and orange)
+        judge.bad.truecolor(255, 165, 0),  // orange
+        judge.poor.red(),
+        judge.fast.blue(),
+        judge.slow.red(),
         judge.combo_break
     );
 
