@@ -1,7 +1,9 @@
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 
+use owo_colors::OwoColorize;
 use serde::Serialize;
 use serde_json::{Value as JsonValue, json};
 
@@ -433,44 +435,107 @@ pub fn export_song_list<P: AsRef<Path>>(path: P, song_db: &HashMap<u32, SongInfo
     Ok(())
 }
 
-/// Format play data for console display with aligned columns
+/// Format play data for console display with colored output
 ///
-/// Returns a multi-line string with header and values aligned
+/// Returns a multi-line string with a boxed format
 pub fn format_play_data_console(play_data: &PlayData) -> String {
-    let mut lines = Vec::new();
-    lines.push("\nLATEST RESULT:".to_string());
+    let mut output = String::new();
 
-    // Build key-value pairs
-    let pairs = [
-        ("Title", play_data.chart.title.to_string()),
-        (
-            "Difficulty",
-            play_data.chart.difficulty.short_name().to_string(),
-        ),
-        ("Level", play_data.chart.level.to_string()),
-        ("EX Score", play_data.ex_score.to_string()),
-        ("Grade", play_data.grade.short_name().to_string()),
-        ("Lamp", play_data.lamp.short_name().to_string()),
-        ("PGreat", play_data.judge.pgreat.to_string()),
-        ("Great", play_data.judge.great.to_string()),
-        ("Good", play_data.judge.good.to_string()),
-        ("Bad", play_data.judge.bad.to_string()),
-        ("Poor", play_data.judge.poor.to_string()),
-        ("Fast", play_data.judge.fast.to_string()),
-        ("Slow", play_data.judge.slow.to_string()),
-        ("ComboBreak", play_data.judge.combo_break.to_string()),
-        (
-            "PlayType",
-            play_data.judge.play_type.short_name().to_string(),
-        ),
-        ("Style", play_data.settings.style.as_str().to_string()),
-    ];
+    // Build title line: "冥 [SPA Lv.12]"
+    let difficulty_label = format_colored_difficulty(&play_data.chart.difficulty);
+    let title_content = format!(
+        "  {} [{} Lv.{}]",
+        play_data.chart.title.bold(),
+        difficulty_label,
+        play_data.chart.level
+    );
 
-    for (key, value) in pairs {
-        lines.push(format!("{:>15}: {:<50}", key, value));
+    // Calculate display width (approximate, accounting for ANSI codes)
+    let content_width = play_data.chart.title.len()
+        + play_data.chart.difficulty.short_name().len()
+        + play_data.chart.level.to_string().len()
+        + 12; // " [" + " Lv." + "]" + padding
+    let border_width = content_width.max(50);
+
+    // Build border line
+    let border: String = "━".repeat(border_width);
+    let border_dim = border.dimmed();
+
+    // Build option string
+    let option = play_data.settings.style.as_str();
+
+    // Build data lines
+    let lamp_colored = format_colored_lamp(&play_data.lamp);
+    let grade_colored = format_colored_grade(&play_data.grade);
+
+    let line1 = format!(
+        "  Option: {}  Score: {} ({})  Lamp: {}",
+        option, play_data.ex_score, grade_colored, lamp_colored
+    );
+
+    let judge = &play_data.judge;
+    let line2 = format!(
+        "  Judge: {}/{}/{}/{}/{}  Fast/Slow: {}/{}  CB: {}",
+        judge.pgreat,
+        judge.great,
+        judge.good,
+        judge.bad,
+        judge.poor,
+        judge.fast,
+        judge.slow,
+        judge.combo_break
+    );
+
+    let _ = writeln!(output, "{}", border_dim);
+    let _ = writeln!(output, "{}", title_content);
+    let _ = writeln!(output, "{}", border_dim);
+    let _ = writeln!(output, "{}", line1);
+    let _ = writeln!(output, "{}", line2);
+    let _ = write!(output, "{}", border_dim);
+
+    output
+}
+
+/// Format difficulty with color
+fn format_colored_difficulty(difficulty: &Difficulty) -> String {
+    let name = difficulty.short_name();
+    match difficulty.expand_name() {
+        "BEGINNER" => name.green().to_string(),
+        "NORMAL" => name.blue().to_string(),
+        "HYPER" => name.yellow().to_string(),
+        "ANOTHER" => name.red().to_string(),
+        "LEGGENDARIA" => name.purple().to_string(),
+        _ => name.to_string(),
     }
+}
 
-    lines.join("\n")
+/// Format lamp with color
+fn format_colored_lamp(lamp: &Lamp) -> String {
+    let name = lamp.short_name();
+    match lamp {
+        Lamp::NoPlay => name.dimmed().to_string(),
+        Lamp::Failed => name.red().to_string(),
+        Lamp::AssistClear => name.purple().to_string(),
+        Lamp::EasyClear => name.green().to_string(),
+        Lamp::Clear => name.blue().to_string(),
+        Lamp::HardClear => name.bold().to_string(),
+        Lamp::ExHardClear => name.yellow().to_string(),
+        Lamp::FullCombo | Lamp::Pfc => name.cyan().to_string(),
+    }
+}
+
+/// Format grade with color
+fn format_colored_grade(grade: &Grade) -> String {
+    let name = grade.short_name();
+    match grade {
+        Grade::NoPlay => name.dimmed().to_string(),
+        Grade::F => name.red().to_string(),
+        Grade::E | Grade::D => name.truecolor(255, 165, 0).to_string(), // orange
+        Grade::C | Grade::B => name.yellow().to_string(),
+        Grade::A => name.green().to_string(),
+        Grade::Aa => name.cyan().to_string(),
+        Grade::Aaa => name.yellow().bold().to_string(),
+    }
 }
 
 /// Simple play data summary for logging
