@@ -438,7 +438,7 @@ pub fn export_song_list<P: AsRef<Path>>(path: P, song_db: &HashMap<u32, SongInfo
 /// Returns a multi-line string with header and values aligned
 pub fn format_play_data_console(play_data: &PlayData) -> String {
     let mut lines = Vec::new();
-    lines.push("\nLATEST CLEAR:".to_string());
+    lines.push("\nLATEST RESULT:".to_string());
 
     // Build key-value pairs
     let pairs = [
