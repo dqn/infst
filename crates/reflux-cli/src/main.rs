@@ -1,3 +1,6 @@
+mod input;
+mod shutdown;
+
 use anyhow::{Result, bail};
 use clap::Parser;
 #[cfg(test)]
@@ -7,10 +10,9 @@ use reflux_core::{
     CustomTypes, EncodingFixes, MemoryReader, OffsetSearcher, OffsetsCollection, ProcessHandle,
     Reflux, ScoreMap, SongInfo, builtin_signatures, fetch_song_database_with_fixes,
 };
+use shutdown::ShutdownSignal;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
@@ -55,17 +57,17 @@ fn load_song_database_with_retry(
     reader: &MemoryReader,
     song_list: u64,
     encoding_fixes: Option<&EncodingFixes>,
-    running: &AtomicBool,
+    shutdown: &ShutdownSignal,
 ) -> Result<Option<HashMap<u32, SongInfo>>> {
-    const RETRY_DELAY_MS: u64 = 5000;
-    const EXTRA_DELAY_MS: u64 = 1000;
+    const RETRY_DELAY: Duration = Duration::from_secs(5);
+    const EXTRA_DELAY: Duration = Duration::from_secs(1);
     const MAX_ATTEMPTS: u32 = 12;
 
     let mut attempts = 0u32;
     let mut last_error: Option<String> = None;
     loop {
         // Check for shutdown signal
-        if !running.load(Ordering::SeqCst) {
+        if shutdown.is_shutdown() {
             return Ok(None);
         }
 
@@ -78,11 +80,8 @@ fn load_song_database_with_retry(
         }
         attempts += 1;
 
-        // Wait for data initialization
-        thread::sleep(Duration::from_millis(EXTRA_DELAY_MS));
-
-        // Check for shutdown signal after sleep
-        if !running.load(Ordering::SeqCst) {
+        // Wait for data initialization (interruptible)
+        if shutdown.wait(EXTRA_DELAY) {
             return Ok(None);
         }
 
@@ -95,7 +94,7 @@ fn load_song_database_with_retry(
                         warn!(
                             "Song list not fully populated ({} songs), retrying in {}s (attempt {}/{})",
                             count,
-                            RETRY_DELAY_MS / 1000,
+                            RETRY_DELAY.as_secs(),
                             attempts,
                             MAX_ATTEMPTS
                         );
@@ -109,7 +108,7 @@ fn load_song_database_with_retry(
                             "Notecount data seems bad (song {}, notes {}), retrying in {}s (attempt {}/{})",
                             READY_SONG_ID,
                             notes,
-                            RETRY_DELAY_MS / 1000,
+                            RETRY_DELAY.as_secs(),
                             attempts,
                             MAX_ATTEMPTS
                         );
@@ -122,18 +121,24 @@ fn load_song_database_with_retry(
                         return Ok(Some(db));
                     }
                 }
-                thread::sleep(Duration::from_millis(RETRY_DELAY_MS));
+                // Interruptible retry delay
+                if shutdown.wait(RETRY_DELAY) {
+                    return Ok(None);
+                }
             }
             Err(e) => {
                 last_error = Some(e.to_string());
                 warn!(
                     "Failed to load song database ({}), retrying in {}s (attempt {}/{})",
                     e,
-                    RETRY_DELAY_MS / 1000,
+                    RETRY_DELAY.as_secs(),
                     attempts,
                     MAX_ATTEMPTS
                 );
-                thread::sleep(Duration::from_millis(RETRY_DELAY_MS));
+                // Interruptible retry delay
+                if shutdown.wait(RETRY_DELAY) {
+                    return Ok(None);
+                }
             }
         }
     }
@@ -142,22 +147,20 @@ fn load_song_database_with_retry(
 fn search_offsets_with_retry(
     reader: &MemoryReader,
     game_version: Option<&String>,
-    running: &AtomicBool,
+    shutdown: &ShutdownSignal,
 ) -> Result<Option<OffsetsCollection>> {
-    const RETRY_DELAY_MS: u64 = 5000;
+    const RETRY_DELAY: Duration = Duration::from_secs(5);
 
     let signatures = builtin_signatures();
 
     loop {
-        // Check for shutdown signal before sleeping
-        if !running.load(Ordering::SeqCst) {
+        // Check for shutdown signal
+        if shutdown.is_shutdown() {
             return Ok(None);
         }
 
-        thread::sleep(Duration::from_millis(RETRY_DELAY_MS));
-
-        // Check for shutdown signal after sleeping
-        if !running.load(Ordering::SeqCst) {
+        // Interruptible retry delay
+        if shutdown.wait(RETRY_DELAY) {
             return Ok(None);
         }
 
@@ -175,14 +178,14 @@ fn search_offsets_with_retry(
 
                 info!(
                     "Offset validation failed, retrying in {}s...",
-                    RETRY_DELAY_MS / 1000
+                    RETRY_DELAY.as_secs()
                 );
             }
             Err(e) => {
                 info!(
                     "Offset detection failed ({}), retrying in {}s...",
                     e,
-                    RETRY_DELAY_MS / 1000
+                    RETRY_DELAY.as_secs()
                 );
             }
         }
@@ -203,12 +206,16 @@ fn main() -> Result<()> {
     tracing_subscriber::fmt().with_env_filter(env_filter).init();
 
     // Setup graceful shutdown handler
-    let running = Arc::new(AtomicBool::new(true));
-    let r = Arc::clone(&running);
+    let shutdown = Arc::new(ShutdownSignal::new());
+    let shutdown_ctrlc = Arc::clone(&shutdown);
     ctrlc::set_handler(move || {
         info!("Received shutdown signal, stopping...");
-        r.store(false, Ordering::SeqCst);
+        shutdown_ctrlc.trigger();
     })?;
+
+    // Spawn keyboard input monitor (Esc, q, Q to quit)
+    let shutdown_keyboard = Arc::clone(&shutdown);
+    let _keyboard_handle = input::spawn_keyboard_monitor(shutdown_keyboard);
 
     // Print version and check for updates
     let current_version = env!("CARGO_PKG_VERSION");
@@ -217,9 +224,9 @@ fn main() -> Result<()> {
     // Create Reflux instance
     let mut reflux = Reflux::new(OffsetsCollection::default());
 
-    // Main loop: wait for process (exits on Ctrl+C)
-    println!("Waiting for INFINITAS...");
-    while running.load(Ordering::SeqCst) {
+    // Main loop: wait for process (exits on Ctrl+C, Esc, or q)
+    println!("Waiting for INFINITAS... (Press Esc or q to quit)");
+    while !shutdown.is_shutdown() {
         match ProcessHandle::find_and_open() {
             Ok(process) => {
                 debug!(
@@ -251,7 +258,7 @@ fn main() -> Result<()> {
                     info!("Invalid offsets detected. Attempting signature search...");
 
                     let offsets =
-                        search_offsets_with_retry(&reader, game_version.as_ref(), &running)?;
+                        search_offsets_with_retry(&reader, game_version.as_ref(), &shutdown)?;
                     let Some(offsets) = offsets else {
                         // Shutdown requested during offset search
                         break;
@@ -283,7 +290,7 @@ fn main() -> Result<()> {
                     &reader,
                     reflux.offsets().song_list,
                     encoding_fixes.as_ref(),
-                    &running,
+                    &shutdown,
                 )?;
                 let Some(song_db) = song_db else {
                     // Shutdown requested during song database loading
@@ -354,7 +361,7 @@ fn main() -> Result<()> {
                 println!("Ready to track. Waiting for plays...");
 
                 // Run tracker loop
-                if let Err(e) = reflux.run(&process, &running) {
+                if let Err(e) = reflux.run(&process, shutdown.as_atomic()) {
                     error!("Tracker error: {}", e);
                 }
 
@@ -370,12 +377,10 @@ fn main() -> Result<()> {
             }
         }
 
-        // Check if we should continue or exit
-        if !running.load(Ordering::SeqCst) {
+        // Interruptible wait before retry
+        if shutdown.wait(Duration::from_secs(5)) {
             break;
         }
-
-        thread::sleep(Duration::from_secs(5));
     }
 
     info!("Shutdown complete");
