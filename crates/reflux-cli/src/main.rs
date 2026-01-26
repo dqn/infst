@@ -173,13 +173,13 @@ fn search_offsets_with_retry(
                     return Ok(Some(offsets));
                 }
 
-                warn!(
+                info!(
                     "Offset validation failed, retrying in {}s...",
                     RETRY_DELAY_MS / 1000
                 );
             }
             Err(e) => {
-                warn!(
+                info!(
                     "Offset detection failed ({}), retrying in {}s...",
                     e,
                     RETRY_DELAY_MS / 1000
@@ -218,7 +218,7 @@ fn main() -> Result<()> {
     let mut reflux = Reflux::new(OffsetsCollection::default());
 
     // Main loop: wait for process (exits on Ctrl+C)
-    debug!("Waiting for INFINITAS process...");
+    println!("Waiting for INFINITAS...");
     while running.load(Ordering::SeqCst) {
         match ProcessHandle::find_and_open() {
             Ok(process) => {
