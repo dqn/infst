@@ -19,14 +19,13 @@ pub fn spawn_keyboard_monitor(shutdown: Arc<ShutdownSignal>) -> JoinHandle<()> {
 
         while !shutdown.is_shutdown() {
             // Poll for events with a timeout to allow checking shutdown state
-            if event::poll(Duration::from_millis(100)).unwrap_or(false) {
-                if let Ok(Event::Key(key_event)) = event::read() {
-                    if should_shutdown(&key_event) {
-                        debug!("Shutdown key pressed: {:?}", key_event.code);
-                        shutdown.trigger();
-                        break;
-                    }
-                }
+            if event::poll(Duration::from_millis(100)).unwrap_or(false)
+                && let Ok(Event::Key(key_event)) = event::read()
+                && should_shutdown(&key_event)
+            {
+                debug!("Shutdown key pressed: {:?}", key_event.code);
+                shutdown.trigger();
+                break;
             }
         }
 

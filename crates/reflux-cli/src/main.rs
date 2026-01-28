@@ -1,14 +1,16 @@
 mod input;
+mod prompter;
 mod shutdown;
 
 use anyhow::{Result, bail};
-use clap::Parser;
+use clap::{Parser, Subcommand};
+use prompter::CliPrompter;
 #[cfg(test)]
 use reflux_core::UnlockType;
 use reflux_core::game::find_game_version;
 use reflux_core::{
     CustomTypes, EncodingFixes, MemoryReader, OffsetSearcher, OffsetsCollection, ProcessHandle,
-    Reflux, ScoreMap, SongInfo, builtin_signatures, fetch_song_database_with_fixes,
+    Reflux, ScoreMap, SongInfo, builtin_signatures, fetch_song_database_with_fixes, save_offsets,
 };
 use shutdown::ShutdownSignal;
 use std::collections::HashMap;
@@ -195,16 +197,121 @@ fn search_offsets_with_retry(
 #[derive(Parser)]
 #[command(name = "reflux")]
 #[command(about = "INFINITAS score tracker", version)]
-struct Args {}
+struct Args {
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// Search for memory offsets interactively
+    FindOffsets {
+        /// Output file path
+        #[arg(short, long, default_value = "offsets.txt")]
+        output: String,
+    },
+}
 
 fn main() -> Result<()> {
-    Args::parse();
+    let args = Args::parse();
 
     // Initialize logging (RUST_LOG がなければ warn を既定にする)
     let env_filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new("reflux=warn,reflux_core=warn"));
     tracing_subscriber::fmt().with_env_filter(env_filter).init();
 
+    match args.command {
+        Some(Command::FindOffsets { output }) => run_find_offsets(&output),
+        None => run_tracking_mode(),
+    }
+}
+
+/// Run the find-offsets interactive mode
+fn run_find_offsets(output: &str) -> Result<()> {
+    // Setup graceful shutdown handler (Ctrl+C only, no keyboard monitor)
+    let shutdown = Arc::new(ShutdownSignal::new());
+    let shutdown_ctrlc = Arc::clone(&shutdown);
+    ctrlc::set_handler(move || {
+        info!("Received shutdown signal, stopping...");
+        shutdown_ctrlc.trigger();
+    })?;
+
+    let current_version = env!("CARGO_PKG_VERSION");
+    info!("Reflux-RS {} - Offset Search Mode", current_version);
+
+    println!("Waiting for INFINITAS... (Press Ctrl+C to cancel)");
+
+    // Wait for process
+    let process = loop {
+        if shutdown.is_shutdown() {
+            info!("Cancelled");
+            return Ok(());
+        }
+
+        match ProcessHandle::find_and_open() {
+            Ok(p) => break p,
+            Err(_) => {
+                if shutdown.wait(Duration::from_secs(2)) {
+                    info!("Cancelled");
+                    return Ok(());
+                }
+            }
+        }
+    };
+
+    debug!(
+        "Found INFINITAS process (base: {:#x})",
+        process.base_address
+    );
+
+    let reader = MemoryReader::new(&process);
+
+    // Game version detection
+    let game_version = match find_game_version(&reader, process.base_address) {
+        Ok(Some(version)) => {
+            println!("Detected game version: {}", version);
+            version
+        }
+        Ok(None) => {
+            println!("Could not detect game version, using 'unknown'");
+            "unknown".to_string()
+        }
+        Err(e) => {
+            warn!("Failed to check game version: {}", e);
+            "unknown".to_string()
+        }
+    };
+
+    // Run interactive search
+    let prompter = CliPrompter;
+    let mut searcher = OffsetSearcher::new(&reader);
+    let old_offsets = OffsetsCollection::default();
+
+    let result = searcher.interactive_search(&prompter, &old_offsets, &game_version)?;
+
+    // Display results
+    println!();
+    println!("=== Offset Search Results ===");
+    println!("Version:      {}", result.offsets.version);
+    println!("Play Type:    {}", result.play_type.short_name());
+    println!("SongList:     0x{:X}", result.offsets.song_list);
+    println!("JudgeData:    0x{:X}", result.offsets.judge_data);
+    println!("PlaySettings: 0x{:X}", result.offsets.play_settings);
+    println!("PlayData:     0x{:X}", result.offsets.play_data);
+    println!("CurrentSong:  0x{:X}", result.offsets.current_song);
+    println!("DataMap:      0x{:X}", result.offsets.data_map);
+    println!("UnlockData:   0x{:X}", result.offsets.unlock_data);
+
+    // Save to file
+    save_offsets(output, &result.offsets)?;
+    println!();
+    println!("Offsets saved to: {}", output);
+
+    Ok(())
+}
+
+/// Run the main tracking mode
+fn run_tracking_mode() -> Result<()> {
     // Setup graceful shutdown handler
     let shutdown = Arc::new(ShutdownSignal::new());
     let shutdown_ctrlc = Arc::clone(&shutdown);
