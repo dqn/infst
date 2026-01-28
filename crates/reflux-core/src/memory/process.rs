@@ -20,7 +20,9 @@ use windows::Win32::System::ProcessStatus::{
     EnumProcessModulesEx, GetModuleInformation, LIST_MODULES_ALL, MODULEINFO,
 };
 #[cfg(target_os = "windows")]
-use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ};
+use windows::Win32::System::Threading::{
+    GetExitCodeProcess, OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ,
+};
 
 const PROCESS_NAME: &str = "bm2dx.exe";
 
@@ -65,6 +67,22 @@ impl ProcessHandle {
     pub fn handle(&self) -> HANDLE {
         self.handle
     }
+
+    /// Check if the process is still running
+    pub fn is_alive(&self) -> bool {
+        const STILL_ACTIVE: u32 = 259;
+
+        let mut exit_code: u32 = 0;
+        // SAFETY: GetExitCodeProcess is called with a valid process handle obtained from OpenProcess.
+        // The exit_code variable is properly initialized and passed by mutable reference.
+        unsafe {
+            if GetExitCodeProcess(self.handle, &mut exit_code).is_ok() {
+                exit_code == STILL_ACTIVE
+            } else {
+                false
+            }
+        }
+    }
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -79,6 +97,11 @@ impl ProcessHandle {
         Err(Error::ProcessNotFound(
             "Windows only: process access not supported on this platform".to_string(),
         ))
+    }
+
+    /// Check if the process is still running (stub for non-Windows)
+    pub fn is_alive(&self) -> bool {
+        false
     }
 }
 

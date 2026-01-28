@@ -14,10 +14,10 @@ use tracing::{debug, error, info, warn};
 // =============================================================================
 
 /// Memory read retry settings.
-/// Exponential backoff: 50ms → 100ms → 200ms = total 350ms max.
-/// Handles transient read failures while keeping latency acceptable.
-const MAX_READ_RETRIES: u32 = 3;
-const RETRY_DELAYS_MS: [u64; 3] = [50, 100, 200];
+/// Exponential backoff: 100ms → 200ms → 400ms → 800ms = total 1.5s max.
+/// Longer delays reduce false disconnection detection from transient failures.
+const MAX_READ_RETRIES: u32 = 5;
+const RETRY_DELAYS_MS: [u64; 5] = [100, 200, 400, 800, 1600];
 
 /// Result screen polling delays (exponential backoff).
 /// Total: 50+50+100+100+200+200+300+300+500+500 = 2.3 seconds max.
@@ -60,15 +60,27 @@ impl Reflux {
                 break;
             }
 
-            // Check if process is still alive with retry mechanism (exponential backoff)
-            let mut process_alive = false;
+            // Step 1: Fast check if process is still alive via exit code
+            if !process.is_alive() {
+                debug!("Process terminated (exit code check)");
+                break;
+            }
+
+            // Step 2: Verify memory access with retry mechanism (exponential backoff)
+            let mut memory_accessible = false;
             for attempt in 0..MAX_READ_RETRIES {
                 match reader.read_bytes(process.base_address, 4) {
                     Ok(_) => {
-                        process_alive = true;
+                        memory_accessible = true;
                         break;
                     }
                     Err(e) => {
+                        // Re-check process status before retrying
+                        if !process.is_alive() {
+                            debug!("Process terminated during retry: {}", e);
+                            break;
+                        }
+
                         if attempt < MAX_READ_RETRIES - 1 {
                             let delay = RETRY_DELAYS_MS[attempt as usize];
                             debug!(
@@ -81,14 +93,14 @@ impl Reflux {
                             thread::sleep(Duration::from_millis(delay));
                         } else {
                             debug!(
-                                "Process terminated after {} retries: {}",
+                                "Memory read failed after {} retries: {}",
                                 MAX_READ_RETRIES, e
                             );
                         }
                     }
                 }
             }
-            if !process_alive {
+            if !memory_accessible {
                 break;
             }
 
