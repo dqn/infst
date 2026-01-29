@@ -154,8 +154,9 @@ impl SongInfo {
         match result {
             Some(mut song) if song.id == 0 && !song.title.is_empty() => {
                 // Try to read song_id from metadata table
-                let metadata_addr =
-                    text_base + Self::METADATA_TABLE_OFFSET as u64 + entry_index * Self::MEMORY_SIZE as u64;
+                let metadata_addr = text_base
+                    + Self::METADATA_TABLE_OFFSET as u64
+                    + entry_index * Self::MEMORY_SIZE as u64;
 
                 if let Ok(metadata) = reader.read_bytes(metadata_addr, 32) {
                     let buf = ByteBuffer::new(&metadata);
@@ -163,13 +164,13 @@ impl SongInfo {
                     let alt_folder = buf.read_i32_at(4).unwrap_or(0);
 
                     // Validate: song_id should be 1000-50000, folder 1-50
-                    if alt_song_id >= 1000 && alt_song_id <= 50000 {
+                    if (1000..=50000).contains(&alt_song_id) {
                         debug!(
                             "Using metadata table for song '{}': id={}, folder={}",
                             song.title, alt_song_id, alt_folder
                         );
                         song.id = alt_song_id as u32;
-                        if alt_folder >= 1 && alt_folder <= 50 {
+                        if (1..=50).contains(&alt_folder) {
                             song.folder = alt_folder;
                         }
                     }
@@ -214,7 +215,7 @@ pub fn analyze_metadata_table<R: ReadMemory>(reader: &R, text_base: u64) {
         let song_id = buf.read_i32_at(offset).unwrap_or(0);
         let folder = buf.read_i32_at(offset + 4).unwrap_or(0);
 
-        if song_id >= 1000 && song_id <= 50000 && folder >= 1 && folder <= 50 {
+        if (1000..=50000).contains(&song_id) && (1..=50).contains(&folder) {
             found_ids.push((offset, song_id, folder));
         }
     }
@@ -232,12 +233,16 @@ pub fn analyze_metadata_table<R: ReadMemory>(reader: &R, text_base: u64) {
         info!("Entry spacing (first 20): {:?}", deltas);
 
         // Find most common delta
-        let mut delta_counts: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
+        let mut delta_counts: std::collections::HashMap<usize, usize> =
+            std::collections::HashMap::new();
         for d in &deltas {
             *delta_counts.entry(*d).or_insert(0) += 1;
         }
         if let Some((most_common, count)) = delta_counts.iter().max_by_key(|(_, v)| *v) {
-            info!("Most common entry size: 0x{:X} ({} bytes), {} occurrences", most_common, most_common, count);
+            info!(
+                "Most common entry size: 0x{:X} ({} bytes), {} occurrences",
+                most_common, most_common, count
+            );
         }
     }
 
@@ -293,7 +298,7 @@ pub fn build_song_id_title_map<R: ReadMemory>(
 
         // Validate song_id and folder ranges
         // Note: folder values vary widely in new INFINITAS versions (e.g., 1-200+)
-        if song_id < 1000 || song_id > 90000 || folder < 1 || folder > 200 {
+        if !(1000..=90000).contains(&song_id) || !(1..=200).contains(&folder) {
             continue;
         }
 
@@ -348,7 +353,12 @@ pub fn fetch_song_database_with_fixes<R: ReadMemory>(
         let address = song_list_addr + entry_index * SongInfo::MEMORY_SIZE as u64;
 
         // Use fallback method for new INFINITAS versions where metadata is split
-        match SongInfo::read_from_memory_with_fallback(reader, address, song_list_addr, entry_index)? {
+        match SongInfo::read_from_memory_with_fallback(
+            reader,
+            address,
+            song_list_addr,
+            entry_index,
+        )? {
             Some(mut song) if !song.title.is_empty() && song.id > 0 => {
                 // Apply encoding fixes if provided
                 if let Some(fixes) = encoding_fixes {
@@ -361,9 +371,7 @@ pub fn fetch_song_database_with_fixes<R: ReadMemory>(
                 }
 
                 // Avoid duplicates
-                if !result.contains_key(&song.id) {
-                    result.insert(song.id, song);
-                }
+                result.entry(song.id).or_insert(song);
                 consecutive_failures = 0;
             }
             _ => {

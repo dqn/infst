@@ -1,7 +1,10 @@
 //! Scan command implementation.
 
 use anyhow::Result;
-use reflux_core::{MemoryReader, OffsetSearcher, ProcessHandle, ReadMemory, ScanResult, builtin_signatures, load_offsets};
+use reflux_core::{
+    MemoryReader, OffsetSearcher, ProcessHandle, ReadMemory, ScanResult, builtin_signatures,
+    load_offsets,
+};
 use tracing::warn;
 
 /// Run the scan command
@@ -58,7 +61,10 @@ pub fn run(
     // Perform scan
     if let Some(size) = entry_size {
         // Custom entry size scan
-        println!("Scanning with entry size {} bytes from 0x{:X}...", size, offsets.song_list);
+        println!(
+            "Scanning with entry size {} bytes from 0x{:X}...",
+            size, offsets.song_list
+        );
         run_custom_entry_size_scan(&reader, offsets.song_list, range, size);
         return Ok(());
     }
@@ -117,7 +123,12 @@ pub fn run(
 }
 
 /// Scan with custom entry size
-fn run_custom_entry_size_scan(reader: &MemoryReader, start_addr: u64, range: usize, entry_size: usize) {
+fn run_custom_entry_size_scan(
+    reader: &MemoryReader,
+    start_addr: u64,
+    range: usize,
+    entry_size: usize,
+) {
     use encoding_rs::SHIFT_JIS;
 
     println!();
@@ -179,8 +190,13 @@ fn run_custom_entry_size_scan(reader: &MemoryReader, start_addr: u64, range: usi
 
         for &offset in id_offsets {
             if offset + 4 <= entry_size {
-                let id = i32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]);
-                if id >= 1000 && id <= 90000 {
+                let id = i32::from_le_bytes([
+                    data[offset],
+                    data[offset + 1],
+                    data[offset + 2],
+                    data[offset + 3],
+                ]);
+                if (1000..=90000).contains(&id) {
                     song_id = id as u32;
                     break;
                 }
@@ -231,7 +247,10 @@ fn run_custom_entry_size_scan(reader: &MemoryReader, start_addr: u64, range: usi
 
     // Statistics
     let with_id = found_songs.iter().filter(|(_, id, _, _)| *id > 0).count();
-    let with_levels = found_songs.iter().filter(|(_, _, _, l)| l.iter().any(|&x| x > 0)).count();
+    let with_levels = found_songs
+        .iter()
+        .filter(|(_, _, _, l)| l.iter().any(|&x| x > 0))
+        .count();
     println!();
     println!("Statistics:");
     println!("  Entries with valid song_id: {}", with_id);

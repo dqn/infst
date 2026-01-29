@@ -193,22 +193,14 @@ fn scan_metadata_table<R: ReadMemory>(
             continue;
         };
 
-        let song_id = i32::from_le_bytes([
-            meta_bytes[0],
-            meta_bytes[1],
-            meta_bytes[2],
-            meta_bytes[3],
-        ]);
-        let folder = i32::from_le_bytes([
-            meta_bytes[4],
-            meta_bytes[5],
-            meta_bytes[6],
-            meta_bytes[7],
-        ]);
+        let song_id =
+            i32::from_le_bytes([meta_bytes[0], meta_bytes[1], meta_bytes[2], meta_bytes[3]]);
+        let folder =
+            i32::from_le_bytes([meta_bytes[4], meta_bytes[5], meta_bytes[6], meta_bytes[7]]);
 
         // Validate song_id and folder ranges
         // Note: folder values vary widely in new INFINITAS versions (e.g., 1-200+)
-        if song_id < 1000 || song_id > 90000 || folder < 1 || folder > 200 {
+        if !(1000..=90000).contains(&song_id) || !(1..=200).contains(&folder) {
             continue;
         }
 
@@ -220,7 +212,7 @@ fn scan_metadata_table<R: ReadMemory>(
         // Parse levels from difficulty ASCII (offset 8 in metadata)
         let mut levels = [0u8; 10];
         for (j, &byte) in meta_bytes[8..18].iter().enumerate() {
-            if byte >= b'0' && byte <= b'9' {
+            if byte.is_ascii_digit() {
                 levels[j] = byte - b'0';
             }
         }

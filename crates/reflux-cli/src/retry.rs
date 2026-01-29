@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use anyhow::{Result, bail};
 use reflux_core::config::database;
 use reflux_core::{
-    EncodingFixes, MemoryReader, OffsetSearcher, OffsetsCollection, SongInfo,
-    builtin_signatures, fetch_song_database_with_fixes,
+    EncodingFixes, MemoryReader, OffsetSearcher, OffsetsCollection, SongInfo, builtin_signatures,
+    fetch_song_database_with_fixes,
 };
 use tracing::{debug, info, warn};
 
@@ -46,40 +46,38 @@ pub fn load_song_database_with_retry(
         }
 
         match fetch_song_database_with_fixes(reader, song_list, encoding_fixes) {
-            Ok(db) => {
-                match validate_song_database(&db) {
-                    ValidationResult::Valid => return Ok(Some(db)),
-                    ValidationResult::TooFewSongs(count) => {
-                        last_error = Some(format!("song list too small ({})", count));
-                        warn!(
-                            "Song list not fully populated ({} songs), retrying in {}s (attempt {}/{})",
-                            count,
-                            database::RETRY_DELAY.as_secs(),
-                            attempts,
-                            database::MAX_LOAD_ATTEMPTS
-                        );
-                    }
-                    ValidationResult::NotecountTooSmall(notes) => {
-                        last_error = Some(format!("notecount too small ({})", notes));
-                        warn!(
-                            "Song data not fully loaded (reference song notecount: {}), retrying in {}s (attempt {}/{})",
-                            notes,
-                            database::RETRY_DELAY.as_secs(),
-                            attempts,
-                            database::MAX_LOAD_ATTEMPTS
-                        );
-                    }
-                    ValidationResult::ReferenceSongMissing => {
-                        last_error = Some("reference song missing".to_string());
-                        warn!(
-                            "Reference song not yet loaded, retrying in {}s (attempt {}/{})",
-                            database::RETRY_DELAY.as_secs(),
-                            attempts,
-                            database::MAX_LOAD_ATTEMPTS
-                        );
-                    }
+            Ok(db) => match validate_song_database(&db) {
+                ValidationResult::Valid => return Ok(Some(db)),
+                ValidationResult::TooFewSongs(count) => {
+                    last_error = Some(format!("song list too small ({})", count));
+                    warn!(
+                        "Song list not fully populated ({} songs), retrying in {}s (attempt {}/{})",
+                        count,
+                        database::RETRY_DELAY.as_secs(),
+                        attempts,
+                        database::MAX_LOAD_ATTEMPTS
+                    );
                 }
-            }
+                ValidationResult::NotecountTooSmall(notes) => {
+                    last_error = Some(format!("notecount too small ({})", notes));
+                    warn!(
+                        "Song data not fully loaded (reference song notecount: {}), retrying in {}s (attempt {}/{})",
+                        notes,
+                        database::RETRY_DELAY.as_secs(),
+                        attempts,
+                        database::MAX_LOAD_ATTEMPTS
+                    );
+                }
+                ValidationResult::ReferenceSongMissing => {
+                    last_error = Some("reference song missing".to_string());
+                    warn!(
+                        "Reference song not yet loaded, retrying in {}s (attempt {}/{})",
+                        database::RETRY_DELAY.as_secs(),
+                        attempts,
+                        database::MAX_LOAD_ATTEMPTS
+                    );
+                }
+            },
             Err(e) => {
                 last_error = Some(e.to_string());
                 debug!(

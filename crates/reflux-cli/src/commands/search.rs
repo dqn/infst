@@ -18,7 +18,10 @@ pub fn run(
         ProcessHandle::find_and_open()?
     };
 
-    println!("Found process (PID: {}, Base: 0x{:X})", process.pid, process.base_address);
+    println!(
+        "Found process (PID: {}, Base: 0x{:X})",
+        process.pid, process.base_address
+    );
 
     let reader = MemoryReader::new(&process);
 
@@ -28,7 +31,11 @@ pub fn run(
         let (encoded, _, _) = encoding_rs::SHIFT_JIS.encode(s);
         let bytes = encoded.to_vec();
         let mask = vec![false; bytes.len()];
-        println!("Searching for string: {:?} ({} bytes, Shift-JIS)", s, bytes.len());
+        println!(
+            "Searching for string: {:?} ({} bytes, Shift-JIS)",
+            s,
+            bytes.len()
+        );
         (bytes, mask)
     } else if let Some(val) = i32_val {
         let bytes = val.to_le_bytes().to_vec();

@@ -123,7 +123,7 @@ fn validate_song_list<R: ReadMemory>(reader: &R, addr: u64) -> OffsetValidation 
     match reader.read_bytes(addr, 64) {
         Ok(bytes) => {
             // Check if first entry looks like song data (title should start with printable chars)
-            let has_title = bytes.iter().take(32).any(|&b| b >= 0x20 && b < 0x80);
+            let has_title = bytes.iter().take(32).any(|&b| (0x20..0x80).contains(&b));
             if has_title {
                 OffsetValidation {
                     name: "songList".to_string(),
@@ -138,19 +138,25 @@ fn validate_song_list<R: ReadMemory>(reader: &R, addr: u64) -> OffsetValidation 
                     Ok(meta) => {
                         let song_id = i32::from_le_bytes([meta[0], meta[1], meta[2], meta[3]]);
                         let folder = i32::from_le_bytes([meta[4], meta[5], meta[6], meta[7]]);
-                        if song_id >= 1000 && song_id <= 50000 && folder >= 1 && folder <= 50 {
+                        if (1000..=50000).contains(&song_id) && (1..=50).contains(&folder) {
                             OffsetValidation {
                                 name: "songList".to_string(),
                                 address: addr,
                                 valid: true,
-                                reason: format!("Metadata table valid: song_id={}, folder={}", song_id, folder),
+                                reason: format!(
+                                    "Metadata table valid: song_id={}, folder={}",
+                                    song_id, folder
+                                ),
                             }
                         } else {
                             OffsetValidation {
                                 name: "songList".to_string(),
                                 address: addr,
                                 valid: false,
-                                reason: format!("No valid title, metadata invalid: song_id={}, folder={}", song_id, folder),
+                                reason: format!(
+                                    "No valid title, metadata invalid: song_id={}, folder={}",
+                                    song_id, folder
+                                ),
                             }
                         }
                     }
@@ -194,14 +200,20 @@ fn validate_judge_data<R: ReadMemory>(reader: &R, addr: u64) -> OffsetValidation
             name: "judgeData".to_string(),
             address: addr,
             valid: true,
-            reason: format!("State markers valid: marker1={}, marker2={}", marker1, marker2),
+            reason: format!(
+                "State markers valid: marker1={}, marker2={}",
+                marker1, marker2
+            ),
         }
     } else {
         OffsetValidation {
             name: "judgeData".to_string(),
             address: addr,
             valid: false,
-            reason: format!("Invalid state markers: marker1={}, marker2={}", marker1, marker2),
+            reason: format!(
+                "Invalid state markers: marker1={}, marker2={}",
+                marker1, marker2
+            ),
         }
     }
 }
@@ -362,14 +374,20 @@ fn validate_data_map<R: ReadMemory>(reader: &R, addr: u64) -> OffsetValidation {
             name: "dataMap".to_string(),
             address: addr,
             valid: true,
-            reason: format!("Table range valid: 0x{:X} - 0x{:X} ({} bytes)", table_start, table_end, size),
+            reason: format!(
+                "Table range valid: 0x{:X} - 0x{:X} ({} bytes)",
+                table_start, table_end, size
+            ),
         }
     } else {
         OffsetValidation {
             name: "dataMap".to_string(),
             address: addr,
             valid: false,
-            reason: format!("Invalid table range: start=0x{:X}, end=0x{:X}", table_start, table_end),
+            reason: format!(
+                "Invalid table range: start=0x{:X}, end=0x{:X}",
+                table_start, table_end
+            ),
         }
     }
 }
@@ -394,21 +412,30 @@ fn validate_unlock_data<R: ReadMemory>(reader: &R, addr: u64) -> OffsetValidatio
             name: "unlockData".to_string(),
             address: addr,
             valid: true,
-            reason: format!("Valid: song_id={}, type={}, unlocks={}", song_id, unlock_type, unlocks),
+            reason: format!(
+                "Valid: song_id={}, type={}, unlocks={}",
+                song_id, unlock_type, unlocks
+            ),
         }
     } else if (1000..=50000).contains(&song_id) {
         OffsetValidation {
             name: "unlockData".to_string(),
             address: addr,
             valid: true,
-            reason: format!("Plausible: song_id={}, type={}, unlocks={}", song_id, unlock_type, unlocks),
+            reason: format!(
+                "Plausible: song_id={}, type={}, unlocks={}",
+                song_id, unlock_type, unlocks
+            ),
         }
     } else {
         OffsetValidation {
             name: "unlockData".to_string(),
             address: addr,
             valid: false,
-            reason: format!("Invalid: song_id={}, type={}, unlocks={}", song_id, unlock_type, unlocks),
+            reason: format!(
+                "Invalid: song_id={}, type={}, unlocks={}",
+                song_id, unlock_type, unlocks
+            ),
         }
     }
 }
@@ -452,7 +479,7 @@ fn get_current_song_info<R: ReadMemory>(
     let song_id = reader.read_i32(current_song_addr).ok()?;
     let difficulty = reader.read_i32(current_song_addr + 4).ok()?;
 
-    if song_id <= 0 || difficulty < 0 || difficulty > 9 {
+    if song_id <= 0 || !(0..=9).contains(&difficulty) {
         return None;
     }
 

@@ -10,7 +10,12 @@ use super::constants::*;
 use super::validation::OffsetValidation;
 
 /// Search near an expected address with validation
-pub fn search_near_expected<R, F>(reader: &R, expected: u64, range: usize, validate: F) -> Option<u64>
+pub fn search_near_expected<R, F>(
+    reader: &R,
+    expected: u64,
+    range: usize,
+    validate: F,
+) -> Option<u64>
 where
     R: ReadMemory,
     F: Fn(&R, u64) -> bool,
@@ -51,7 +56,8 @@ pub fn search_judge_data_near_song_list<R: ReadMemory>(reader: &R, song_list: u6
         r.validate_judge_data_candidate(addr)
     })
     .ok_or_else(|| {
-        Error::offset_search_failed_for("judgeData",
+        Error::offset_search_failed_for(
+            "judgeData",
             "No valid candidates found near SongList".to_string(),
         )
     })
@@ -67,7 +73,8 @@ pub fn search_play_settings_near_judge_data<R: ReadMemory>(
         r.validate_play_settings_at(addr).is_some()
     })
     .ok_or_else(|| {
-        Error::offset_search_failed_for("playSettings",
+        Error::offset_search_failed_for(
+            "playSettings",
             "No valid candidates found near JudgeData".to_string(),
         )
     })
@@ -83,7 +90,8 @@ pub fn search_play_data_near_play_settings<R: ReadMemory>(
         r.validate_play_data_address(addr).unwrap_or(false)
     })
     .ok_or_else(|| {
-        Error::offset_search_failed_for("playData",
+        Error::offset_search_failed_for(
+            "playData",
             "No valid candidates found near PlaySettings".to_string(),
         )
     })
@@ -99,7 +107,8 @@ pub fn search_current_song_near_judge_data<R: ReadMemory>(
         r.validate_current_song_address(addr).unwrap_or(false)
     })
     .ok_or_else(|| {
-        Error::offset_search_failed_for("currentSong",
+        Error::offset_search_failed_for(
+            "currentSong",
             "No valid candidates found near JudgeData".to_string(),
         )
     })

@@ -25,8 +25,8 @@ use crate::offset::{CodeSignature, OffsetSignatureSet, OffsetsCollection};
 
 // Re-export validation functions and trait
 pub use validation::{
-    validate_basic_memory_access, validate_new_version_text_table, validate_signature_offsets,
-    OffsetValidation,
+    OffsetValidation, validate_basic_memory_access, validate_new_version_text_table,
+    validate_signature_offsets,
 };
 
 use constants::*;
@@ -140,7 +140,9 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         debug!("Phase 4: Searching PlayData via signatures...");
         offsets.play_data =
             match self.search_offset_by_signature(signatures, "playData", |this, addr| {
-                this.reader.validate_play_data_address(addr).unwrap_or(false)
+                this.reader
+                    .validate_play_data_address(addr)
+                    .unwrap_or(false)
             }) {
                 Ok(addr) => addr,
                 Err(e) => {
@@ -158,7 +160,11 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         offsets.current_song = match self.search_offset_by_signature(
             signatures,
             "currentSong",
-            |this, addr| this.reader.validate_current_song_address(addr).unwrap_or(false),
+            |this, addr| {
+                this.reader
+                    .validate_current_song_address(addr)
+                    .unwrap_or(false)
+            },
         ) {
             Ok(addr) => addr,
             Err(e) => {
@@ -267,14 +273,16 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
 
                     // Check for new version structure (song_id in metadata table)
                     // If direct match and at least 1 song with valid title exists
-                    if offset == 0 && song_count >= 1 && new_version_candidate.is_none() {
-                        if validate_new_version_text_table(self.reader, candidate_addr) {
-                            info!(
-                                "  New version text table detected at 0x{:X} ({} title entries)",
-                                candidate_addr, song_count
-                            );
-                            new_version_candidate = Some(candidate_addr);
-                        }
+                    if offset == 0
+                        && song_count >= 1
+                        && new_version_candidate.is_none()
+                        && validate_new_version_text_table(self.reader, candidate_addr)
+                    {
+                        info!(
+                            "  New version text table detected at 0x{:X} ({} title entries)",
+                            candidate_addr, song_count
+                        );
+                        new_version_candidate = Some(candidate_addr);
                     }
 
                     if song_count < MIN_EXPECTED_SONGS {
@@ -378,7 +386,9 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                         );
 
                         // Dump full structure for analysis
-                        if let Ok(bytes) = self.reader.read_bytes(*addr_1001, NEW_STRUCT_SIZE as usize) {
+                        if let Ok(bytes) =
+                            self.reader.read_bytes(*addr_1001, NEW_STRUCT_SIZE as usize)
+                        {
                             let struct_buf = ByteBuffer::new(&bytes);
                             debug!("    Full structure dump (312 bytes):");
                             debug!("      Bytes 0-31:   {:02X?}", &bytes[0..32]);
@@ -390,15 +400,16 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                             for ptr_offset in [8usize, 12, 16, 20, 24, 28, 32] {
                                 if ptr_offset + 8 <= bytes.len() {
                                     let ptr = struct_buf.read_u64_at(ptr_offset).unwrap_or(0);
-                                    if ptr > 0x140000000 && ptr < 0x150000000 {
-                                        if let Ok(str_bytes) = self.reader.read_bytes(ptr, 32) {
-                                            let s = decode_shift_jis_to_string(&str_bytes);
-                                            if !s.is_empty() {
-                                                debug!(
-                                                    "      Ptr at offset {}: 0x{:X} -> {:?}",
-                                                    ptr_offset, ptr, s
-                                                );
-                                            }
+                                    if ptr > 0x140000000
+                                        && ptr < 0x150000000
+                                        && let Ok(str_bytes) = self.reader.read_bytes(ptr, 32)
+                                    {
+                                        let s = decode_shift_jis_to_string(&str_bytes);
+                                        if !s.is_empty() {
+                                            debug!(
+                                                "      Ptr at offset {}: 0x{:X} -> {:?}",
+                                                ptr_offset, ptr, s
+                                            );
                                         }
                                     }
                                 }
@@ -473,7 +484,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             };
 
             // Valid song IDs are >= 1000
-            if song_id < 1000 || song_id > 50000 {
+            if !(1000..=50000).contains(&song_id) {
                 break;
             }
 
@@ -498,7 +509,10 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         for struct_size in [32u64, 48, 64, 80, 96, 128] {
             let count = self.try_count_with_size(start_addr, struct_size);
             if count >= 100 {
-                debug!("      Alt structure size {} works: {} songs", struct_size, count);
+                debug!(
+                    "      Alt structure size {} works: {} songs",
+                    struct_size, count
+                );
                 return count;
             }
         }
@@ -518,7 +532,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             };
 
             // Valid song IDs are >= 1000 and increasing or close
-            if song_id < 1000 || song_id > 50000 {
+            if !(1000..=50000).contains(&song_id) {
                 break;
             }
 
@@ -555,12 +569,18 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
 
             // Read song_id (offset 0)
             let song_id = buf.read_i32_at(0).unwrap_or(0);
-            if song_id < 1000 || song_id > 50000 {
-                info!("  Entry {}: Invalid song_id={}, stopping", entry_idx, song_id);
+            if !(1000..=50000).contains(&song_id) {
+                info!(
+                    "  Entry {}: Invalid song_id={}, stopping",
+                    entry_idx, song_id
+                );
                 break;
             }
 
-            info!("  Entry {} at 0x{:X}: song_id={}", entry_idx, entry_addr, song_id);
+            info!(
+                "  Entry {} at 0x{:X}: song_id={}",
+                entry_idx, entry_addr, song_id
+            );
 
             // Analyze 32-bit compressed pointers (high 32 bits = 0x00000001)
             info!("    Compressed pointer analysis (32-bit + 0x100000000):");
@@ -573,18 +593,30 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                 // Check if this looks like a compressed pointer (high nibble 0x4)
                 if ptr32 > 0x40000000 && ptr32 < 0x50000000 {
                     let ptr64 = (ptr32 as u64) + 0x100000000;
-                    info!("      Offset {:3}: 0x{:08X} -> 0x{:016X}", ptr_offset, ptr32, ptr64);
+                    info!(
+                        "      Offset {:3}: 0x{:08X} -> 0x{:016X}",
+                        ptr_offset, ptr32, ptr64
+                    );
 
                     // Try to read and decode what the pointer points to
                     if let Ok(target_bytes) = self.reader.read_bytes(ptr64, 128) {
                         // Try as Shift-JIS string
                         let s = decode_shift_jis_to_string(&target_bytes);
-                        if !s.is_empty() && s.len() > 1 && s.chars().take(10).all(|c| c.is_ascii_graphic() || c == ' ') {
-                            info!("        -> String: {:?}", s.chars().take(60).collect::<String>());
+                        if !s.is_empty()
+                            && s.len() > 1
+                            && s.chars().take(10).all(|c| c.is_ascii_graphic() || c == ' ')
+                        {
+                            info!(
+                                "        -> String: {:?}",
+                                s.chars().take(60).collect::<String>()
+                            );
                         }
 
                         // Show raw bytes (first 48)
-                        info!("        -> Raw: {:02X?}", &target_bytes[0..48.min(target_bytes.len())]);
+                        info!(
+                            "        -> Raw: {:02X?}",
+                            &target_bytes[0..48.min(target_bytes.len())]
+                        );
 
                         // Check for nested compressed pointer
                         let target_buf = ByteBuffer::new(&target_bytes);
@@ -593,13 +625,17 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                             let nested64 = (nested32 as u64) + 0x100000000;
                             if let Ok(nested_bytes) = self.reader.read_bytes(nested64, 64) {
                                 let nested_s = decode_shift_jis_to_string(&nested_bytes);
-                                info!("          -> Nested ptr 0x{:X}: {:?}", nested64, nested_s.chars().take(40).collect::<String>());
+                                info!(
+                                    "          -> Nested ptr 0x{:X}: {:?}",
+                                    nested64,
+                                    nested_s.chars().take(40).collect::<String>()
+                                );
                             }
                         }
 
                         // Also check for embedded song_id at target
                         let target_id = target_buf.read_i32_at(0).unwrap_or(0);
-                        if target_id >= 1000 && target_id <= 50000 {
+                        if (1000..=50000).contains(&target_id) {
                             info!("        -> Possible song_id at target: {}", target_id);
                         }
                     }
@@ -615,8 +651,11 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                 let val = buf.read_i32_at(i32_offset).unwrap_or(0);
 
                 // Show non-zero values that might be meaningful
-                if val != 0 && (val > 0 && val < 10000 || val >= 1000 && val <= 50000) {
-                    info!("      Offset {:3}: {} (0x{:08X})", i32_offset, val, val as u32);
+                if val != 0 && (val > 0 && val < 10000 || (1000..=50000).contains(&val)) {
+                    info!(
+                        "      Offset {:3}: {} (0x{:08X})",
+                        i32_offset, val, val as u32
+                    );
                 }
             }
 
@@ -634,11 +673,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             // Remaining bytes
             if 312 % 16 != 0 {
                 let row_start = (312 / 16) * 16;
-                info!(
-                    "      {:03X}: {:02X?}",
-                    row_start,
-                    &buffer[row_start..312]
-                );
+                info!("      {:03X}: {:02X?}", row_start, &buffer[row_start..312]);
             }
         }
 
@@ -705,18 +740,18 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             };
 
             // Valid song IDs are >= 1000
-            if song_id < 1000 || song_id > 50000 {
+            if !(1000..=50000).contains(&song_id) {
                 // Check if it's just zero (uninitialized) vs invalid
                 if song_id == 0 && count > 0 {
                     // Try a few more entries in case of gaps
                     let mut found_more = false;
                     for skip in 1..10 {
                         let next_addr = addr + (skip * STRUCT_SIZE);
-                        if let Ok(next_id) = self.reader.read_i32(next_addr) {
-                            if next_id >= 1000 && next_id <= 50000 {
-                                found_more = true;
-                                break;
-                            }
+                        if let Ok(next_id) = self.reader.read_i32(next_addr)
+                            && (1000..=50000).contains(&next_id)
+                        {
+                            found_more = true;
+                            break;
                         }
                     }
                     if !found_more {
@@ -1107,7 +1142,9 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
     fn search_play_data_near_play_settings(&self, play_settings: u64) -> Result<u64> {
         let expected = play_settings.wrapping_add(PLAY_SETTINGS_TO_PLAY_DATA);
         self.search_near_expected(expected, PLAY_DATA_SEARCH_RANGE, |this, addr| {
-            this.reader.validate_play_data_address(addr).unwrap_or(false)
+            this.reader
+                .validate_play_data_address(addr)
+                .unwrap_or(false)
         })
         .ok_or_else(|| {
             Error::offset_search_failed(
@@ -1119,7 +1156,9 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
     fn search_current_song_near_judge_data(&self, judge_data: u64) -> Result<u64> {
         let expected = judge_data.wrapping_add(JUDGE_TO_CURRENT_SONG);
         self.search_near_expected(expected, CURRENT_SONG_SEARCH_RANGE, |this, addr| {
-            this.reader.validate_current_song_address(addr).unwrap_or(false)
+            this.reader
+                .validate_current_song_address(addr)
+                .unwrap_or(false)
         })
         .ok_or_else(|| {
             Error::offset_search_failed(

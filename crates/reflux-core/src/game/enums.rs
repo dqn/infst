@@ -2,8 +2,18 @@ use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString, FromRepr, IntoStaticStr};
 
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, FromRepr, EnumString,
-    IntoStaticStr, Display,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    FromRepr,
+    EnumString,
+    IntoStaticStr,
+    Display,
 )]
 #[repr(u8)]
 pub enum Difficulty {
@@ -73,8 +83,20 @@ impl Difficulty {
 }
 
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
-    FromRepr, IntoStaticStr, Display,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    Default,
+    FromRepr,
+    IntoStaticStr,
+    Display,
 )]
 #[repr(u8)]
 pub enum Lamp {
@@ -124,8 +146,20 @@ impl Lamp {
 }
 
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
-    FromRepr, IntoStaticStr, Display,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    Default,
+    FromRepr,
+    IntoStaticStr,
+    Display,
 )]
 #[repr(u8)]
 pub enum Grade {
@@ -194,8 +228,18 @@ impl PlayType {
 }
 
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default, FromRepr,
-    IntoStaticStr, Display,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    Default,
+    FromRepr,
+    IntoStaticStr,
+    Display,
 )]
 #[repr(u8)]
 pub enum UnlockType {

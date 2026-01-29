@@ -7,8 +7,8 @@ use tracing::debug;
 
 use crate::error::Result;
 use crate::game::SongInfo;
-use crate::memory::layout::{judge, settings};
 use crate::memory::ReadMemory;
+use crate::memory::layout::{judge, settings};
 use crate::offset::OffsetsCollection;
 
 use super::constants::*;
@@ -136,7 +136,7 @@ pub trait OffsetValidation: ReadMemory {
 
         let size = table_end - table_start;
         // Valid size range: 8KB to 16MB
-        size >= 0x2000 && size <= 0x1000000
+        (0x2000..=0x1000000).contains(&size)
     }
 
     /// Validate unlock_data address
@@ -221,31 +221,26 @@ pub trait OffsetValidation: ReadMemory {
 
             match SongInfo::read_from_memory(self, address) {
                 Ok(Some(song)) if !song.title.is_empty() => {
-                    if count < 3 {
-                        if let Ok(full_buffer) =
-                            self.read_bytes(address, SongInfo::MEMORY_SIZE)
-                        {
-                            let id_offset = 256 + 368; // SONG_ID_OFFSET
-                            debug!(
-                                "    Song {}: id={}, title={:?} at 0x{:X}",
-                                count, song.id, song.title, address
-                            );
-                            debug!("      First 32 bytes: {:02X?}", &full_buffer[0..32]);
-                            debug!(
-                                "      Bytes at id_offset ({}): {:02X?}",
-                                id_offset,
-                                &full_buffer[id_offset..id_offset + 8]
-                            );
-                        }
+                    if count < 3
+                        && let Ok(full_buffer) = self.read_bytes(address, SongInfo::MEMORY_SIZE)
+                    {
+                        let id_offset = 256 + 368; // SONG_ID_OFFSET
+                        debug!(
+                            "    Song {}: id={}, title={:?} at 0x{:X}",
+                            count, song.id, song.title, address
+                        );
+                        debug!("      First 32 bytes: {:02X?}", &full_buffer[0..32]);
+                        debug!(
+                            "      Bytes at id_offset ({}): {:02X?}",
+                            id_offset,
+                            &full_buffer[id_offset..id_offset + 8]
+                        );
                     }
                     count += 1;
                     consecutive_failures = 0;
                 }
                 Ok(Some(song)) => {
-                    debug!(
-                        "    Song at 0x{:X}: empty title (id={})",
-                        address, song.id
-                    );
+                    debug!("    Song at 0x{:X}: empty title (id={})", address, song.id);
                     consecutive_failures += 1;
                     if consecutive_failures >= MAX_CONSECUTIVE_FAILURES {
                         debug!(
@@ -256,13 +251,13 @@ pub trait OffsetValidation: ReadMemory {
                     }
                 }
                 Ok(None) => {
-                    if count < 5 {
-                        if let Ok(bytes) = self.read_bytes(address, 16) {
-                            debug!(
-                                "    Song at 0x{:X}: first 4 bytes zero, raw: {:02X?}",
-                                address, bytes
-                            );
-                        }
+                    if count < 5
+                        && let Ok(bytes) = self.read_bytes(address, 16)
+                    {
+                        debug!(
+                            "    Song at 0x{:X}: first 4 bytes zero, raw: {:02X?}",
+                            address, bytes
+                        );
                     }
                     consecutive_failures += 1;
                     if consecutive_failures >= MAX_CONSECUTIVE_FAILURES {
@@ -292,10 +287,7 @@ impl<T: ReadMemory> OffsetValidation for T {}
 /// Validate all offsets in a collection
 ///
 /// Performs structural validation of offset relationships and memory access checks.
-pub fn validate_signature_offsets<R: ReadMemory>(
-    reader: &R,
-    offsets: &OffsetsCollection,
-) -> bool {
+pub fn validate_signature_offsets<R: ReadMemory>(reader: &R, offsets: &OffsetsCollection) -> bool {
     // Check required offsets are non-zero
     if offsets.song_list == 0 {
         debug!("Validation failed: song_list is zero");
@@ -337,16 +329,10 @@ pub fn validate_signature_offsets<R: ReadMemory>(
     );
 
     if !reader.validate_judge_data_candidate(offsets.judge_data) {
-        debug!(
-            "Judge data validation failed at 0x{:X}",
-            offsets.judge_data
-        );
+        debug!("Judge data validation failed at 0x{:X}", offsets.judge_data);
         return false;
     }
-    debug!(
-        "Judge data validation passed at 0x{:X}",
-        offsets.judge_data
-    );
+    debug!("Judge data validation passed at 0x{:X}", offsets.judge_data);
 
     if reader
         .validate_play_settings_at(offsets.play_settings)
@@ -553,8 +539,8 @@ pub fn validate_new_version_text_table<R: ReadMemory>(reader: &R, text_base: u64
     let folder = i32::from_le_bytes([metadata[4], metadata[5], metadata[6], metadata[7]]);
 
     // Validate: first song in list should be song_id ~1000-2000 range
-    let valid_song_id = song_id >= 1000 && song_id <= 5000;
-    let valid_folder = folder >= 1 && folder <= 50;
+    let valid_song_id = (1000..=5000).contains(&song_id);
+    let valid_folder = (1..=50).contains(&folder);
 
     if valid_song_id && valid_folder {
         debug!(
@@ -599,9 +585,11 @@ mod tests {
             .write_i32(marker_offset + 16, 2) // range
             .build();
 
-        assert!(reader
-            .validate_play_settings_at(0x1000 + marker_offset as u64)
-            .is_some());
+        assert!(
+            reader
+                .validate_play_settings_at(0x1000 + marker_offset as u64)
+                .is_some()
+        );
     }
 
     #[test]

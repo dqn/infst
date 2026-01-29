@@ -36,10 +36,10 @@ pub trait RetryStrategy {
                 Ok(value) => return Ok(value),
                 Err(e) => {
                     last_error = Some(e);
-                    if attempt + 1 < max {
-                        if let Some(delay) = self.delay_for_attempt(attempt) {
-                            std::thread::sleep(delay);
-                        }
+                    if attempt + 1 < max
+                        && let Some(delay) = self.delay_for_attempt(attempt)
+                    {
+                        std::thread::sleep(delay);
                     }
                 }
             }
@@ -87,7 +87,10 @@ pub struct FixedDelay {
 impl FixedDelay {
     /// Create a new fixed delay strategy.
     pub fn new(max_attempts: u32, delay: Duration) -> Self {
-        Self { max_attempts, delay }
+        Self {
+            max_attempts,
+            delay,
+        }
     }
 }
 
@@ -199,11 +202,7 @@ mod tests {
         let mut attempts = 0;
         let result: Result<i32, &str> = strategy.execute(|_| {
             attempts += 1;
-            if attempts < 3 {
-                Err("not yet")
-            } else {
-                Ok(42)
-            }
+            if attempts < 3 { Err("not yet") } else { Ok(42) }
         });
         assert_eq!(result, Ok(42));
         assert_eq!(attempts, 3);

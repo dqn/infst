@@ -115,7 +115,9 @@ fn dump_song_entries<R: ReadMemory>(
         let entry_addr = song_list_addr + i as u64 * SongInfo::MEMORY_SIZE as u64;
         let metadata_addr = metadata_base + i as u64 * SongInfo::MEMORY_SIZE as u64;
 
-        let (song_id, folder, title, levels) = match reader.read_bytes(entry_addr, SongInfo::MEMORY_SIZE) {
+        let (song_id, folder, title, levels) = match reader
+            .read_bytes(entry_addr, SongInfo::MEMORY_SIZE)
+        {
             Ok(bytes) => {
                 // Parse title (first 64 bytes, Shift-JIS)
                 let title = decode_shift_jis(&bytes[0..64]);
@@ -191,7 +193,8 @@ fn collect_detected_songs<R: ReadMemory>(reader: &R, song_list_addr: u64) -> Vec
             if !title.is_empty() {
                 // Read song_id from main entry
                 if let Ok(id_bytes) = reader.read_bytes(entry_addr + 624, 4) {
-                    let song_id = i32::from_le_bytes([id_bytes[0], id_bytes[1], id_bytes[2], id_bytes[3]]);
+                    let song_id =
+                        i32::from_le_bytes([id_bytes[0], id_bytes[1], id_bytes[2], id_bytes[3]]);
                     let folder = reader.read_i32(entry_addr + 280).unwrap_or(0);
 
                     if song_id > 0 {
@@ -207,10 +210,20 @@ fn collect_detected_songs<R: ReadMemory>(reader: &R, song_list_addr: u64) -> Vec
 
                 // Try metadata table
                 if let Ok(meta_bytes) = reader.read_bytes(metadata_addr, 8) {
-                    let meta_id = i32::from_le_bytes([meta_bytes[0], meta_bytes[1], meta_bytes[2], meta_bytes[3]]);
-                    let meta_folder = i32::from_le_bytes([meta_bytes[4], meta_bytes[5], meta_bytes[6], meta_bytes[7]]);
+                    let meta_id = i32::from_le_bytes([
+                        meta_bytes[0],
+                        meta_bytes[1],
+                        meta_bytes[2],
+                        meta_bytes[3],
+                    ]);
+                    let meta_folder = i32::from_le_bytes([
+                        meta_bytes[4],
+                        meta_bytes[5],
+                        meta_bytes[6],
+                        meta_bytes[7],
+                    ]);
 
-                    if meta_id >= 1000 && meta_id <= 50000 {
+                    if (1000..=50000).contains(&meta_id) {
                         songs.push(DetectedSong {
                             song_id: meta_id as u32,
                             title,
@@ -245,7 +258,13 @@ fn format_hex_dump(address: u64, bytes: &[u8]) -> Vec<String> {
 
         let ascii_part: String = chunk
             .iter()
-            .map(|&b| if b >= 0x20 && b < 0x7F { b as char } else { '.' })
+            .map(|&b| {
+                if (0x20..0x7F).contains(&b) {
+                    b as char
+                } else {
+                    '.'
+                }
+            })
             .collect();
 
         lines.push(format!("{:016X}  {:48}  {}", addr, hex_part, ascii_part));

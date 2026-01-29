@@ -3,8 +3,8 @@
 use anyhow::Result;
 use reflux_core::{MemoryReader, ProcessHandle, ReadMemory};
 
-use crate::cli::ValidateTarget;
 use super::offset::parse_hex_address;
+use crate::cli::ValidateTarget;
 
 /// Run the validate command
 pub fn run(target: ValidateTarget) -> Result<()> {
@@ -62,7 +62,11 @@ fn run_validate_song_entry(address: u64, pid: Option<u32>) -> Result<()> {
 
     // Title English at offset 64
     let title_en = decode_string(64, 64);
-    println!("  title_en  @   64: {:?} {}", title_en, check_string(&title_en));
+    println!(
+        "  title_en  @   64: {:?} {}",
+        title_en,
+        check_string(&title_en)
+    );
 
     // Genre at offset 128
     let genre = decode_string(128, 64);
@@ -75,17 +79,29 @@ fn run_validate_song_entry(address: u64, pid: Option<u32>) -> Result<()> {
     // Levels at offset 480
     let levels: Vec<u8> = data[480..490].to_vec();
     let levels_valid = levels.iter().all(|&l| l <= 12);
-    println!("  levels    @  480: {:?} {}", levels, if levels_valid { "✓" } else { "?" });
+    println!(
+        "  levels    @  480: {:?} {}",
+        levels,
+        if levels_valid { "✓" } else { "?" }
+    );
 
     // Song ID at offset 816
     let song_id = i32::from_le_bytes([data[816], data[817], data[818], data[819]]);
-    let song_id_valid = song_id >= 1000 && song_id <= 90000;
-    println!("  song_id   @  816: {} {}", song_id, if song_id_valid { "✓" } else { "?" });
+    let song_id_valid = (1000..=90000).contains(&song_id);
+    println!(
+        "  song_id   @  816: {} {}",
+        song_id,
+        if song_id_valid { "✓" } else { "?" }
+    );
 
     // Folder at offset 820
     let folder = i32::from_le_bytes([data[820], data[821], data[822], data[823]]);
-    let folder_valid = folder >= 1 && folder <= 200;
-    println!("  folder    @  820: {} {}", folder, if folder_valid { "✓" } else { "?" });
+    let folder_valid = (1..=200).contains(&folder);
+    println!(
+        "  folder    @  820: {} {}",
+        folder,
+        if folder_valid { "✓" } else { "?" }
+    );
 
     // Total notes at offset 500 (10 x u16)
     let total_notes: Vec<u16> = (0..10)
@@ -103,13 +119,14 @@ fn run_validate_song_entry(address: u64, pid: Option<u32>) -> Result<()> {
     println!();
 
     // Overall validation
-    let valid = !title.is_empty()
-        && title != "(empty)"
-        && song_id_valid
-        && levels_valid;
+    let valid = !title.is_empty() && title != "(empty)" && song_id_valid && levels_valid;
     println!(
         "Overall: {}",
-        if valid { "Valid song entry" } else { "Invalid or unknown structure" }
+        if valid {
+            "Valid song entry"
+        } else {
+            "Invalid or unknown structure"
+        }
     );
 
     Ok(())

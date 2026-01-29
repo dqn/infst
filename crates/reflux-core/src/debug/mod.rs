@@ -5,10 +5,10 @@
 //! - Dumping memory structures (`DumpInfo`)
 //! - Scanning for song data (`ScanResult`)
 
-mod status;
 mod dump;
 mod scan;
+mod status;
 
-pub use status::{StatusInfo, OffsetStatus, OffsetValidation};
 pub use dump::{DumpInfo, MemoryDump};
 pub use scan::{ScanResult, ScannedSong};
+pub use status::{OffsetStatus, OffsetValidation, StatusInfo};

@@ -69,11 +69,7 @@ impl<'a> ByteBuffer<'a> {
         if pos > self.data.len() {
             return Err(Error::MemoryReadFailed {
                 address: pos as u64,
-                message: format!(
-                    "Position {} exceeds buffer length {}",
-                    pos,
-                    self.data.len()
-                ),
+                message: format!("Position {} exceeds buffer length {}", pos, self.data.len()),
             });
         }
         self.pos = pos;
@@ -95,10 +91,12 @@ impl<'a> ByteBuffer<'a> {
     ///
     /// Returns an error if the range is out of bounds.
     pub fn slice_at(&self, offset: usize, len: usize) -> Result<&'a [u8]> {
-        let end = offset.checked_add(len).ok_or_else(|| Error::MemoryReadFailed {
-            address: offset as u64,
-            message: "Offset overflow".to_string(),
-        })?;
+        let end = offset
+            .checked_add(len)
+            .ok_or_else(|| Error::MemoryReadFailed {
+                address: offset as u64,
+                message: "Offset overflow".to_string(),
+            })?;
 
         if end > self.data.len() {
             return Err(Error::MemoryReadFailed {
@@ -173,17 +171,22 @@ impl<'a> ByteBuffer<'a> {
     ///
     /// Returns an error if there are not enough bytes remaining.
     pub fn read_bytes(&mut self, count: usize) -> Result<&'a [u8]> {
-        let end = self.pos.checked_add(count).ok_or_else(|| Error::MemoryReadFailed {
-            address: self.pos as u64,
-            message: "Position overflow".to_string(),
-        })?;
+        let end = self
+            .pos
+            .checked_add(count)
+            .ok_or_else(|| Error::MemoryReadFailed {
+                address: self.pos as u64,
+                message: "Position overflow".to_string(),
+            })?;
 
         if end > self.data.len() {
             return Err(Error::MemoryReadFailed {
                 address: self.pos as u64,
                 message: format!(
                     "Read of {} bytes at position {} exceeds buffer length {}",
-                    count, self.pos, self.data.len()
+                    count,
+                    self.pos,
+                    self.data.len()
                 ),
             });
         }

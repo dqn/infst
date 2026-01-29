@@ -13,11 +13,7 @@ pub fn run(from: &str, to: &str) -> Result<()> {
     let from_addr = parse_hex_address(from)?;
     let to_addr = parse_hex_address(to)?;
 
-    let diff = if to_addr >= from_addr {
-        to_addr - from_addr
-    } else {
-        from_addr - to_addr
-    };
+    let diff = to_addr.abs_diff(from_addr);
 
     let sign = if to_addr >= from_addr { "" } else { "-" };
 

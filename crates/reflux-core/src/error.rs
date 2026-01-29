@@ -18,7 +18,10 @@ pub enum Error {
     OffsetVersionMismatch { expected: String, actual: String },
 
     #[error("Failed to search offset for {target}: {message}")]
-    OffsetSearchFailed { target: &'static str, message: String },
+    OffsetSearchFailed {
+        target: &'static str,
+        message: String,
+    },
 
     #[error("Invalid game state: expected {expected}, got {actual}")]
     InvalidGameState {

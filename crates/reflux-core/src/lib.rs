@@ -52,4 +52,6 @@ pub use stream::StreamOutput;
 
 // Debug utilities (requires debug-tools feature)
 #[cfg(feature = "debug-tools")]
-pub use debug::{DumpInfo, MemoryDump, OffsetStatus, OffsetValidation, ScanResult, ScannedSong, StatusInfo};
+pub use debug::{
+    DumpInfo, MemoryDump, OffsetStatus, OffsetValidation, ScanResult, ScannedSong, StatusInfo,
+};

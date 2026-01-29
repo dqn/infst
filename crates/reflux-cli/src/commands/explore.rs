@@ -14,7 +14,10 @@ pub fn run(base_addr: u64, pid: Option<u32>) -> Result<()> {
         ProcessHandle::find_and_open()?
     };
 
-    println!("Found process (PID: {}, Base: 0x{:X})", process.pid, process.base_address);
+    println!(
+        "Found process (PID: {}, Base: 0x{:X})",
+        process.pid, process.base_address
+    );
     let reader = MemoryReader::new(&process);
 
     const ENTRY_SIZE: u64 = 0x3F0; // 1008 bytes
@@ -24,7 +27,10 @@ pub fn run(base_addr: u64, pid: Option<u32>) -> Result<()> {
     println!();
     println!("=== Entry State Analysis at 0x{:X} ===", base_addr);
     println!("Entry size: 0x{:X} ({} bytes)", ENTRY_SIZE, ENTRY_SIZE);
-    println!("Metadata offset: 0x{:X} ({} bytes)", METADATA_OFFSET, METADATA_OFFSET);
+    println!(
+        "Metadata offset: 0x{:X} ({} bytes)",
+        METADATA_OFFSET, METADATA_OFFSET
+    );
 
     let max_entries = 2000u64;
     let mut has_title = 0u32;
@@ -48,7 +54,11 @@ pub fn run(base_addr: u64, pid: Option<u32>) -> Result<()> {
                 if len > 0 && bytes[0] != 0 {
                     let (decoded, _, _) = encoding_rs::SHIFT_JIS.decode(&bytes[..len]);
                     let t = decoded.trim();
-                    if !t.is_empty() && t.chars().next().is_some_and(|c| c.is_ascii_graphic() || !c.is_ascii()) {
+                    if !t.is_empty()
+                        && t.chars()
+                            .next()
+                            .is_some_and(|c| c.is_ascii_graphic() || !c.is_ascii())
+                    {
                         Some(t.to_string())
                     } else {
                         None
@@ -76,28 +86,37 @@ pub fn run(base_addr: u64, pid: Option<u32>) -> Result<()> {
             }
         };
 
-        let valid_meta = song_id >= 1000 && song_id <= 90000 && folder >= 1 && folder <= 200;
+        let valid_meta = (1000..=90000).contains(&song_id) && (1..=200).contains(&folder);
 
         // Debug: Look for song_id=9003 regardless of filter
         if song_id == 9003 {
-            println!("*** FOUND song_id=9003 (metadata) at entry={}, folder={}, title={:?}", i, folder, title);
+            println!(
+                "*** FOUND song_id=9003 (metadata) at entry={}, folder={}, title={:?}",
+                i, folder, title
+            );
         }
 
         // Also check C# style offset (0x270 from entry start for song_id)
         let csharp_id_offset = 624u64; // 256 + 368 = 0x270
-        if let Ok(csharp_id) = reader.read_i32(text_addr + csharp_id_offset) {
-            if csharp_id == 9003 {
-                // Read difficulty levels at offset 288 (0x120)
-                let levels = reader.read_bytes(text_addr + 288, 10).unwrap_or_default();
-                println!("*** FOUND song_id=9003 (C# style) at entry={}, title={:?}, levels={:?}", i, title, levels);
-            }
+        if let Ok(csharp_id) = reader.read_i32(text_addr + csharp_id_offset)
+            && csharp_id == 9003
+        {
+            // Read difficulty levels at offset 288 (0x120)
+            let levels = reader.read_bytes(text_addr + 288, 10).unwrap_or_default();
+            println!(
+                "*** FOUND song_id=9003 (C# style) at entry={}, title={:?}, levels={:?}",
+                i, title, levels
+            );
         }
 
         // Debug: Look for title containing "fun"
-        if let Some(ref t) = title {
-            if t.to_lowercase().contains("fun") {
-                println!("*** FOUND title containing 'fun' at entry={}, id={}, folder={}, title={:?}", i, song_id, folder, t);
-            }
+        if let Some(ref t) = title
+            && t.to_lowercase().contains("fun")
+        {
+            println!(
+                "*** FOUND title containing 'fun' at entry={}, id={}, folder={}, title={:?}",
+                i, song_id, folder, t
+            );
         }
 
         match (title.is_some(), valid_meta) {
@@ -132,7 +151,10 @@ pub fn run(base_addr: u64, pid: Option<u32>) -> Result<()> {
     println!("  Read errors:                 {:5}", read_errors);
 
     println!();
-    println!("=== Found songs with title + valid metadata ({} total) ===", found_songs.len());
+    println!(
+        "=== Found songs with title + valid metadata ({} total) ===",
+        found_songs.len()
+    );
     for (i, (idx, song_id, folder, title)) in found_songs.iter().take(30).enumerate() {
         println!(
             "  [{:3}] entry={:4}, id={:5}, folder={:3}, title={:?}",
@@ -150,9 +172,16 @@ pub fn run(base_addr: u64, pid: Option<u32>) -> Result<()> {
         let indices: Vec<u64> = found_songs.iter().map(|(idx, _, _, _)| *idx).collect();
         let min_idx = *indices.iter().min().unwrap();
         let max_idx = *indices.iter().max().unwrap();
-        println!("  Entry range: {} to {} (span: {})", min_idx, max_idx, max_idx - min_idx + 1);
-        println!("  Density: {:.1}% of entries in range have songs",
-            100.0 * found_songs.len() as f64 / (max_idx - min_idx + 1) as f64);
+        println!(
+            "  Entry range: {} to {} (span: {})",
+            min_idx,
+            max_idx,
+            max_idx - min_idx + 1
+        );
+        println!(
+            "  Density: {:.1}% of entries in range have songs",
+            100.0 * found_songs.len() as f64 / (max_idx - min_idx + 1) as f64
+        );
     }
 
     // Check first entry (5.1.1.) with both old and new offsets
@@ -169,15 +198,25 @@ pub fn run(base_addr: u64, pid: Option<u32>) -> Result<()> {
         // Check OLD offsets (C# style)
         let old_levels = &data[288..298];
         let old_song_id = i32::from_le_bytes([data[624], data[625], data[626], data[627]]);
-        println!("    OLD: song_id at 624 = {}, levels at 288 = {:?}", old_song_id, old_levels);
+        println!(
+            "    OLD: song_id at 624 = {}, levels at 288 = {:?}",
+            old_song_id, old_levels
+        );
 
         // Check NEW offsets (discovered from 'fun')
         let new_levels = &data[480..490];
         let new_song_id = i32::from_le_bytes([data[816], data[817], data[818], data[819]]);
-        println!("    NEW: song_id at 816 = {}, levels at 480 = {:?}", new_song_id, new_levels);
+        println!(
+            "    NEW: song_id at 816 = {}, levels at 480 = {:?}",
+            new_song_id, new_levels
+        );
 
         // Dump some key offsets to understand structure
-        for offset in [256, 320, 384, 448, 512, 576, 640, 704, 768, 832, 896, 960, 1024, 1088].iter() {
+        for offset in [
+            256, 320, 384, 448, 512, 576, 640, 704, 768, 832, 896, 960, 1024, 1088,
+        ]
+        .iter()
+        {
             if *offset + 64 <= 1200 {
                 let str_bytes = &data[*offset..*offset + 64];
                 let len = str_bytes.iter().position(|&b| b == 0).unwrap_or(64);
@@ -214,17 +253,23 @@ pub fn run(base_addr: u64, pid: Option<u32>) -> Result<()> {
             let song_id = i32::from_le_bytes([data[816], data[817], data[818], data[819]]);
             let levels = &data[480..490];
 
-            if song_id >= 1000 && song_id <= 50000 {
+            if (1000..=50000).contains(&song_id) {
                 found_with_new.push((i, song_id, title.to_string(), levels.to_vec()));
                 if song_id == 9003 {
-                    println!("  *** FOUND song_id=9003: entry={}, title={:?}, levels={:?}", i, title, levels);
+                    println!(
+                        "  *** FOUND song_id=9003: entry={}, title={:?}, levels={:?}",
+                        i, title, levels
+                    );
                 }
             }
         }
     }
     println!("  Found {} songs with new offsets", found_with_new.len());
     for (i, (idx, id, title, levels)) in found_with_new.iter().take(10).enumerate() {
-        println!("    [{:2}] entry={:4}, id={:5}, title={:?}, levels={:?}", i, idx, id, title, levels);
+        println!(
+            "    [{:2}] entry={:4}, id={:5}, title={:?}, levels={:?}",
+            i, idx, id, title, levels
+        );
     }
 
     // Check currentSong offset (0x1428382d0) and surrounding area
@@ -242,8 +287,14 @@ pub fn run(base_addr: u64, pid: Option<u32>) -> Result<()> {
         // Look for pointers (values that look like addresses)
         for i in (0..120).step_by(8) {
             let val = u64::from_le_bytes([
-                bytes[i], bytes[i+1], bytes[i+2], bytes[i+3],
-                bytes[i+4], bytes[i+5], bytes[i+6], bytes[i+7],
+                bytes[i],
+                bytes[i + 1],
+                bytes[i + 2],
+                bytes[i + 3],
+                bytes[i + 4],
+                bytes[i + 5],
+                bytes[i + 6],
+                bytes[i + 7],
             ]);
             if val > 0x140000000 && val < 0x150000000 {
                 println!("  Potential pointer at offset {}: 0x{:X}", i, val);
@@ -273,7 +324,7 @@ pub fn run(base_addr: u64, pid: Option<u32>) -> Result<()> {
         let addr = search_start + chunk_start;
         if let Ok(chunk) = reader.read_bytes(addr, chunk_size) {
             for i in 0..(chunk_size - 4) {
-                if &chunk[i..i+4] == fun_pattern {
+                if &chunk[i..i + 4] == fun_pattern {
                     found_fun.push(addr + i as u64);
                 }
             }
@@ -298,7 +349,9 @@ pub fn run(base_addr: u64, pid: Option<u32>) -> Result<()> {
                 ("unknown (384)", 384),
                 ("unknown (448)", 448),
                 ("unknown (512)", 512),
-            ].iter() {
+            ]
+            .iter()
+            {
                 let str_bytes = &data[*offset..*offset + 64];
                 let len = str_bytes.iter().position(|&b| b == 0).unwrap_or(64);
                 if len > 0 && str_bytes[0] >= 0x20 {
@@ -324,7 +377,7 @@ pub fn run(base_addr: u64, pid: Option<u32>) -> Result<()> {
             println!("      Scanning for song_id=9003 in entry:");
             let target_bytes: [u8; 4] = 9003u32.to_le_bytes();
             for j in 0..1020 {
-                if &wide_data[j..j+4] == &target_bytes {
+                if wide_data[j..j + 4] == target_bytes {
                     println!("        *** song_id=9003 at offset {} ***", j);
                 }
             }
@@ -341,12 +394,17 @@ pub fn run(base_addr: u64, pid: Option<u32>) -> Result<()> {
     if let Ok(data) = reader.read_bytes(base_addr, search_size) {
         let mut found_locations = Vec::new();
         for i in 0..(search_size - 4) {
-            if &data[i..i+4] == &target_bytes {
+            if data[i..i + 4] == target_bytes {
                 found_locations.push(base_addr + i as u64);
             }
         }
 
-        println!("  Found {} occurrences of 0x{:08X} ({})", found_locations.len(), target_id, target_id);
+        println!(
+            "  Found {} occurrences of 0x{:08X} ({})",
+            found_locations.len(),
+            target_id,
+            target_id
+        );
         for (i, addr) in found_locations.iter().take(20).enumerate() {
             let offset_from_base = addr - base_addr;
             println!("  [{}] 0x{:X} (base+0x{:X})", i, addr, offset_from_base);
@@ -386,8 +444,12 @@ pub fn run(base_addr: u64, pid: Option<u32>) -> Result<()> {
                     if title_len > 0 && entry[0] >= 0x20 {
                         let (title, _, _) = encoding_rs::SHIFT_JIS.decode(&entry[..title_len]);
                         let levels = &entry[288..298];
-                        println!("      -> if at offset 624: entry=0x{:X}, title={:?}, levels={:?}",
-                                 potential_entry_start, title.trim(), levels);
+                        println!(
+                            "      -> if at offset 624: entry=0x{:X}, title={:?}, levels={:?}",
+                            potential_entry_start,
+                            title.trim(),
+                            levels
+                        );
                     }
                 }
             }

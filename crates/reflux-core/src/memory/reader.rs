@@ -1,8 +1,8 @@
 #![cfg_attr(not(target_os = "windows"), allow(dead_code, unused_variables))]
 
 use crate::error::{Error, Result};
-use crate::memory::bytes::decode_shift_jis_to_string;
 use crate::memory::ProcessHandle;
+use crate::memory::bytes::decode_shift_jis_to_string;
 
 #[cfg(target_os = "windows")]
 use windows::Win32::System::Diagnostics::Debug::ReadProcessMemory;

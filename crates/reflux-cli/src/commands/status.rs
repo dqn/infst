@@ -2,7 +2,9 @@
 
 use anyhow::{Result, bail};
 use reflux_core::game::find_game_version;
-use reflux_core::{MemoryReader, OffsetSearcher, ProcessHandle, StatusInfo, builtin_signatures, load_offsets};
+use reflux_core::{
+    MemoryReader, OffsetSearcher, ProcessHandle, StatusInfo, builtin_signatures, load_offsets,
+};
 
 /// Run the status command
 pub fn run(offsets_file: Option<&str>, pid: Option<u32>, json: bool) -> Result<()> {
@@ -87,43 +89,71 @@ pub fn run(offsets_file: Option<&str>, pid: Option<u32>, json: bool) -> Result<(
         println!(
             "SongList:     0x{:016X}  {}",
             status.offsets.song_list.address,
-            if status.offsets.song_list.valid { "✓" } else { "✗" }
+            if status.offsets.song_list.valid {
+                "✓"
+            } else {
+                "✗"
+            }
         );
         println!("              {}", status.offsets.song_list.reason);
         println!(
             "JudgeData:    0x{:016X}  {}",
             status.offsets.judge_data.address,
-            if status.offsets.judge_data.valid { "✓" } else { "✗" }
+            if status.offsets.judge_data.valid {
+                "✓"
+            } else {
+                "✗"
+            }
         );
         println!("              {}", status.offsets.judge_data.reason);
         println!(
             "PlaySettings: 0x{:016X}  {}",
             status.offsets.play_settings.address,
-            if status.offsets.play_settings.valid { "✓" } else { "✗" }
+            if status.offsets.play_settings.valid {
+                "✓"
+            } else {
+                "✗"
+            }
         );
         println!("              {}", status.offsets.play_settings.reason);
         println!(
             "PlayData:     0x{:016X}  {}",
             status.offsets.play_data.address,
-            if status.offsets.play_data.valid { "✓" } else { "✗" }
+            if status.offsets.play_data.valid {
+                "✓"
+            } else {
+                "✗"
+            }
         );
         println!("              {}", status.offsets.play_data.reason);
         println!(
             "CurrentSong:  0x{:016X}  {}",
             status.offsets.current_song.address,
-            if status.offsets.current_song.valid { "✓" } else { "✗" }
+            if status.offsets.current_song.valid {
+                "✓"
+            } else {
+                "✗"
+            }
         );
         println!("              {}", status.offsets.current_song.reason);
         println!(
             "DataMap:      0x{:016X}  {}",
             status.offsets.data_map.address,
-            if status.offsets.data_map.valid { "✓" } else { "✗" }
+            if status.offsets.data_map.valid {
+                "✓"
+            } else {
+                "✗"
+            }
         );
         println!("              {}", status.offsets.data_map.reason);
         println!(
             "UnlockData:   0x{:016X}  {}",
             status.offsets.unlock_data.address,
-            if status.offsets.unlock_data.valid { "✓" } else { "✗" }
+            if status.offsets.unlock_data.valid {
+                "✓"
+            } else {
+                "✗"
+            }
         );
         println!("              {}", status.offsets.unlock_data.reason);
 

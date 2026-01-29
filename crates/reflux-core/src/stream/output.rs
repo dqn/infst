@@ -115,7 +115,11 @@ mod tests {
         // When disabled, all writes should succeed without actually writing
         assert!(output.write_play_state(GameState::Playing).is_ok());
         assert!(output.write_current_song("Test", "SPA", 12).is_ok());
-        assert!(output.write_latest_result("Test", "SPA", 12, "AAA", "HARD CLEAR", 2000).is_ok());
+        assert!(
+            output
+                .write_latest_result("Test", "SPA", 12, "AAA", "HARD CLEAR", 2000)
+                .is_ok()
+        );
         assert!(output.write_marquee("Test marquee").is_ok());
     }
 
@@ -155,7 +159,9 @@ mod tests {
         let base_dir = temp_dir.path().to_str().unwrap().to_string();
         let output = StreamOutput::new(true, base_dir);
 
-        output.write_latest_result("Test Song", "SPA", 12, "AAA", "HARD CLEAR", 2000).unwrap();
+        output
+            .write_latest_result("Test Song", "SPA", 12, "AAA", "HARD CLEAR", 2000)
+            .unwrap();
 
         let content = fs::read_to_string(temp_dir.path().join("latest.txt")).unwrap();
         assert_eq!(content, "Test Song [SPA12] AAA HARD CLEAR 2000");
@@ -191,11 +197,26 @@ mod tests {
 
         output.write_full_song_info(&song, Difficulty::SpA).unwrap();
 
-        assert_eq!(fs::read_to_string(temp_dir.path().join("title.txt")).unwrap(), "Test Title");
-        assert_eq!(fs::read_to_string(temp_dir.path().join("artist.txt")).unwrap(), "Test Artist");
-        assert_eq!(fs::read_to_string(temp_dir.path().join("englishtitle.txt")).unwrap(), "Test Title EN");
-        assert_eq!(fs::read_to_string(temp_dir.path().join("genre.txt")).unwrap(), "Test Genre");
-        assert_eq!(fs::read_to_string(temp_dir.path().join("level.txt")).unwrap(), "11");
+        assert_eq!(
+            fs::read_to_string(temp_dir.path().join("title.txt")).unwrap(),
+            "Test Title"
+        );
+        assert_eq!(
+            fs::read_to_string(temp_dir.path().join("artist.txt")).unwrap(),
+            "Test Artist"
+        );
+        assert_eq!(
+            fs::read_to_string(temp_dir.path().join("englishtitle.txt")).unwrap(),
+            "Test Title EN"
+        );
+        assert_eq!(
+            fs::read_to_string(temp_dir.path().join("genre.txt")).unwrap(),
+            "Test Genre"
+        );
+        assert_eq!(
+            fs::read_to_string(temp_dir.path().join("level.txt")).unwrap(),
+            "11"
+        );
     }
 
     #[test]
@@ -211,7 +232,13 @@ mod tests {
         // Then clear
         output.clear_full_song_info().unwrap();
 
-        assert_eq!(fs::read_to_string(temp_dir.path().join("title.txt")).unwrap(), "");
-        assert_eq!(fs::read_to_string(temp_dir.path().join("artist.txt")).unwrap(), "");
+        assert_eq!(
+            fs::read_to_string(temp_dir.path().join("title.txt")).unwrap(),
+            ""
+        );
+        assert_eq!(
+            fs::read_to_string(temp_dir.path().join("artist.txt")).unwrap(),
+            ""
+        );
     }
 }

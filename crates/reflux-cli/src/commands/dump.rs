@@ -1,7 +1,9 @@
 //! Dump command implementation.
 
 use anyhow::Result;
-use reflux_core::{DumpInfo, MemoryReader, OffsetSearcher, ProcessHandle, builtin_signatures, load_offsets};
+use reflux_core::{
+    DumpInfo, MemoryReader, OffsetSearcher, ProcessHandle, builtin_signatures, load_offsets,
+};
 
 /// Run the dump command
 pub fn run(offsets_file: Option<&str>, pid: Option<u32>, output: Option<&str>) -> Result<()> {
@@ -51,7 +53,9 @@ pub fn run(offsets_file: Option<&str>, pid: Option<u32>, output: Option<&str>) -
                 "  [{}] 0x{:X}: id={}, folder={}, title={:?}",
                 entry.index, entry.address, entry.song_id, entry.folder, entry.title
             );
-            if let (Some(meta_id), Some(meta_folder)) = (entry.metadata_song_id, entry.metadata_folder) {
+            if let (Some(meta_id), Some(meta_folder)) =
+                (entry.metadata_song_id, entry.metadata_folder)
+            {
                 println!("       metadata: id={}, folder={}", meta_id, meta_folder);
             }
         }
@@ -65,7 +69,10 @@ pub fn run(offsets_file: Option<&str>, pid: Option<u32>, output: Option<&str>) -
         }
 
         println!();
-        println!("=== Detected Songs ({} total) ===", dump.detected_songs.len());
+        println!(
+            "=== Detected Songs ({} total) ===",
+            dump.detected_songs.len()
+        );
         for (i, song) in dump.detected_songs.iter().take(20).enumerate() {
             println!(
                 "  [{}] id={}, folder={}, title={:?} ({})",

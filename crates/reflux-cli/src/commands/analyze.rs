@@ -19,8 +19,7 @@ pub fn run(address: Option<String>, pid: Option<u32>) -> Result<()> {
 
     println!(
         "Found process (Base: 0x{:X}, Size: 0x{:X})",
-        process.base_address,
-        process.module_size
+        process.base_address, process.module_size
     );
 
     let reader = MemoryReader::new(&process);
@@ -114,7 +113,7 @@ fn count_songs_new_structure(reader: &MemoryReader, start: u64) -> usize {
             Ok(id) => id,
             Err(_) => break,
         };
-        if song_id < 1000 || song_id > 50000 {
+        if !(1000..=50000).contains(&song_id) {
             break;
         }
         count += 1;
@@ -182,27 +181,37 @@ fn analyze_potential_song_entry(reader: &MemoryReader, addr: u64) {
         let folder = i32::from_le_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]);
 
         // Check if offset 8 has ASCII data (difficulty levels)
-        let has_ascii = buffer[8..18].iter().all(|&b| b >= 0x30 && b <= 0x39 || b == 0);
+        let has_ascii = buffer[8..18]
+            .iter()
+            .all(|&b| (0x30..=0x39).contains(&b) || b == 0);
 
         if has_ascii {
             let diff_str: String = buffer[8..18]
                 .iter()
-                .take_while(|&&b| b >= 0x30 && b <= 0x39)
+                .take_while(|&&b| (0x30..=0x39).contains(&b))
                 .map(|&b| b as char)
                 .collect();
-            println!("      song_id={}, folder={}, difficulty=\"{}\"", song_id, folder, diff_str);
+            println!(
+                "      song_id={}, folder={}, difficulty=\"{}\"",
+                song_id, folder, diff_str
+            );
         }
 
         // Check for next entry at various offsets
         for entry_size in [32u64, 48, 64, 80, 96, 128] {
             let next_addr = addr + entry_size;
             if let Ok(next_buf) = reader.read_bytes(next_addr, 8) {
-                let next_id = i32::from_le_bytes([next_buf[0], next_buf[1], next_buf[2], next_buf[3]]);
-                let next_folder = i32::from_le_bytes([next_buf[4], next_buf[5], next_buf[6], next_buf[7]]);
+                let next_id =
+                    i32::from_le_bytes([next_buf[0], next_buf[1], next_buf[2], next_buf[3]]);
+                let next_folder =
+                    i32::from_le_bytes([next_buf[4], next_buf[5], next_buf[6], next_buf[7]]);
 
                 // Check if next entry looks valid (song_id 1001-50000, folder 1-50)
-                if next_id >= 1000 && next_id <= 50000 && next_folder >= 1 && next_folder <= 50 {
-                    println!("        -> Entry size {} works: next song_id={}", entry_size, next_id);
+                if (1000..=50000).contains(&next_id) && (1..=50).contains(&next_folder) {
+                    println!(
+                        "        -> Entry size {} works: next song_id={}",
+                        entry_size, next_id
+                    );
                 }
             }
         }
@@ -224,41 +233,39 @@ fn search_consecutive_song_ids(reader: &MemoryReader, base: u64, module_size: u6
         let addr = search_start + offset;
         let read_size = chunk_size.min((search_end - addr) as usize);
 
-        match reader.read_bytes(addr, read_size) {
-            Ok(buffer) => {
-                // Find all 1001 patterns
-                let mut addr_1001s: Vec<u64> = Vec::new();
-                let mut addr_1002s: Vec<u64> = Vec::new();
+        if let Ok(buffer) = reader.read_bytes(addr, read_size) {
+            // Find all 1001 patterns
+            let mut addr_1001s: Vec<u64> = Vec::new();
+            let mut addr_1002s: Vec<u64> = Vec::new();
 
-                for (i, window) in buffer.windows(4).enumerate() {
-                    if window == pattern_1001 {
-                        addr_1001s.push(addr + i as u64);
-                    } else if window == pattern_1002 {
-                        addr_1002s.push(addr + i as u64);
-                    }
+            for (i, window) in buffer.windows(4).enumerate() {
+                if window == pattern_1001 {
+                    addr_1001s.push(addr + i as u64);
+                } else if window == pattern_1002 {
+                    addr_1002s.push(addr + i as u64);
                 }
+            }
 
-                // Find pairs
-                for &a1001 in &addr_1001s {
-                    for &a1002 in &addr_1002s {
-                        if a1002 > a1001 {
-                            let delta = a1002 - a1001;
-                            // Look for reasonable entry sizes
-                            if delta >= 32 && delta <= 2048 && delta % 4 == 0 {
-                                found_pairs.push((a1001, a1002, delta));
-                            }
+            // Find pairs
+            for &a1001 in &addr_1001s {
+                for &a1002 in &addr_1002s {
+                    if a1002 > a1001 {
+                        let delta = a1002 - a1001;
+                        // Look for reasonable entry sizes
+                        if (32..=2048).contains(&delta) && delta % 4 == 0 {
+                            found_pairs.push((a1001, a1002, delta));
                         }
                     }
                 }
             }
-            Err(_) => {}
         }
 
         offset += chunk_size as u64;
     }
 
     // Group by delta to find likely entry sizes
-    let mut delta_counts: std::collections::HashMap<u64, Vec<u64>> = std::collections::HashMap::new();
+    let mut delta_counts: std::collections::HashMap<u64, Vec<u64>> =
+        std::collections::HashMap::new();
     for (addr_1001, _, delta) in &found_pairs {
         delta_counts.entry(*delta).or_default().push(*addr_1001);
     }
@@ -269,13 +276,20 @@ fn search_consecutive_song_ids(reader: &MemoryReader, base: u64, module_size: u6
 
     println!("    Top entry size candidates:");
     for (delta, addresses) in sorted.iter().take(5) {
-        println!("      Delta={} bytes: {} occurrences", delta, addresses.len());
-        if let Some(&first_addr) = addresses.first() {
-            if addresses.len() >= 10 {
-                // Try to count songs with this structure size
-                let count = count_songs_with_size(reader, first_addr, *delta);
-                println!("        -> Starting at 0x{:X}: {} consecutive songs", first_addr, count);
-            }
+        println!(
+            "      Delta={} bytes: {} occurrences",
+            delta,
+            addresses.len()
+        );
+        if let Some(&first_addr) = addresses.first()
+            && addresses.len() >= 10
+        {
+            // Try to count songs with this structure size
+            let count = count_songs_with_size(reader, first_addr, *delta);
+            println!(
+                "        -> Starting at 0x{:X}: {} consecutive songs",
+                first_addr, count
+            );
         }
     }
 }
@@ -288,7 +302,7 @@ fn count_songs_with_size(reader: &MemoryReader, start: u64, entry_size: u64) -> 
     while count < 5000 {
         match reader.read_i32(addr) {
             Ok(id) => {
-                if id < 1000 || id > 50000 {
+                if !(1000..=50000).contains(&id) {
                     break;
                 }
                 // Allow some gaps/out-of-order but not too much
@@ -349,17 +363,25 @@ fn search_for_title_strings(reader: &MemoryReader, base: u64, module_size: u64) 
                             println!("    Found at 0x{:X}", found_addr);
 
                             // Read some context around the match
-                            if let Ok(context) = reader.read_bytes(found_addr.saturating_sub(64), 192) {
+                            if let Ok(context) =
+                                reader.read_bytes(found_addr.saturating_sub(64), 192)
+                            {
                                 // Look for song_id nearby (at known offsets from old structure)
                                 for check_offset in [0usize, 64, 128, 256, 512, 624, 656, 688] {
                                     if check_offset + 4 <= context.len() {
                                         let potential_id = i32::from_le_bytes([
-                                            context[check_offset], context[check_offset + 1],
-                                            context[check_offset + 2], context[check_offset + 3],
+                                            context[check_offset],
+                                            context[check_offset + 1],
+                                            context[check_offset + 2],
+                                            context[check_offset + 3],
                                         ]);
-                                        if potential_id >= 1000 && potential_id <= 50000 {
-                                            println!("      -> Potential song_id={} at relative offset {} (abs: 0x{:X})",
-                                                potential_id, check_offset as i64 - 64, found_addr.saturating_sub(64) + check_offset as u64);
+                                        if (1000..=50000).contains(&potential_id) {
+                                            println!(
+                                                "      -> Potential song_id={} at relative offset {} (abs: 0x{:X})",
+                                                potential_id,
+                                                check_offset as i64 - 64,
+                                                found_addr.saturating_sub(64) + check_offset as u64
+                                            );
                                         }
                                     }
                                 }

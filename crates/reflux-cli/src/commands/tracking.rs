@@ -7,8 +7,8 @@ use std::time::Duration;
 use anyhow::Result;
 use reflux_core::game::find_game_version;
 use reflux_core::{
-    CustomTypes, EncodingFixes, MemoryReader, OffsetSearcher, OffsetsCollection,
-    ProcessHandle, Reflux, ScoreMap, SongInfo, load_offsets,
+    CustomTypes, EncodingFixes, MemoryReader, OffsetSearcher, OffsetsCollection, ProcessHandle,
+    Reflux, ScoreMap, SongInfo, load_offsets,
 };
 use tracing::{debug, error, info, warn};
 
@@ -27,7 +27,9 @@ pub fn run(offsets_file: Option<&str>) -> Result<()> {
 
     while !shutdown.is_shutdown() {
         if let Some(process) = wait_for_process(&shutdown) {
-            if let Err(e) = run_tracking_session(&mut reflux, &process, &shutdown, offsets_from_file) {
+            if let Err(e) =
+                run_tracking_session(&mut reflux, &process, &shutdown, offsets_from_file)
+            {
                 error!("Tracking session error: {}", e);
             }
             debug!("Process disconnected, waiting for reconnect...");
@@ -93,7 +95,10 @@ fn wait_for_process(shutdown: &ShutdownSignal) -> Option<ProcessHandle> {
 
     match ProcessHandle::find_and_open() {
         Ok(process) => {
-            debug!("Found INFINITAS process (base: {:#x})", process.base_address);
+            debug!(
+                "Found INFINITAS process (base: {:#x})",
+                process.base_address
+            );
             Some(process)
         }
         Err(_) => None,
@@ -123,7 +128,9 @@ fn validate_or_search_offsets(
     } else {
         let searcher = OffsetSearcher::new(reader);
         if !searcher.validate_signature_offsets(reflux.offsets()) {
-            info!("Offset validation failed (offsets may be stale or incorrect). Attempting signature search...");
+            info!(
+                "Offset validation failed (offsets may be stale or incorrect). Attempting signature search..."
+            );
             true
         } else {
             debug!("Loaded offsets validated successfully");
@@ -172,10 +179,7 @@ fn load_song_database(
     if std::path::Path::new(tsv_path).exists() {
         debug!("Building song database from TSV + memory scan...");
         let db = reflux_core::game::build_song_database_from_tsv_with_memory(
-            reader,
-            song_list,
-            tsv_path,
-            0x100000, // 1MB scan
+            reader, song_list, tsv_path, 0x100000, // 1MB scan
         );
 
         if db.is_empty() {
@@ -187,7 +191,8 @@ fn load_song_database(
 
     // No TSV, use memory-only approach
     debug!("No TSV file found, using memory scan...");
-    let song_db = reflux_core::game::fetch_song_database_from_memory_scan(reader, song_list, 0x100000);
+    let song_db =
+        reflux_core::game::fetch_song_database_from_memory_scan(reader, song_list, 0x100000);
 
     if song_db.is_empty() {
         debug!("Memory scan found no songs, trying legacy approach...");

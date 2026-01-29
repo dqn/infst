@@ -75,8 +75,14 @@ mod retry_tests {
         let strategy = ExponentialBackoff::new();
 
         assert_eq!(strategy.max_attempts(), 5);
-        assert_eq!(strategy.delay_for_attempt(0), Some(Duration::from_millis(100)));
-        assert_eq!(strategy.delay_for_attempt(4), Some(Duration::from_millis(1600)));
+        assert_eq!(
+            strategy.delay_for_attempt(0),
+            Some(Duration::from_millis(100))
+        );
+        assert_eq!(
+            strategy.delay_for_attempt(4),
+            Some(Duration::from_millis(1600))
+        );
         assert_eq!(strategy.delay_for_attempt(5), None);
     }
 
@@ -85,8 +91,14 @@ mod retry_tests {
         let strategy = FixedDelay::new(3, Duration::from_millis(50));
 
         assert_eq!(strategy.max_attempts(), 3);
-        assert_eq!(strategy.delay_for_attempt(0), Some(Duration::from_millis(50)));
-        assert_eq!(strategy.delay_for_attempt(2), Some(Duration::from_millis(50)));
+        assert_eq!(
+            strategy.delay_for_attempt(0),
+            Some(Duration::from_millis(50))
+        );
+        assert_eq!(
+            strategy.delay_for_attempt(2),
+            Some(Duration::from_millis(50))
+        );
     }
 
     #[test]
@@ -104,11 +116,7 @@ mod retry_tests {
 
         let result: Result<i32, &str> = strategy.execute(|_| {
             attempts += 1;
-            if attempts < 3 {
-                Err("not yet")
-            } else {
-                Ok(42)
-            }
+            if attempts < 3 { Err("not yet") } else { Ok(42) }
         });
 
         assert_eq!(result, Ok(42));

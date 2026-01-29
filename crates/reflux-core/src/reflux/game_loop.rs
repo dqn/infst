@@ -65,7 +65,8 @@ fn verify_memory_access(reader: &MemoryReader, process: &ProcessHandle) -> bool 
                 } else {
                     debug!(
                         "Memory read failed after {} retries: {}",
-                        retry::MAX_READ_RETRIES, e
+                        retry::MAX_READ_RETRIES,
+                        e
                     );
                 }
             }
@@ -288,12 +289,14 @@ impl Reflux {
 
         let mut new_songs = 0usize;
         for (song_id, song) in scan_result {
-            if !self.game_data.song_db.contains_key(&song_id) {
+            if let std::collections::hash_map::Entry::Vacant(e) =
+                self.game_data.song_db.entry(song_id)
+            {
                 debug!(
                     "Discovered new song via rescan: {} ({})",
                     song.title, song_id
                 );
-                self.game_data.song_db.insert(song_id, song);
+                e.insert(song);
                 new_songs += 1;
             }
         }
@@ -414,10 +417,7 @@ impl Reflux {
 
         // Try to dynamically load from memory
         if let Some(song) = fetch_song_by_id(reader, self.offsets.song_list, song_id, 0x200000) {
-            info!(
-                "Dynamically loaded song: {} ({})",
-                song.title, song_id
-            );
+            info!("Dynamically loaded song: {} ({})", song.title, song_id);
             let chart = ChartInfo::from_song_info(&song, difficulty, true);
             // Add to song database for future lookups
             self.game_data.song_db.insert(song_id, song);
