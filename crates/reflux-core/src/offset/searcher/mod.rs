@@ -17,6 +17,14 @@ pub use types::*;
 use utils::is_power_of_two;
 pub use utils::merge_byte_representations;
 
+/// Simple Shift-JIS decoder for searcher (avoids circular dependency)
+fn decode_shift_jis_simple(bytes: &[u8]) -> String {
+    use encoding_rs::SHIFT_JIS;
+    let len = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+    let (decoded, _, _) = SHIFT_JIS.decode(&bytes[..len]);
+    decoded.into_owned()
+}
+
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 struct DataMapProbe {
@@ -178,40 +186,85 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
     }
 
     pub fn validate_signature_offsets(&self, offsets: &OffsetsCollection) -> bool {
-        if offsets.song_list == 0
-            || offsets.judge_data == 0
-            || offsets.play_settings == 0
-            || offsets.play_data == 0
-            || offsets.current_song == 0
-        {
+        // Check required offsets are non-zero
+        if offsets.song_list == 0 {
+            debug!("Validation failed: song_list is zero");
+            return false;
+        }
+        if offsets.judge_data == 0 {
+            debug!("Validation failed: judge_data is zero");
+            return false;
+        }
+        if offsets.play_settings == 0 {
+            debug!("Validation failed: play_settings is zero");
+            return false;
+        }
+        if offsets.play_data == 0 {
+            debug!("Validation failed: play_data is zero");
+            return false;
+        }
+        if offsets.current_song == 0 {
+            debug!("Validation failed: current_song is zero");
             return false;
         }
 
-        if self.count_songs_at_address(offsets.song_list) < MIN_EXPECTED_SONGS {
+        // Validate song list: either old-style (high song count) or new-style (metadata table)
+        let song_count = self.count_songs_at_address(offsets.song_list);
+        let has_enough_songs = song_count >= MIN_EXPECTED_SONGS;
+        let is_new_version = song_count >= 1 && self.validate_new_version_text_table(offsets.song_list);
+
+        if !has_enough_songs && !is_new_version {
+            debug!(
+                "Song list validation failed: count={}, new_version={}",
+                song_count, is_new_version
+            );
             return false;
         }
+        debug!("Song list validation passed: count={}, new_version={}", song_count, is_new_version);
+
         if !self.validate_judge_data_candidate(offsets.judge_data) {
+            debug!("Judge data validation failed at 0x{:X}", offsets.judge_data);
             return false;
         }
-        if self
-            .validate_play_settings_at(offsets.play_settings)
-            .is_none()
-        {
+        debug!("Judge data validation passed at 0x{:X}", offsets.judge_data);
+
+        if self.validate_play_settings_at(offsets.play_settings).is_none() {
+            debug!("Play settings validation failed at 0x{:X}", offsets.play_settings);
             return false;
         }
-        if !self
-            .validate_play_data_address(offsets.play_data)
-            .unwrap_or(false)
-        {
+        debug!("Play settings validation passed at 0x{:X}", offsets.play_settings);
+
+        if !self.validate_play_data_address(offsets.play_data).unwrap_or(false) {
+            debug!("Play data validation failed at 0x{:X}", offsets.play_data);
             return false;
         }
-        if !self
-            .validate_current_song_address(offsets.current_song)
-            .unwrap_or(false)
-        {
+        debug!("Play data validation passed at 0x{:X}", offsets.play_data);
+
+        if !self.validate_current_song_address(offsets.current_song).unwrap_or(false) {
+            debug!("Current song validation failed at 0x{:X}", offsets.current_song);
             return false;
+        }
+        debug!("Current song validation passed at 0x{:X}", offsets.current_song);
+
+        // Validate data_map if present
+        if offsets.data_map != 0 && !self.validate_data_map_address(offsets.data_map) {
+            debug!("Data map validation failed at 0x{:X}", offsets.data_map);
+            return false;
+        }
+        if offsets.data_map != 0 {
+            debug!("Data map validation passed at 0x{:X}", offsets.data_map);
         }
 
+        // Validate unlock_data if present
+        if offsets.unlock_data != 0 && !self.validate_unlock_data_address(offsets.unlock_data) {
+            debug!("Unlock data validation failed at 0x{:X}", offsets.unlock_data);
+            return false;
+        }
+        if offsets.unlock_data != 0 {
+            debug!("Unlock data validation passed at 0x{:X}", offsets.unlock_data);
+        }
+
+        // Validate relative distances between offsets
         let within_range = |actual: u64, expected: u64, range: u64| {
             if actual >= expected {
                 actual - expected <= range
@@ -221,38 +274,85 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         };
 
         let judge_to_play = offsets.judge_data.wrapping_sub(offsets.play_settings);
-        if !within_range(
-            judge_to_play,
-            JUDGE_TO_PLAY_SETTINGS,
-            PLAY_SETTINGS_SEARCH_RANGE as u64,
-        ) {
+        if !within_range(judge_to_play, JUDGE_TO_PLAY_SETTINGS, PLAY_SETTINGS_SEARCH_RANGE as u64) {
+            debug!(
+                "Relative distance validation failed: judge_data - play_settings = 0x{:X} (expected ~0x{:X})",
+                judge_to_play, JUDGE_TO_PLAY_SETTINGS
+            );
             return false;
         }
 
         let song_to_judge = offsets.song_list.wrapping_sub(offsets.judge_data);
-        if !within_range(
-            song_to_judge,
-            JUDGE_TO_SONG_LIST,
-            JUDGE_DATA_SEARCH_RANGE as u64,
-        ) {
+        if !within_range(song_to_judge, JUDGE_TO_SONG_LIST, JUDGE_DATA_SEARCH_RANGE as u64) {
+            debug!(
+                "Relative distance validation failed: song_list - judge_data = 0x{:X} (expected ~0x{:X})",
+                song_to_judge, JUDGE_TO_SONG_LIST
+            );
             return false;
         }
 
         let play_data_delta = offsets.play_data.wrapping_sub(offsets.play_settings);
-        if !within_range(
-            play_data_delta,
-            PLAY_SETTINGS_TO_PLAY_DATA,
-            PLAY_DATA_SEARCH_RANGE as u64,
-        ) {
+        if !within_range(play_data_delta, PLAY_SETTINGS_TO_PLAY_DATA, PLAY_DATA_SEARCH_RANGE as u64) {
+            debug!(
+                "Relative distance validation failed: play_data - play_settings = 0x{:X} (expected ~0x{:X})",
+                play_data_delta, PLAY_SETTINGS_TO_PLAY_DATA
+            );
             return false;
         }
 
         let current_song_delta = offsets.current_song.wrapping_sub(offsets.judge_data);
-        if !within_range(
-            current_song_delta,
-            JUDGE_TO_CURRENT_SONG,
-            CURRENT_SONG_SEARCH_RANGE as u64,
-        ) {
+        if !within_range(current_song_delta, JUDGE_TO_CURRENT_SONG, CURRENT_SONG_SEARCH_RANGE as u64) {
+            debug!(
+                "Relative distance validation failed: current_song - judge_data = 0x{:X} (expected ~0x{:X})",
+                current_song_delta, JUDGE_TO_CURRENT_SONG
+            );
+            return false;
+        }
+
+        debug!("All offset validations passed");
+        true
+    }
+
+    /// Validate data_map address
+    fn validate_data_map_address(&self, addr: u64) -> bool {
+        // DataMap structure: table_start at addr, table_end at addr+8
+        let table_start = match self.reader.read_u64(addr) {
+            Ok(v) => v,
+            Err(_) => return false,
+        };
+        let table_end = match self.reader.read_u64(addr + 8) {
+            Ok(v) => v,
+            Err(_) => return false,
+        };
+
+        if table_end <= table_start {
+            return false;
+        }
+
+        let size = table_end - table_start;
+        // Valid size range: 8KB to 16MB
+        size >= 0x2000 && size <= 0x1000000
+    }
+
+    /// Validate unlock_data address
+    fn validate_unlock_data_address(&self, addr: u64) -> bool {
+        // First entry should have song_id around 1000, reasonable type and unlocks
+        let song_id = match self.reader.read_i32(addr) {
+            Ok(v) => v,
+            Err(_) => return false,
+        };
+        let unlock_type = match self.reader.read_i32(addr + 4) {
+            Ok(v) => v,
+            Err(_) => return false,
+        };
+
+        // song_id should be in valid range
+        if !(MIN_SONG_ID..=MAX_SONG_ID).contains(&song_id) {
+            return false;
+        }
+
+        // unlock_type should be 0-3
+        if !(0..=3).contains(&unlock_type) {
             return false;
         }
 
@@ -260,12 +360,540 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
     }
 
     /// Search for song list offset using version string pattern
+    ///
+    /// Finds all matches and selects the one with the most valid songs.
+    /// Also searches nearby offsets since "5.1.1." may be a header before actual song data.
+    ///
+    /// For new INFINITAS versions (2026012800+), the text table may only have a few entries
+    /// populated due to lazy loading. In this case, we validate by checking the metadata
+    /// table at text_base + 0x7E0.
     pub fn search_song_list_offset(&mut self, base_hint: u64) -> Result<u64> {
-        self.load_buffer_around(base_hint, INITIAL_SEARCH_SIZE)?;
-
         // Pattern: "5.1.1." (version string marker)
         let pattern = b"5.1.1.";
-        self.fetch_and_search(base_hint, pattern, 0, None)
+        let mut search_size = INITIAL_SEARCH_SIZE;
+        let mut best: Option<(u64, usize)> = None;
+        let mut new_version_candidate: Option<u64> = None;
+        let mut all_candidates: Vec<(u64, usize)> = Vec::new();
+
+        while search_size <= MAX_SEARCH_SIZE {
+            if self.load_buffer_around(base_hint, search_size).is_err() {
+                break;
+            }
+
+            let matches = self.find_all_matches(pattern);
+            debug!(
+                "  SongList pattern search: found {} matches at search_size={}MB",
+                matches.len(),
+                search_size / 1024 / 1024
+            );
+
+            for addr in matches {
+                if !addr.is_multiple_of(4) {
+                    continue;
+                }
+
+                // Try the address itself and nearby offsets
+                // "5.1.1." might be a header, with actual song list starting after it
+                let offsets_to_try: &[i64] = &[
+                    0,                                // Direct match
+                    SongInfo::MEMORY_SIZE as i64,     // One entry after (0x3F0)
+                    SongInfo::MEMORY_SIZE as i64 * 2, // Two entries after
+                    -(SongInfo::MEMORY_SIZE as i64),  // One entry before
+                ];
+
+                for &offset in offsets_to_try {
+                    let candidate_addr = addr.wrapping_add_signed(offset);
+                    if !candidate_addr.is_multiple_of(4) {
+                        continue;
+                    }
+
+                    let song_count = self.count_songs_at_address(candidate_addr);
+                    if offset == 0 || song_count > 1 {
+                        debug!(
+                            "    Candidate 0x{:X} (offset {:+}): {} songs",
+                            candidate_addr, offset, song_count
+                        );
+                    }
+                    all_candidates.push((candidate_addr, song_count));
+
+                    // Check for new version structure (song_id in metadata table)
+                    // If direct match and at least 1 song with valid title exists
+                    if offset == 0 && song_count >= 1 && new_version_candidate.is_none() {
+                        if self.validate_new_version_text_table(candidate_addr) {
+                            info!(
+                                "  New version text table detected at 0x{:X} ({} title entries)",
+                                candidate_addr, song_count
+                            );
+                            new_version_candidate = Some(candidate_addr);
+                        }
+                    }
+
+                    if song_count < MIN_EXPECTED_SONGS {
+                        continue;
+                    }
+
+                    let is_better = match best {
+                        Some((_, best_count)) => song_count > best_count,
+                        None => true,
+                    };
+
+                    if is_better {
+                        best = Some((candidate_addr, song_count));
+                    }
+                }
+            }
+
+            // If we found a valid candidate with enough songs, return it
+            if best.is_some() {
+                break;
+            }
+
+            search_size *= 2;
+        }
+
+        // Prefer old-style match with high song count
+        if let Some((addr, count)) = best {
+            debug!(
+                "  SongList: selected 0x{:X} ({} songs, pattern search)",
+                addr, count
+            );
+            return Ok(addr);
+        }
+
+        // For new version: use text table if metadata table validation passed
+        if let Some(addr) = new_version_candidate {
+            info!(
+                "  SongList: using new version text table at 0x{:X} (metadata table validated)",
+                addr
+            );
+            return Ok(addr);
+        }
+
+        // Log all candidates for debugging
+        if !all_candidates.is_empty() {
+            // Sort by song count descending
+            all_candidates.sort_by(|a, b| b.1.cmp(&a.1));
+            warn!(
+                "  SongList pattern search: no valid candidate found. Best candidates: {:?}",
+                all_candidates.iter().take(5).collect::<Vec<_>>()
+            );
+        }
+
+        // Fallback: search for song_id=1001 pattern (first IIDX song)
+        warn!("Trying song_id=1001 pattern search as fallback...");
+        if let Ok(addr) = self.search_song_list_by_song_id(base_hint) {
+            return Ok(addr);
+        }
+
+        Err(Error::OffsetSearchFailed(
+            "SongList not found via pattern search".to_string(),
+        ))
+    }
+
+    /// Search for song list by looking for song_id patterns (new structure)
+    ///
+    /// New version uses 312-byte structures with pointers to title strings.
+    fn search_song_list_by_song_id(&mut self, base_hint: u64) -> Result<u64> {
+        const NEW_STRUCT_SIZE: u64 = 312; // 0x138
+
+        let search_size = 32 * 1024 * 1024; // 32MB
+
+        if self.load_buffer_around(base_hint, search_size).is_err() {
+            return Err(Error::OffsetSearchFailed(
+                "Failed to load buffer for song_id search".to_string(),
+            ));
+        }
+
+        // Find song_id=1001 and song_id=1002 to locate new structure
+        let pattern_1001 = merge_byte_representations(&[1001i32]);
+        let pattern_1002 = merge_byte_representations(&[1002i32]);
+
+        let matches_1001 = self.find_all_matches(&pattern_1001);
+        let matches_1002 = self.find_all_matches(&pattern_1002);
+
+        debug!(
+            "  song_id search: found {} matches for 1001, {} matches for 1002",
+            matches_1001.len(),
+            matches_1002.len()
+        );
+
+        // Find pair with delta=312 (new structure size)
+        for addr_1001 in &matches_1001 {
+            for addr_1002 in &matches_1002 {
+                if *addr_1002 > *addr_1001 {
+                    let delta = addr_1002 - addr_1001;
+                    if delta == NEW_STRUCT_SIZE {
+                        debug!(
+                            "  Found new structure: song_id=1001 at 0x{:X}, delta={}",
+                            addr_1001, delta
+                        );
+
+                        // Dump full structure for analysis
+                        if let Ok(bytes) = self.reader.read_bytes(*addr_1001, NEW_STRUCT_SIZE as usize) {
+                            debug!("    Full structure dump (312 bytes):");
+                            debug!("      Bytes 0-31:   {:02X?}", &bytes[0..32]);
+                            debug!("      Bytes 32-63:  {:02X?}", &bytes[32..64]);
+                            debug!("      Bytes 64-95:  {:02X?}", &bytes[64..96]);
+                            debug!("      Bytes 96-127: {:02X?}", &bytes[96..128]);
+
+                            // Try different pointer offsets
+                            for ptr_offset in [8usize, 12, 16, 20, 24, 28, 32] {
+                                if ptr_offset + 8 <= bytes.len() {
+                                    let ptr = u64::from_le_bytes([
+                                        bytes[ptr_offset], bytes[ptr_offset + 1],
+                                        bytes[ptr_offset + 2], bytes[ptr_offset + 3],
+                                        bytes[ptr_offset + 4], bytes[ptr_offset + 5],
+                                        bytes[ptr_offset + 6], bytes[ptr_offset + 7],
+                                    ]);
+                                    if ptr > 0x140000000 && ptr < 0x150000000 {
+                                        if let Ok(str_bytes) = self.reader.read_bytes(ptr, 32) {
+                                            let s = decode_shift_jis_simple(&str_bytes);
+                                            if !s.is_empty() {
+                                                debug!(
+                                                    "      Ptr at offset {}: 0x{:X} -> {:?}",
+                                                    ptr_offset, ptr, s
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Count songs to verify
+                        let song_count = self.count_songs_new_structure(*addr_1001);
+                        debug!("    Song count (new structure): {}", song_count);
+
+                        if song_count >= MIN_EXPECTED_SONGS {
+                            info!(
+                                "  SongList (new structure): 0x{:X} ({} songs)",
+                                addr_1001, song_count
+                            );
+                            return Ok(*addr_1001);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Try alternative: SongList at 0x143186D80 with old 0x3F0 size but new layout
+        // New layout: song_id at offset 0 (instead of offset 624)
+        warn!("Trying new layout search (song_id at start)...");
+
+        // Search for song_id=1001 followed by folder=43
+        let alt_pattern = merge_byte_representations(&[1001i32, 43i32]);
+        let alt_matches = self.find_all_matches(&alt_pattern);
+
+        debug!("  Alt pattern search: found {} matches", alt_matches.len());
+
+        for addr in &alt_matches {
+            debug!("    Found potential new layout at 0x{:X}", addr);
+
+            // Try counting with old structure size (0x3F0) but song_id at offset 0
+            let count = self.count_songs_new_layout(*addr);
+            debug!("      Song count (new layout, 0x3F0 size): {}", count);
+
+            if count >= MIN_EXPECTED_SONGS {
+                info!("  SongList (new layout): 0x{:X} ({} songs)", addr, count);
+                return Ok(*addr);
+            }
+
+            // Also dump first few entries
+            if count > 0 {
+                for i in 0..3.min(count) {
+                    let entry_addr = *addr + (i as u64 * 0x3F0);
+                    if let Ok(id) = self.reader.read_i32(entry_addr) {
+                        debug!("        Entry {}: song_id={} at 0x{:X}", i, id, entry_addr);
+                    }
+                }
+            }
+        }
+
+        Err(Error::OffsetSearchFailed(
+            "New structure SongList not found".to_string(),
+        ))
+    }
+
+    /// Count songs using new 312-byte structure
+    fn count_songs_new_structure(&self, start_addr: u64) -> usize {
+        const NEW_STRUCT_SIZE: u64 = 312;
+        let mut count = 0;
+        let mut addr = start_addr;
+
+        while count < 5000 {
+            // Read song_id (first 4 bytes)
+            let song_id = match self.reader.read_i32(addr) {
+                Ok(id) => id,
+                Err(_) => break,
+            };
+
+            // Valid song IDs are >= 1000
+            if song_id < 1000 || song_id > 50000 {
+                break;
+            }
+
+            if count < 5 {
+                debug!("      Entry {}: song_id={} at 0x{:X}", count, song_id, addr);
+            }
+
+            count += 1;
+            addr += NEW_STRUCT_SIZE;
+        }
+
+        count
+    }
+
+    /// Count songs using alternate structure (song_id + folder + ASCII data)
+    ///
+    /// Structure seems to be variable size, search for consecutive valid song_ids
+    #[allow(dead_code)]
+    fn count_songs_alt_structure(&self, start_addr: u64) -> usize {
+        // Try different structure sizes
+        for struct_size in [32u64, 48, 64, 80, 96, 128] {
+            let count = self.try_count_with_size(start_addr, struct_size);
+            if count >= 100 {
+                debug!("      Alt structure size {} works: {} songs", struct_size, count);
+                return count;
+            }
+        }
+        0
+    }
+
+    #[allow(dead_code)]
+    fn try_count_with_size(&self, start_addr: u64, struct_size: u64) -> usize {
+        let mut count = 0;
+        let mut addr = start_addr;
+        let mut prev_id = 0i32;
+
+        while count < 5000 {
+            let song_id = match self.reader.read_i32(addr) {
+                Ok(id) => id,
+                Err(_) => break,
+            };
+
+            // Valid song IDs are >= 1000 and increasing or close
+            if song_id < 1000 || song_id > 50000 {
+                break;
+            }
+
+            // Check if song_id is reasonable (not too far from previous)
+            if count > 0 && (song_id < prev_id - 100 || song_id > prev_id + 1000) {
+                break;
+            }
+
+            prev_id = song_id;
+            count += 1;
+            addr += struct_size;
+        }
+
+        count
+    }
+
+    /// Comprehensive analysis of new 312-byte song structure
+    ///
+    /// Dumps detailed information about the structure to understand pointer layout
+    pub fn analyze_new_structure(&self, start_addr: u64) {
+        const NEW_STRUCT_SIZE: u64 = 312; // 0x138
+
+        info!("=== New Structure Analysis at 0x{:X} ===", start_addr);
+
+        // Read first few entries and analyze in detail
+        for entry_idx in 0..5 {
+            let entry_addr = start_addr + (entry_idx * NEW_STRUCT_SIZE);
+            let Ok(buffer) = self.reader.read_bytes(entry_addr, NEW_STRUCT_SIZE as usize) else {
+                warn!("  Entry {}: Failed to read", entry_idx);
+                continue;
+            };
+
+            // Read song_id (offset 0)
+            let song_id = i32::from_le_bytes([buffer[0], buffer[1], buffer[2], buffer[3]]);
+            if song_id < 1000 || song_id > 50000 {
+                info!("  Entry {}: Invalid song_id={}, stopping", entry_idx, song_id);
+                break;
+            }
+
+            info!("  Entry {} at 0x{:X}: song_id={}", entry_idx, entry_addr, song_id);
+
+            // Analyze 32-bit compressed pointers (high 32 bits = 0x00000001)
+            info!("    Compressed pointer analysis (32-bit + 0x100000000):");
+            for ptr_offset in (0..312).step_by(4) {
+                if ptr_offset + 4 > 312 {
+                    break;
+                }
+                let ptr32 = u32::from_le_bytes([
+                    buffer[ptr_offset], buffer[ptr_offset + 1],
+                    buffer[ptr_offset + 2], buffer[ptr_offset + 3],
+                ]);
+
+                // Check if this looks like a compressed pointer (high nibble 0x4)
+                if ptr32 > 0x40000000 && ptr32 < 0x50000000 {
+                    let ptr64 = (ptr32 as u64) + 0x100000000;
+                    info!("      Offset {:3}: 0x{:08X} -> 0x{:016X}", ptr_offset, ptr32, ptr64);
+
+                    // Try to read and decode what the pointer points to
+                    if let Ok(target_bytes) = self.reader.read_bytes(ptr64, 128) {
+                        // Try as Shift-JIS string
+                        let s = decode_shift_jis_simple(&target_bytes);
+                        if !s.is_empty() && s.len() > 1 && s.chars().take(10).all(|c| c.is_ascii_graphic() || c == ' ') {
+                            info!("        -> String: {:?}", s.chars().take(60).collect::<String>());
+                        }
+
+                        // Show raw bytes (first 48)
+                        info!("        -> Raw: {:02X?}", &target_bytes[0..48.min(target_bytes.len())]);
+
+                        // Check for nested compressed pointer
+                        let nested32 = u32::from_le_bytes([
+                            target_bytes[0], target_bytes[1], target_bytes[2], target_bytes[3],
+                        ]);
+                        if nested32 > 0x40000000 && nested32 < 0x50000000 {
+                            let nested64 = (nested32 as u64) + 0x100000000;
+                            if let Ok(nested_bytes) = self.reader.read_bytes(nested64, 64) {
+                                let nested_s = decode_shift_jis_simple(&nested_bytes);
+                                info!("          -> Nested ptr 0x{:X}: {:?}", nested64, nested_s.chars().take(40).collect::<String>());
+                            }
+                        }
+
+                        // Also check for embedded song_id at target
+                        let target_id = i32::from_le_bytes([
+                            target_bytes[0], target_bytes[1], target_bytes[2], target_bytes[3],
+                        ]);
+                        if target_id >= 1000 && target_id <= 50000 {
+                            info!("        -> Possible song_id at target: {}", target_id);
+                        }
+                    }
+                }
+            }
+
+            // Also show interesting 32-bit values (potential offsets, flags, etc.)
+            info!("    32-bit value analysis:");
+            for i32_offset in (0..312).step_by(4) {
+                if i32_offset + 4 > 312 {
+                    break;
+                }
+                let val = i32::from_le_bytes([
+                    buffer[i32_offset], buffer[i32_offset + 1],
+                    buffer[i32_offset + 2], buffer[i32_offset + 3],
+                ]);
+
+                // Show non-zero values that might be meaningful
+                if val != 0 && (val > 0 && val < 10000 || val >= 1000 && val <= 50000) {
+                    info!("      Offset {:3}: {} (0x{:08X})", i32_offset, val, val as u32);
+                }
+            }
+
+            // Dump structure in rows of 16 bytes
+            info!("    Full hex dump:");
+            for row in 0..(312 / 16) {
+                let row_start = row * 16;
+                let row_end = (row_start + 16).min(312);
+                info!(
+                    "      {:03X}: {:02X?}",
+                    row_start,
+                    &buffer[row_start..row_end]
+                );
+            }
+            // Remaining bytes
+            if 312 % 16 != 0 {
+                let row_start = (312 / 16) * 16;
+                info!(
+                    "      {:03X}: {:02X?}",
+                    row_start,
+                    &buffer[row_start..312]
+                );
+            }
+        }
+
+        // Also search for the old-style text table nearby
+        info!("=== Searching for text table (old style embedded strings) ===");
+        let search_base = start_addr.saturating_sub(0x100000);
+        if let Ok(buffer) = self.reader.read_bytes(search_base, 0x200000) {
+            let pattern = b"5.1.1.";
+            let mut found_count = 0;
+            for (i, window) in buffer.windows(pattern.len()).enumerate() {
+                if window == pattern {
+                    let addr = search_base + i as u64;
+                    info!("  Found '5.1.1.' at 0x{:X}", addr);
+                    found_count += 1;
+                    if found_count >= 5 {
+                        info!("  ... (truncated, found more than 5 matches)");
+                        break;
+                    }
+                }
+            }
+            if found_count == 0 {
+                info!("  No '5.1.1.' pattern found in search range");
+            }
+        }
+    }
+
+    /// Search for song data in both old and new formats
+    pub fn search_song_list_comprehensive(&mut self, base_hint: u64) -> Result<u64> {
+        info!("=== Comprehensive Song List Search ===");
+
+        // First, try old-style pattern search
+        info!("Attempting old-style pattern search (embedded strings)...");
+        if let Ok(addr) = self.search_song_list_offset(base_hint) {
+            let song_count = self.count_songs_at_address(addr);
+            if song_count >= MIN_EXPECTED_SONGS {
+                info!("Found via old-style: 0x{:X} ({} songs)", addr, song_count);
+                return Ok(addr);
+            }
+        }
+
+        // Try new structure search
+        info!("Attempting new structure search (312-byte entries)...");
+        if let Ok(addr) = self.search_song_list_by_song_id(base_hint) {
+            self.analyze_new_structure(addr);
+            return Ok(addr);
+        }
+
+        Err(Error::OffsetSearchFailed(
+            "No song list found via any method".to_string(),
+        ))
+    }
+
+    /// Count songs with new layout: song_id at offset 0, struct size 0x3F0
+    fn count_songs_new_layout(&self, start_addr: u64) -> usize {
+        const STRUCT_SIZE: u64 = 0x3F0; // 1008 bytes, same as old
+        let mut count = 0;
+        let mut addr = start_addr;
+
+        while count < 5000 {
+            // Read song_id at offset 0 (new layout)
+            let song_id = match self.reader.read_i32(addr) {
+                Ok(id) => id,
+                Err(_) => break,
+            };
+
+            // Valid song IDs are >= 1000
+            if song_id < 1000 || song_id > 50000 {
+                // Check if it's just zero (uninitialized) vs invalid
+                if song_id == 0 && count > 0 {
+                    // Try a few more entries in case of gaps
+                    let mut found_more = false;
+                    for skip in 1..10 {
+                        let next_addr = addr + (skip * STRUCT_SIZE);
+                        if let Ok(next_id) = self.reader.read_i32(next_addr) {
+                            if next_id >= 1000 && next_id <= 50000 {
+                                found_more = true;
+                                break;
+                            }
+                        }
+                    }
+                    if !found_more {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            } else {
+                count += 1;
+            }
+
+            addr += STRUCT_SIZE;
+        }
+
+        count
     }
 
     /// Search for unlock data offset
@@ -575,6 +1203,38 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         warn!("SongList signature search failed. Falling back to pattern search...");
         let base = self.reader.base_address();
         self.search_song_list_offset(base)
+    }
+
+    /// Validate if address is a valid text table for new INFINITAS version (2026012800+)
+    ///
+    /// New version stores song_id in a separate metadata table at text_base + 0x7E0.
+    /// This validation checks if the metadata table has valid song_id values.
+    fn validate_new_version_text_table(&self, text_base: u64) -> bool {
+        // Check metadata table at text_base + 0x7E0
+        let metadata_addr = text_base + SongInfo::METADATA_TABLE_OFFSET as u64;
+
+        // Read first metadata entry
+        let Ok(metadata) = self.reader.read_bytes(metadata_addr, 8) else {
+            return false;
+        };
+
+        let song_id = i32::from_le_bytes([metadata[0], metadata[1], metadata[2], metadata[3]]);
+        let folder = i32::from_le_bytes([metadata[4], metadata[5], metadata[6], metadata[7]]);
+
+        // Validate: first song in list should be song_id ~1000-2000 range (5.1.1. is id=1001)
+        // folder should be 1-50
+        let valid_song_id = song_id >= 1000 && song_id <= 5000;
+        let valid_folder = folder >= 1 && folder <= 50;
+
+        if valid_song_id && valid_folder {
+            debug!(
+                "  New version text table validation passed: song_id={}, folder={} at metadata 0x{:X}",
+                song_id, folder, metadata_addr
+            );
+            return true;
+        }
+
+        false
     }
 
     fn search_offset_by_signature<F>(
@@ -995,8 +1655,13 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
     ///
     /// This is used to validate SongList candidates by checking if they
     /// actually point to valid song data.
+    ///
+    /// For new INFINITAS versions (2026012800+), song_id may be 0 in the text table
+    /// (stored in separate metadata table), so we count entries with valid titles
+    /// regardless of song_id value.
     fn count_songs_at_address(&self, song_list_addr: u64) -> usize {
         let mut count = 0;
+        let mut consecutive_failures = 0;
         let mut current_position: u64 = 0;
 
         // Read up to a reasonable limit to avoid infinite loops.
@@ -1004,16 +1669,67 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         // so this limit provides ample headroom for future expansion while preventing
         // runaway iteration on invalid addresses.
         const MAX_SONGS_TO_CHECK: usize = 5000;
+        const MAX_CONSECUTIVE_FAILURES: u32 = 10;
 
         while count < MAX_SONGS_TO_CHECK {
             let address = song_list_addr + current_position;
 
             match SongInfo::read_from_memory(self.reader, address) {
                 Ok(Some(song)) if !song.title.is_empty() => {
+                    // Debug: log first few songs with more detail
+                    if count < 3 {
+                        // Dump first 64 bytes and song_id area to understand structure
+                        if let Ok(full_buffer) = self.reader.read_bytes(address, SongInfo::MEMORY_SIZE) {
+                            let id_offset = 256 + 368; // SONG_ID_OFFSET
+                            debug!(
+                                "    Song {}: id={}, title={:?} at 0x{:X}",
+                                count, song.id, song.title, address
+                            );
+                            debug!(
+                                "      First 32 bytes: {:02X?}",
+                                &full_buffer[0..32]
+                            );
+                            debug!(
+                                "      Bytes at id_offset ({}): {:02X?}",
+                                id_offset, &full_buffer[id_offset..id_offset + 8]
+                            );
+                        }
+                    }
+                    // Count entries with valid titles, even if song_id=0
+                    // (new version stores song_id in separate metadata table)
                     count += 1;
+                    consecutive_failures = 0;
                 }
-                _ => {
-                    // End of song list or invalid data
+                Ok(Some(song)) => {
+                    // Song with empty title
+                    debug!(
+                        "    Song at 0x{:X}: empty title (id={})",
+                        address, song.id
+                    );
+                    consecutive_failures += 1;
+                    if consecutive_failures >= MAX_CONSECUTIVE_FAILURES {
+                        debug!("    Stopping after {} consecutive empty/invalid entries", consecutive_failures);
+                        break;
+                    }
+                }
+                Ok(None) => {
+                    // First 4 bytes are zero - this is common for uninitialized entries
+                    if count < 5 {
+                        if let Ok(bytes) = self.reader.read_bytes(address, 16) {
+                            debug!(
+                                "    Song at 0x{:X}: first 4 bytes zero, raw: {:02X?}",
+                                address, bytes
+                            );
+                        }
+                    }
+                    consecutive_failures += 1;
+                    if consecutive_failures >= MAX_CONSECUTIVE_FAILURES {
+                        debug!("    Stopping after {} consecutive empty/invalid entries", consecutive_failures);
+                        break;
+                    }
+                }
+                Err(e) => {
+                    debug!("    Song at 0x{:X}: read error: {}", address, e);
                     break;
                 }
             }
