@@ -36,6 +36,12 @@ impl GameStateDetector {
     }
 
     /// Detect state from raw memory values without transition validation
+    ///
+    /// Based on C# implementation:
+    /// 1. marker54 != 0 → Playing
+    /// 2. last_state == SongSelect → stay in SongSelect (can't go directly to ResultScreen)
+    /// 3. song_select_marker == 1 → SongSelect
+    /// 4. Otherwise → ResultScreen
     fn detect_raw(
         &self,
         judge_marker_54: i32,
@@ -50,23 +56,20 @@ impl GameStateDetector {
             return GameState::Playing;
         }
 
+        // "Cannot go from song select to result screen anyway" (C# implementation)
+        // Maintain SongSelect during intermediate transitions
+        if last_state == GameState::SongSelect {
+            return GameState::SongSelect;
+        }
+
         // Check if in song select
         if song_select_marker == 1 {
             return GameState::SongSelect;
         }
 
-        // Only treat as ResultScreen when transitioning from Playing
-        if last_state == GameState::Playing {
-            return GameState::ResultScreen;
-        }
-
-        // Maintain SongSelect during intermediate transitions (equivalent to C# implementation)
-        // "Cannot go from song select to result screen anyway"
-        if last_state == GameState::SongSelect {
-            return GameState::SongSelect;
-        }
-
-        GameState::Unknown
+        // Otherwise it's ResultScreen (matches C# behavior)
+        // This allows detecting ResultScreen even when starting from Unknown state
+        GameState::ResultScreen
     }
 
     /// Reset state (e.g., when reconnecting to process)
@@ -106,10 +109,12 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_unknown_when_idle() {
+    fn test_detect_result_screen_when_idle() {
         let mut detector = GameStateDetector::new();
+        // When starting from Unknown with all markers zero, it's ResultScreen
+        // (matches C# behavior where it falls through to resultScreen)
         let state = detector.detect(0, 0, 0);
-        assert_eq!(state, GameState::Unknown);
+        assert_eq!(state, GameState::ResultScreen);
     }
 
     #[test]
@@ -158,19 +163,19 @@ mod tests {
     }
 
     #[test]
-    fn test_only_marker2_nonzero_not_playing() {
+    fn test_only_marker2_nonzero_is_result_screen() {
         let mut detector = GameStateDetector::new();
-        // Only marker2 non-zero should NOT be Playing (both required)
+        // Only marker2 non-zero with marker1=0 falls through to ResultScreen
         let state = detector.detect(0, 1, 0);
-        assert_eq!(state, GameState::Unknown);
+        assert_eq!(state, GameState::ResultScreen);
     }
 
     #[test]
-    fn test_all_zero_from_unknown() {
+    fn test_all_zero_from_unknown_is_result_screen() {
         let mut detector = GameStateDetector::new();
-        // All markers zero from Unknown should stay Unknown
+        // All markers zero from Unknown should be ResultScreen (matches C# behavior)
         let state = detector.detect(0, 0, 0);
-        assert_eq!(state, GameState::Unknown);
+        assert_eq!(state, GameState::ResultScreen);
     }
 
     #[test]
