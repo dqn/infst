@@ -25,6 +25,9 @@ fn decode_shift_jis_simple(bytes: &[u8]) -> String {
     decoded.into_owned()
 }
 
+/// Probe result for DataMap candidate validation
+///
+/// Some fields are used only for Debug output or future enhancements.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 struct DataMapProbe {
@@ -645,7 +648,8 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
 
     /// Count songs using alternate structure (song_id + folder + ASCII data)
     ///
-    /// Structure seems to be variable size, search for consecutive valid song_ids
+    /// Structure seems to be variable size, search for consecutive valid song_ids.
+    /// Kept for potential future use with new INFINITAS versions.
     #[allow(dead_code)]
     fn count_songs_alt_structure(&self, start_addr: u64) -> usize {
         // Try different structure sizes

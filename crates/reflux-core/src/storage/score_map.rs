@@ -54,6 +54,7 @@ impl ScoreData {
 #[derive(Debug, Clone, Default)]
 struct ListNode {
     next: u64,
+    /// Previous node pointer (unused but required for memory layout compatibility)
     #[allow(dead_code)]
     prev: u64,
     diff: i32,
