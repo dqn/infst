@@ -29,13 +29,11 @@ pub struct SongInfo {
 }
 
 impl SongInfo {
-    /// Size of one song entry in memory (0x3F0 = 1008 bytes)
-    /// This corresponds to the INFINITAS internal song entry structure.
-    pub const MEMORY_SIZE: usize = 0x3F0;
+    /// Size of one song entry in memory
+    /// Version 2026012800+: 0x4B0 = 1200 bytes (was 0x3F0 = 1008 bytes in older versions)
+    pub const MEMORY_SIZE: usize = 0x4B0; // 1200 bytes
 
-    /// Offset from text table to metadata table in new INFINITAS versions
-    /// In version 2026012800+, the song_id is stored in a separate metadata table
-    /// located 0x7E0 (2016) bytes after the text table base.
+    /// Offset from text table to metadata table (legacy, kept for compatibility)
     pub const METADATA_TABLE_OFFSET: usize = 0x7E0;
 
     // Memory layout constants
@@ -44,22 +42,27 @@ impl SongInfo {
     const WORD: usize = 4; // i32/u32 size
 
     // Memory offsets (relative to song entry start)
+    // Version 2026012800+ layout - 3 additional 64-byte fields compared to older versions
+    //
     // String fields (each 64 bytes, Shift-JIS encoded):
     //   0x000: Title
     //   0x040: Title (English)
     //   0x080: Genre
     //   0x0C0: Artist
+    //   0x100-0x1BF: Additional fields (unknown purpose)
     const TITLE_OFFSET: usize = 0;
     const TITLE_ENGLISH_OFFSET: usize = Self::SLAB; // 64
     const GENRE_OFFSET: usize = Self::SLAB * 2; // 128
     const ARTIST_OFFSET: usize = Self::SLAB * 3; // 192
 
-    // Metadata section (starts at 0x100 = 256):
-    const FOLDER_OFFSET: usize = Self::SLAB * 4 + 24; // 280
-    const LEVELS_OFFSET: usize = Self::SLAB * 4 + Self::SLAB / 2; // 288 (10 bytes)
-    const BPM_OFFSET: usize = Self::SLAB * 5; // 320 (8 bytes: max, min)
-    const NOTES_OFFSET: usize = Self::SLAB * 6 + 48; // 432 (40 bytes: 10 x i32)
-    const SONG_ID_OFFSET: usize = 256 + 368; // 624
+    // Metadata section (updated for version 2026012800+):
+    // Old offsets were: folder=280, levels=288, bpm=320, notes=432, song_id=624
+    // New offsets add 192 bytes (3 x 64-byte fields) to most positions
+    const FOLDER_OFFSET: usize = 472; // folder byte (estimated)
+    const LEVELS_OFFSET: usize = 480; // 10 bytes for difficulty levels
+    const BPM_OFFSET: usize = 512; // 8 bytes: max, min (estimated)
+    const NOTES_OFFSET: usize = 624; // 40 bytes: 10 x i32 (estimated)
+    const SONG_ID_OFFSET: usize = 816; // 4 bytes
 
     /// Get level for a specific difficulty index
     pub fn get_level(&self, difficulty_index: usize) -> u8 {
