@@ -56,7 +56,9 @@ impl Reflux {
 
         loop {
             // Check for shutdown signal
-            if !running.load(Ordering::SeqCst) {
+            // Note: `running` is actually the shutdown flag from ShutdownSignal.as_atomic()
+            // It's true when shutdown is requested, so we exit when it's true
+            if running.load(Ordering::SeqCst) {
                 debug!("Shutdown signal received, exiting tracker loop");
                 break;
             }
