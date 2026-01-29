@@ -29,12 +29,14 @@ const PROCESS_NAME: &str = "bm2dx.exe";
 #[cfg(target_os = "windows")]
 pub struct ProcessHandle {
     handle: HANDLE,
+    pub pid: u32,
     pub base_address: u64,
     pub module_size: u32,
 }
 
 #[cfg(not(target_os = "windows"))]
 pub struct ProcessHandle {
+    pub pid: u32,
     pub base_address: u64,
     pub module_size: u32,
 }
@@ -68,6 +70,7 @@ impl ProcessHandle {
 
         Ok(Self {
             handle,
+            pid,
             base_address,
             module_size,
         })
