@@ -28,7 +28,8 @@ const POLL_DELAYS_MS: [u64; 10] = [50, 50, 100, 100, 200, 200, 300, 300, 500, 50
 use crate::error::Result;
 use crate::game::{
     AssistType, ChartInfo, Difficulty, GameState, Grade, Judge, Lamp, PlayData, PlayType,
-    PlayerJudge, RawJudgeData, Settings, check_version_match, find_game_version, get_unlock_states,
+    PlayerJudge, RawJudgeData, Settings, check_version_match, fetch_song_by_id,
+    fetch_song_database_from_memory_scan, find_game_version, get_unlock_states,
 };
 use crate::memory::layout::{judge, play, settings, timing};
 use crate::memory::{MemoryReader, ProcessHandle, ReadMemory};
@@ -171,6 +172,8 @@ impl Reflux {
 
     /// Handle transition to result screen
     fn handle_result_screen(&mut self, reader: &MemoryReader) {
+        info!("Detected result screen, waiting for data...");
+
         // Initial delay to allow game data to settle (matching C# implementation)
         // This prevents race conditions where judge data updates before play data
         thread::sleep(Duration::from_millis(1000));
@@ -187,13 +190,30 @@ impl Reflux {
                         + play_data.judge.good
                         + play_data.judge.bad
                         + play_data.judge.poor;
+
+                    debug!(
+                        "Attempt {}: song_id={}, total_notes={}, judge: P={} G={} Go={} B={} Po={}",
+                        attempt + 1,
+                        play_data.chart.song_id,
+                        total_notes,
+                        play_data.judge.pgreat,
+                        play_data.judge.great,
+                        play_data.judge.good,
+                        play_data.judge.bad,
+                        play_data.judge.poor
+                    );
+
                     if total_notes > 0 {
+                        info!(
+                            "Play result captured: {} ({}) - EX: {}",
+                            play_data.chart.title, play_data.chart.song_id, play_data.ex_score
+                        );
                         self.process_play_result(&play_data);
                         return;
                     }
                     // Data not ready yet, continue polling
                     if attempt == POLL_DELAYS_MS.len() - 1 {
-                        info!(
+                        warn!(
                             "Play data notes count is zero after {} attempts",
                             POLL_DELAYS_MS.len()
                         );
@@ -223,19 +243,69 @@ impl Reflux {
 
     /// Save play data to session file (TSV)
     fn save_session_data(&mut self, play_data: &PlayData) {
-        if let Err(e) = self.session_manager.append_tsv_row(play_data) {
-            error!("Failed to append TSV row: {}", e);
+        debug!(
+            "Saving session data: song_id={}, title={}, ex_score={}",
+            play_data.chart.song_id, play_data.chart.title, play_data.ex_score
+        );
+
+        if self.session_manager.current_session_path().is_none() {
+            warn!("No active TSV session, attempting to start one...");
+            if let Err(e) = self.session_manager.start_tsv_session() {
+                error!("Failed to start TSV session: {}", e);
+                return;
+            }
+        }
+
+        match self.session_manager.append_tsv_row(play_data) {
+            Ok(()) => {
+                if let Some(path) = self.session_manager.current_session_path() {
+                    debug!("Successfully wrote to session file: {:?}", path);
+                }
+            }
+            Err(e) => error!("Failed to append TSV row: {}", e),
         }
     }
 
     /// Handle transition to song select screen
     fn handle_song_select(&mut self, reader: &MemoryReader) {
+        // Re-scan for newly loaded songs (handles lazy loading)
+        self.rescan_song_database(reader);
+
         // Poll unlock state changes
         self.poll_unlock_changes(reader);
 
         // Export tracker.tsv
         if let Err(e) = self.export_tracker_tsv("tracker.tsv") {
             error!("Failed to export tracker.tsv: {}", e);
+        }
+    }
+
+    /// Re-scan memory for newly loaded songs
+    ///
+    /// This handles lazy loading in newer INFINITAS versions where songs are
+    /// only loaded into memory when scrolled to in the song select screen.
+    fn rescan_song_database(&mut self, reader: &MemoryReader) {
+        let scan_result =
+            fetch_song_database_from_memory_scan(reader, self.offsets.song_list, 0x200000);
+
+        let mut new_songs = 0usize;
+        for (song_id, song) in scan_result {
+            if !self.game_data.song_db.contains_key(&song_id) {
+                debug!(
+                    "Discovered new song via rescan: {} ({})",
+                    song.title, song_id
+                );
+                self.game_data.song_db.insert(song_id, song);
+                new_songs += 1;
+            }
+        }
+
+        if new_songs > 0 {
+            info!(
+                "Re-scan discovered {} new songs (total: {})",
+                new_songs,
+                self.game_data.song_db.len()
+            );
         }
     }
 
@@ -283,7 +353,7 @@ impl Reflux {
         Ok((song_id, difficulty))
     }
 
-    fn fetch_play_data(&self, reader: &MemoryReader) -> Result<PlayData> {
+    fn fetch_play_data(&mut self, reader: &MemoryReader) -> Result<PlayData> {
         // Read data in same order as C# implementation:
         // 1. Judge data first (updates earliest on result screen)
         // 2. Settings
@@ -311,7 +381,7 @@ impl Reflux {
         let data_available =
             !settings.h_ran && !settings.battle && settings.assist == AssistType::Off;
 
-        let chart = self.create_chart_info(song_id, difficulty);
+        let chart = self.create_chart_info_dynamic(reader, song_id, difficulty);
 
         // Calculate grade
         let grade = if chart.total_notes > 0 {
@@ -332,23 +402,43 @@ impl Reflux {
         })
     }
 
-    /// Create chart info from song database or generate a placeholder
-    fn create_chart_info(&self, song_id: u32, difficulty: Difficulty) -> ChartInfo {
+    /// Create chart info from song database, dynamically loading from memory if not found
+    fn create_chart_info_dynamic(
+        &mut self,
+        reader: &MemoryReader,
+        song_id: u32,
+        difficulty: Difficulty,
+    ) -> ChartInfo {
+        // First check if song is already in database
         if let Some(song) = self.game_data.song_db.get(&song_id) {
-            ChartInfo::from_song_info(song, difficulty, true)
-        } else {
-            ChartInfo {
-                song_id,
-                title: format!("Song {:05}", song_id).into(),
-                title_english: format!("Song {:05}", song_id).into(),
-                artist: "".into(),
-                genre: "".into(),
-                bpm: "".into(),
-                difficulty,
-                level: 0,
-                total_notes: 0,
-                unlocked: true,
-            }
+            return ChartInfo::from_song_info(song, difficulty, true);
+        }
+
+        // Try to dynamically load from memory
+        if let Some(song) = fetch_song_by_id(reader, self.offsets.song_list, song_id, 0x200000) {
+            info!(
+                "Dynamically loaded song: {} ({})",
+                song.title, song_id
+            );
+            let chart = ChartInfo::from_song_info(&song, difficulty, true);
+            // Add to song database for future lookups
+            self.game_data.song_db.insert(song_id, song);
+            return chart;
+        }
+
+        // Fallback to placeholder
+        debug!("Song {} not found in memory, using placeholder", song_id);
+        ChartInfo {
+            song_id,
+            title: format!("Song {:05}", song_id).into(),
+            title_english: format!("Song {:05}", song_id).into(),
+            artist: "".into(),
+            genre: "".into(),
+            bpm: "".into(),
+            difficulty,
+            level: 0,
+            total_notes: 0,
+            unlocked: true,
         }
     }
 
