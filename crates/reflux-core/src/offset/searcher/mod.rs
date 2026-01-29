@@ -316,6 +316,70 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         true
     }
 
+    /// Validate basic memory access for file-loaded offsets
+    /// This skips relative distance checks which may differ between game versions
+    pub fn validate_basic_memory_access(&self, offsets: &OffsetsCollection) -> bool {
+        // Check required offsets are non-zero
+        if offsets.song_list == 0
+            || offsets.judge_data == 0
+            || offsets.play_settings == 0
+            || offsets.play_data == 0
+            || offsets.current_song == 0
+        {
+            debug!("Basic validation failed: some required offsets are zero");
+            return false;
+        }
+
+        // Try to read from each offset to verify memory is accessible
+        // Song list: try to read first few bytes
+        if self.reader.read_bytes(offsets.song_list, 64).is_err() {
+            debug!(
+                "Basic validation failed: cannot read song_list at 0x{:X}",
+                offsets.song_list
+            );
+            return false;
+        }
+
+        // Judge data: try to read
+        if self.reader.read_bytes(offsets.judge_data, 32).is_err() {
+            debug!(
+                "Basic validation failed: cannot read judge_data at 0x{:X}",
+                offsets.judge_data
+            );
+            return false;
+        }
+
+        // Play settings: try to read
+        if self.reader.read_bytes(offsets.play_settings, 32).is_err() {
+            debug!(
+                "Basic validation failed: cannot read play_settings at 0x{:X}",
+                offsets.play_settings
+            );
+            return false;
+        }
+
+        // Play data: try to read
+        if self.reader.read_bytes(offsets.play_data, 32).is_err() {
+            debug!(
+                "Basic validation failed: cannot read play_data at 0x{:X}",
+                offsets.play_data
+            );
+            return false;
+        }
+
+        // Current song: try to read
+        if self.reader.read_bytes(offsets.current_song, 16).is_err() {
+            debug!(
+                "Basic validation failed: cannot read current_song at 0x{:X}",
+                offsets.current_song
+            );
+            return false;
+        }
+
+        debug!("Basic memory access validation passed for all offsets");
+        true
+    }
+
     /// Validate data_map address
     fn validate_data_map_address(&self, addr: u64) -> bool {
         // DataMap structure: table_start at addr, table_end at addr+8

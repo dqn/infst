@@ -1028,106 +1028,120 @@ fn run_explore_mode(base_addr: u64, pid: Option<u32>) -> Result<()> {
     println!("Found process (PID: {}, Base: 0x{:X})", process.pid, process.base_address);
     let reader = MemoryReader::new(&process);
 
-    // Read and analyze entry structure
-    println!();
-    println!("=== Entry Structure at 0x{:X} ===", base_addr);
-
     const ENTRY_SIZE: u64 = 0x3F0; // 1008 bytes
     const METADATA_OFFSET: u64 = 0x7E0; // 2016 bytes
 
-    for i in 0..10u64 {
-        let text_addr = base_addr + i * ENTRY_SIZE;
-        let meta_addr = text_addr + METADATA_OFFSET;
-
-        // Read title (64 bytes)
-        let title = match reader.read_bytes(text_addr, 64) {
-            Ok(bytes) => {
-                let len = bytes.iter().position(|&b| b == 0).unwrap_or(64);
-                if len > 0 {
-                    let (decoded, _, _) = encoding_rs::SHIFT_JIS.decode(&bytes[..len]);
-                    decoded.trim().to_string()
-                } else {
-                    String::new()
-                }
-            }
-            Err(_) => continue,
-        };
-
-        // Read metadata
-        let (song_id, folder, difficulty) = match reader.read_bytes(meta_addr, 20) {
-            Ok(bytes) => {
-                let id = i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
-                let folder = i32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
-                let diff: String = bytes[8..18]
-                    .iter()
-                    .map(|&b| if b >= 0x30 && b <= 0x39 { b as char } else { '?' })
-                    .collect();
-                (id, folder, diff)
-            }
-            Err(_) => continue,
-        };
-
-        if !title.is_empty() || song_id >= 1000 {
-            println!(
-                "  [{}] text=0x{:X} meta=0x{:X}",
-                i, text_addr, meta_addr
-            );
-            println!(
-                "       title={:?}, song_id={}, folder={}, diff={}",
-                title, song_id, folder, difficulty
-            );
-        }
-    }
-
-    // Now scan metadata table more aggressively
+    // Analyze entry states
     println!();
-    println!("=== Scanning metadata table (entry_size={}) ===", ENTRY_SIZE);
+    println!("=== Entry State Analysis at 0x{:X} ===", base_addr);
+    println!("Entry size: 0x{:X} ({} bytes)", ENTRY_SIZE, ENTRY_SIZE);
+    println!("Metadata offset: 0x{:X} ({} bytes)", METADATA_OFFSET, METADATA_OFFSET);
 
-    let mut found_songs: Vec<(u32, i32, String, u64)> = Vec::new();
-    let max_entries = 5000u64;
+    let max_entries = 2000u64;
+    let mut has_title = 0u32;
+    let mut has_valid_meta = 0u32;
+    let mut has_both = 0u32;
+    let mut title_only = 0u32;
+    let mut meta_only = 0u32;
+    let mut empty = 0u32;
+    let mut read_errors = 0u32;
+
+    let mut found_songs: Vec<(u64, u32, i32, String)> = Vec::new();
 
     for i in 0..max_entries {
         let text_addr = base_addr + i * ENTRY_SIZE;
         let meta_addr = text_addr + METADATA_OFFSET;
 
-        // Read metadata first (faster check)
+        // Read title
+        let title = match reader.read_bytes(text_addr, 64) {
+            Ok(bytes) => {
+                let len = bytes.iter().position(|&b| b == 0).unwrap_or(64);
+                if len > 0 && bytes[0] != 0 {
+                    let (decoded, _, _) = encoding_rs::SHIFT_JIS.decode(&bytes[..len]);
+                    let t = decoded.trim();
+                    if !t.is_empty() && t.chars().next().is_some_and(|c| c.is_ascii_graphic() || !c.is_ascii()) {
+                        Some(t.to_string())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+            Err(_) => {
+                read_errors += 1;
+                continue;
+            }
+        };
+
+        // Read metadata
         let (song_id, folder) = match reader.read_bytes(meta_addr, 8) {
             Ok(bytes) => {
                 let id = i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
                 let folder = i32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
                 (id, folder)
             }
-            Err(_) => break,
+            Err(_) => {
+                read_errors += 1;
+                continue;
+            }
         };
 
-        if song_id >= 1000 && song_id <= 50000 && folder >= 1 && folder <= 50 {
-            // Valid metadata, read title
-            let title = match reader.read_bytes(text_addr, 64) {
-                Ok(bytes) => {
-                    let len = bytes.iter().position(|&b| b == 0).unwrap_or(64);
-                    if len > 0 {
-                        let (decoded, _, _) = encoding_rs::SHIFT_JIS.decode(&bytes[..len]);
-                        decoded.trim().to_string()
-                    } else {
-                        String::new()
-                    }
-                }
-                Err(_) => String::new(),
-            };
+        let valid_meta = song_id >= 1000 && song_id <= 90000 && folder >= 1 && folder <= 200;
 
-            found_songs.push((song_id as u32, folder, title, text_addr));
+        match (title.is_some(), valid_meta) {
+            (true, true) => {
+                has_title += 1;
+                has_valid_meta += 1;
+                has_both += 1;
+                found_songs.push((i, song_id as u32, folder, title.unwrap()));
+            }
+            (true, false) => {
+                has_title += 1;
+                title_only += 1;
+            }
+            (false, true) => {
+                has_valid_meta += 1;
+                meta_only += 1;
+            }
+            (false, false) => {
+                empty += 1;
+            }
         }
     }
 
-    println!("Found {} songs with valid metadata", found_songs.len());
-    for (i, (song_id, folder, title, addr)) in found_songs.iter().take(30).enumerate() {
+    println!();
+    println!("=== Statistics (first {} entries) ===", max_entries);
+    println!("  Entries with valid title:    {:5}", has_title);
+    println!("  Entries with valid metadata: {:5}", has_valid_meta);
+    println!("  Entries with both:           {:5}", has_both);
+    println!("  Title only (no valid meta):  {:5}", title_only);
+    println!("  Metadata only (no title):    {:5}", meta_only);
+    println!("  Empty entries:               {:5}", empty);
+    println!("  Read errors:                 {:5}", read_errors);
+
+    println!();
+    println!("=== Found songs with title + valid metadata ({} total) ===", found_songs.len());
+    for (i, (idx, song_id, folder, title)) in found_songs.iter().take(30).enumerate() {
         println!(
-            "  [{:3}] id={:5}, folder={:2}, addr=0x{:X}, title={:?}",
-            i, song_id, folder, addr, title
+            "  [{:3}] entry={:4}, id={:5}, folder={:3}, title={:?}",
+            i, idx, song_id, folder, title
         );
     }
     if found_songs.len() > 30 {
         println!("  ... and {} more", found_songs.len() - 30);
+    }
+
+    // Check if entries are contiguous or scattered
+    if found_songs.len() >= 2 {
+        println!();
+        println!("=== Entry distribution ===");
+        let indices: Vec<u64> = found_songs.iter().map(|(idx, _, _, _)| *idx).collect();
+        let min_idx = *indices.iter().min().unwrap();
+        let max_idx = *indices.iter().max().unwrap();
+        println!("  Entry range: {} to {} (span: {})", min_idx, max_idx, max_idx - min_idx + 1);
+        println!("  Density: {:.1}% of entries in range have songs",
+            100.0 * found_songs.len() as f64 / (max_idx - min_idx + 1) as f64);
     }
 
     Ok(())
@@ -1256,7 +1270,7 @@ fn run_tracking_mode(offsets_file: Option<&str>) -> Result<()> {
     info!("Reflux-RS {}", current_version);
 
     // Load offsets from file if specified
-    let initial_offsets = if let Some(path) = offsets_file {
+    let (initial_offsets, offsets_from_file) = if let Some(path) = offsets_file {
         match load_offsets(path) {
             Ok(offsets) => {
                 info!("Loaded offsets from {}", path);
@@ -1264,15 +1278,15 @@ fn run_tracking_mode(offsets_file: Option<&str>) -> Result<()> {
                     "  SongList: {:#x}, JudgeData: {:#x}, PlaySettings: {:#x}",
                     offsets.song_list, offsets.judge_data, offsets.play_settings
                 );
-                offsets
+                (offsets, true)
             }
             Err(e) => {
                 warn!("Failed to load offsets from {}: {}", path, e);
-                OffsetsCollection::default()
+                (OffsetsCollection::default(), false)
             }
         }
     } else {
-        OffsetsCollection::default()
+        (OffsetsCollection::default(), false)
     };
 
     // Create Reflux instance
@@ -1310,9 +1324,21 @@ fn run_tracking_mode(offsets_file: Option<&str>) -> Result<()> {
                 // Check if offsets are valid before proceeding
                 // First check basic validity (all offsets non-zero)
                 // Then validate signature offsets against the actual memory state
+                // Note: For offsets loaded from file, skip distance-based validation
+                // as the relative distances may differ between game versions
                 let needs_search = if !reflux.offsets().is_valid() {
                     info!("Invalid offsets detected (some offsets are zero)");
                     true
+                } else if offsets_from_file {
+                    // For file-loaded offsets, just verify memory is readable
+                    let searcher = OffsetSearcher::new(&reader);
+                    if searcher.validate_basic_memory_access(reflux.offsets()) {
+                        debug!("File-loaded offsets: basic memory access validated");
+                        false
+                    } else {
+                        info!("File-loaded offsets: memory access failed. Attempting signature search...");
+                        true
+                    }
                 } else {
                     let searcher = OffsetSearcher::new(&reader);
                     if !searcher.validate_signature_offsets(reflux.offsets()) {
