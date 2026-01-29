@@ -9,22 +9,7 @@ use std::time::Duration;
 use chrono::Utc;
 use tracing::{debug, error, info, warn};
 
-// =============================================================================
-// Retry and polling configuration
-// =============================================================================
-
-/// Memory read retry settings.
-/// Exponential backoff: 100ms → 200ms → 400ms → 800ms = total 1.5s max.
-/// Longer delays reduce false disconnection detection from transient failures.
-const MAX_READ_RETRIES: u32 = 5;
-const RETRY_DELAYS_MS: [u64; 5] = [100, 200, 400, 800, 1600];
-
-/// Result screen polling delays (exponential backoff).
-/// Total: 50+50+100+100+200+200+300+300+500+500 = 2.3 seconds max.
-/// Faster initial polling catches quick data availability, while exponential
-/// backoff reduces CPU usage if data takes longer to populate.
-const POLL_DELAYS_MS: [u64; 10] = [50, 50, 100, 100, 200, 200, 300, 300, 500, 500];
-
+use crate::config::{polling, retry};
 use crate::error::Result;
 use crate::game::{
     AssistType, ChartInfo, Difficulty, GameState, Grade, Judge, Lamp, PlayData, PlayType,
@@ -40,8 +25,9 @@ use super::Reflux;
 impl Reflux {
     /// Run the main tracking loop
     ///
-    /// The `running` flag is checked each iteration to allow graceful shutdown via Ctrl+C.
-    pub fn run(&mut self, process: &ProcessHandle, running: &AtomicBool) -> Result<()> {
+    /// The `shutdown_requested` flag is checked each iteration to allow graceful shutdown via Ctrl+C.
+    /// When `shutdown_requested` is `true`, the loop exits.
+    pub fn run(&mut self, process: &ProcessHandle, shutdown_requested: &AtomicBool) -> Result<()> {
         let reader = MemoryReader::new(process);
         let mut last_state = GameState::Unknown;
 
@@ -56,9 +42,7 @@ impl Reflux {
 
         loop {
             // Check for shutdown signal
-            // Note: `running` is actually the shutdown flag from ShutdownSignal.as_atomic()
-            // It's true when shutdown is requested, so we exit when it's true
-            if running.load(Ordering::SeqCst) {
+            if shutdown_requested.load(Ordering::SeqCst) {
                 debug!("Shutdown signal received, exiting tracker loop");
                 break;
             }
@@ -71,7 +55,7 @@ impl Reflux {
 
             // Step 2: Verify memory access with retry mechanism (exponential backoff)
             let mut memory_accessible = false;
-            for attempt in 0..MAX_READ_RETRIES {
+            for attempt in 0..retry::MAX_READ_RETRIES {
                 match reader.read_bytes(process.base_address, 4) {
                     Ok(_) => {
                         memory_accessible = true;
@@ -84,12 +68,12 @@ impl Reflux {
                             break;
                         }
 
-                        if attempt < MAX_READ_RETRIES - 1 {
-                            let delay = RETRY_DELAYS_MS[attempt as usize];
+                        if attempt < retry::MAX_READ_RETRIES - 1 {
+                            let delay = retry::RETRY_DELAYS_MS[attempt as usize];
                             debug!(
                                 "Memory read failed (attempt {}/{}, retry in {}ms): {}",
                                 attempt + 1,
-                                MAX_READ_RETRIES,
+                                retry::MAX_READ_RETRIES,
                                 delay,
                                 e
                             );
@@ -97,7 +81,7 @@ impl Reflux {
                         } else {
                             debug!(
                                 "Memory read failed after {} retries: {}",
-                                MAX_READ_RETRIES, e
+                                retry::MAX_READ_RETRIES, e
                             );
                         }
                     }
@@ -181,7 +165,7 @@ impl Reflux {
         thread::sleep(Duration::from_millis(1000));
 
         // Poll until play data becomes available (exponential backoff)
-        for (attempt, &delay) in POLL_DELAYS_MS.iter().enumerate() {
+        for (attempt, &delay) in polling::POLL_DELAYS_MS.iter().enumerate() {
             thread::sleep(Duration::from_millis(delay));
 
             match self.fetch_play_data(reader) {
@@ -214,18 +198,18 @@ impl Reflux {
                         return;
                     }
                     // Data not ready yet, continue polling
-                    if attempt == POLL_DELAYS_MS.len() - 1 {
+                    if attempt == polling::POLL_DELAYS_MS.len() - 1 {
                         debug!(
                             "Play data notes count is zero after {} attempts",
-                            POLL_DELAYS_MS.len()
+                            polling::POLL_DELAYS_MS.len()
                         );
                     }
                 }
                 Err(e) => {
-                    if attempt == POLL_DELAYS_MS.len() - 1 {
+                    if attempt == polling::POLL_DELAYS_MS.len() - 1 {
                         error!(
                             "Failed to fetch play data after {} attempts: {}",
-                            POLL_DELAYS_MS.len(),
+                            polling::POLL_DELAYS_MS.len(),
                             e
                         );
                     }

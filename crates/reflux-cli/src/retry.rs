@@ -1,9 +1,9 @@
 //! Retry utilities for data loading.
 
 use std::collections::HashMap;
-use std::time::Duration;
 
 use anyhow::{Result, bail};
+use reflux_core::config::database;
 use reflux_core::{
     EncodingFixes, MemoryReader, OffsetSearcher, OffsetsCollection, SongInfo,
     builtin_signatures, fetch_song_database_with_fixes,
@@ -23,10 +23,6 @@ pub fn load_song_database_with_retry(
     encoding_fixes: Option<&EncodingFixes>,
     shutdown: &ShutdownSignal,
 ) -> Result<Option<HashMap<u32, SongInfo>>> {
-    const RETRY_DELAY: Duration = Duration::from_secs(5);
-    const EXTRA_DELAY: Duration = Duration::from_secs(1);
-    const MAX_ATTEMPTS: u32 = 12;
-
     let mut attempts = 0u32;
     let mut last_error: Option<String> = None;
     loop {
@@ -35,17 +31,17 @@ pub fn load_song_database_with_retry(
             return Ok(None);
         }
 
-        if attempts >= MAX_ATTEMPTS {
+        if attempts >= database::MAX_LOAD_ATTEMPTS {
             bail!(
                 "Failed to load song database after {} attempts: {}",
-                MAX_ATTEMPTS,
+                database::MAX_LOAD_ATTEMPTS,
                 last_error.unwrap_or_else(|| "unknown error".to_string())
             );
         }
         attempts += 1;
 
         // Wait for data initialization (interruptible)
-        if shutdown.wait(EXTRA_DELAY) {
+        if shutdown.wait(database::EXTRA_DELAY) {
             return Ok(None);
         }
 
@@ -58,9 +54,9 @@ pub fn load_song_database_with_retry(
                         warn!(
                             "Song list not fully populated ({} songs), retrying in {}s (attempt {}/{})",
                             count,
-                            RETRY_DELAY.as_secs(),
+                            database::RETRY_DELAY.as_secs(),
                             attempts,
-                            MAX_ATTEMPTS
+                            database::MAX_LOAD_ATTEMPTS
                         );
                     }
                     ValidationResult::NotecountTooSmall(notes) => {
@@ -68,18 +64,18 @@ pub fn load_song_database_with_retry(
                         warn!(
                             "Song data not fully loaded (reference song notecount: {}), retrying in {}s (attempt {}/{})",
                             notes,
-                            RETRY_DELAY.as_secs(),
+                            database::RETRY_DELAY.as_secs(),
                             attempts,
-                            MAX_ATTEMPTS
+                            database::MAX_LOAD_ATTEMPTS
                         );
                     }
                     ValidationResult::ReferenceSongMissing => {
                         last_error = Some("reference song missing".to_string());
                         warn!(
                             "Reference song not yet loaded, retrying in {}s (attempt {}/{})",
-                            RETRY_DELAY.as_secs(),
+                            database::RETRY_DELAY.as_secs(),
                             attempts,
-                            MAX_ATTEMPTS
+                            database::MAX_LOAD_ATTEMPTS
                         );
                     }
                 }
@@ -89,15 +85,15 @@ pub fn load_song_database_with_retry(
                 debug!(
                     "Error loading song database: {}. Retrying in {}s (attempt {}/{})",
                     e,
-                    RETRY_DELAY.as_secs(),
+                    database::RETRY_DELAY.as_secs(),
                     attempts,
-                    MAX_ATTEMPTS
+                    database::MAX_LOAD_ATTEMPTS
                 );
             }
         }
 
         // Wait before retry (interruptible)
-        if shutdown.wait(RETRY_DELAY) {
+        if shutdown.wait(database::RETRY_DELAY) {
             return Ok(None);
         }
     }
@@ -111,8 +107,6 @@ pub fn search_offsets_with_retry(
     game_version: Option<&String>,
     shutdown: &ShutdownSignal,
 ) -> Result<Option<OffsetsCollection>> {
-    const RETRY_DELAY: Duration = Duration::from_secs(5);
-
     let signatures = builtin_signatures();
 
     loop {
@@ -122,7 +116,7 @@ pub fn search_offsets_with_retry(
         }
 
         // Interruptible retry delay
-        if shutdown.wait(RETRY_DELAY) {
+        if shutdown.wait(database::RETRY_DELAY) {
             return Ok(None);
         }
 
@@ -143,14 +137,14 @@ pub fn search_offsets_with_retry(
 
                 info!(
                     "Offset detection incomplete, retrying in {}s...",
-                    RETRY_DELAY.as_secs()
+                    database::RETRY_DELAY.as_secs()
                 );
             }
             Err(e) => {
                 info!(
                     "Offset detection failed ({}), retrying in {}s...",
                     e,
-                    RETRY_DELAY.as_secs()
+                    database::RETRY_DELAY.as_secs()
                 );
             }
         }

@@ -1,6 +1,7 @@
 #![cfg_attr(not(target_os = "windows"), allow(dead_code))]
 
 use crate::error::{Error, Result};
+use crate::memory::provider::ProcessInfo;
 
 #[cfg(target_os = "windows")]
 use tracing::warn;
@@ -97,6 +98,25 @@ impl ProcessHandle {
     }
 }
 
+#[cfg(target_os = "windows")]
+impl ProcessInfo for ProcessHandle {
+    fn pid(&self) -> u32 {
+        self.pid
+    }
+
+    fn base_address(&self) -> u64 {
+        self.base_address
+    }
+
+    fn module_size(&self) -> u32 {
+        self.module_size
+    }
+
+    fn is_alive(&self) -> bool {
+        ProcessHandle::is_alive(self)
+    }
+}
+
 #[cfg(not(target_os = "windows"))]
 impl ProcessHandle {
     pub fn find_and_open() -> Result<Self> {
@@ -114,6 +134,25 @@ impl ProcessHandle {
     /// Check if the process is still running (stub for non-Windows)
     pub fn is_alive(&self) -> bool {
         false
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+impl ProcessInfo for ProcessHandle {
+    fn pid(&self) -> u32 {
+        self.pid
+    }
+
+    fn base_address(&self) -> u64 {
+        self.base_address
+    }
+
+    fn module_size(&self) -> u32 {
+        self.module_size
+    }
+
+    fn is_alive(&self) -> bool {
+        ProcessHandle::is_alive(self)
     }
 }
 

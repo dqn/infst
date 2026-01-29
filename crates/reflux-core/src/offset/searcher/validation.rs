@@ -540,7 +540,7 @@ pub fn validate_basic_memory_access<R: ReadMemory>(
 }
 
 /// Validate if address is a valid text table for new INFINITAS version
-fn validate_new_version_text_table<R: ReadMemory>(reader: &R, text_base: u64) -> bool {
+pub fn validate_new_version_text_table<R: ReadMemory>(reader: &R, text_base: u64) -> bool {
     // Check metadata table at text_base + 0x7E0
     let metadata_addr = text_base + SongInfo::METADATA_TABLE_OFFSET as u64;
 

@@ -1,8 +1,8 @@
 #![cfg_attr(not(target_os = "windows"), allow(dead_code, unused_variables))]
 
 use crate::error::{Error, Result};
+use crate::memory::bytes::decode_shift_jis_to_string;
 use crate::memory::ProcessHandle;
-use encoding_rs::SHIFT_JIS;
 
 #[cfg(target_os = "windows")]
 use windows::Win32::System::Diagnostics::Debug::ReadProcessMemory;
@@ -46,21 +46,11 @@ pub trait ReadMemory {
     }
 
     /// Read a Shift-JIS encoded string from memory
+    ///
+    /// Delegates to `decode_shift_jis_to_string` for decoding.
     fn read_string_shift_jis(&self, address: u64, max_len: usize) -> Result<String> {
         let bytes = self.read_bytes(address, max_len)?;
-
-        // Find null terminator
-        let len = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
-        let bytes = &bytes[..len];
-
-        let (decoded, _, had_errors) = SHIFT_JIS.decode(bytes);
-        if had_errors {
-            return Err(Error::EncodingError(
-                "Failed to decode Shift-JIS string".to_string(),
-            ));
-        }
-
-        Ok(decoded.into_owned())
+        Ok(decode_shift_jis_to_string(&bytes))
     }
 
     /// Read a UTF-8 encoded string from memory
