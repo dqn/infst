@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use strum::{Display, IntoStaticStr};
 use thiserror::Error;
 use tracing::warn;
 
@@ -86,16 +87,26 @@ impl Settings {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, IntoStaticStr, Display,
+)]
+#[repr(i32)]
 pub enum Style {
     #[default]
-    Off,
-    Random,
-    RRandom,
-    SRandom,
-    Mirror,
-    SynchronizeRandom,
-    SymmetryRandom,
+    #[strum(serialize = "OFF")]
+    Off = 0,
+    #[strum(serialize = "RANDOM")]
+    Random = 1,
+    #[strum(serialize = "R-RANDOM")]
+    RRandom = 2,
+    #[strum(serialize = "S-RANDOM")]
+    SRandom = 3,
+    #[strum(serialize = "MIRROR")]
+    Mirror = 4,
+    #[strum(serialize = "SYNCHRONIZE RANDOM")]
+    SynchronizeRandom = 5,
+    #[strum(serialize = "SYMMETRY RANDOM")]
+    SymmetryRandom = 6,
 }
 
 impl TryFrom<i32> for Style {
@@ -117,27 +128,28 @@ impl TryFrom<i32> for Style {
 
 impl Style {
     pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Off => "OFF",
-            Self::Random => "RANDOM",
-            Self::RRandom => "R-RANDOM",
-            Self::SRandom => "S-RANDOM",
-            Self::Mirror => "MIRROR",
-            Self::SynchronizeRandom => "SYNCHRONIZE RANDOM",
-            Self::SymmetryRandom => "SYMMETRY RANDOM",
-        }
+        self.into()
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, IntoStaticStr, Display,
+)]
+#[repr(i32)]
 pub enum AssistType {
     #[default]
-    Off,
-    AutoScratch,
-    FiveKeys,
-    LegacyNote,
-    KeyAssist,
-    AnyKey,
+    #[strum(serialize = "OFF")]
+    Off = 0,
+    #[strum(serialize = "AUTO SCRATCH")]
+    AutoScratch = 1,
+    #[strum(serialize = "5KEYS")]
+    FiveKeys = 2,
+    #[strum(serialize = "LEGACY NOTE")]
+    LegacyNote = 3,
+    #[strum(serialize = "KEY ASSIST")]
+    KeyAssist = 4,
+    #[strum(serialize = "ANY KEY")]
+    AnyKey = 5,
 }
 
 impl TryFrom<i32> for AssistType {
@@ -158,26 +170,28 @@ impl TryFrom<i32> for AssistType {
 
 impl AssistType {
     pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Off => "OFF",
-            Self::AutoScratch => "AUTO SCRATCH",
-            Self::FiveKeys => "5KEYS",
-            Self::LegacyNote => "LEGACY NOTE",
-            Self::KeyAssist => "KEY ASSIST",
-            Self::AnyKey => "ANY KEY",
-        }
+        self.into()
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, IntoStaticStr, Display,
+)]
+#[repr(i32)]
 pub enum RangeType {
     #[default]
-    Off,
-    SuddenPlus,
-    HiddenPlus,
-    SudHid,
-    Lift,
-    LiftSud,
+    #[strum(serialize = "OFF")]
+    Off = 0,
+    #[strum(serialize = "SUDDEN+")]
+    SuddenPlus = 1,
+    #[strum(serialize = "HIDDEN+")]
+    HiddenPlus = 2,
+    #[strum(serialize = "SUD+ & HID+")]
+    SudHid = 3,
+    #[strum(serialize = "LIFT")]
+    Lift = 4,
+    #[strum(serialize = "LIFT & SUD+")]
+    LiftSud = 5,
 }
 
 impl TryFrom<i32> for RangeType {
@@ -198,14 +212,7 @@ impl TryFrom<i32> for RangeType {
 
 impl RangeType {
     pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Off => "OFF",
-            Self::SuddenPlus => "SUDDEN+",
-            Self::HiddenPlus => "HIDDEN+",
-            Self::SudHid => "SUD+ & HID+",
-            Self::Lift => "LIFT",
-            Self::LiftSud => "LIFT & SUD+",
-        }
+        self.into()
     }
 }
 

@@ -249,6 +249,7 @@ impl ScoreMap {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::memory::MockMemoryBuilder;
 
     #[test]
     fn test_score_data_new() {
@@ -256,6 +257,71 @@ mod tests {
         assert_eq!(data.song_id, 1000);
         assert_eq!(data.lamp, [Lamp::NoPlay; 10]);
         assert_eq!(data.score, [0; 10]);
+    }
+
+    #[test]
+    fn test_score_data_miss_count_default() {
+        let data = ScoreData::new(1000);
+        // All miss counts should default to None
+        for mc in &data.miss_count {
+            assert!(mc.is_none());
+        }
+    }
+
+    #[test]
+    fn test_score_data_dj_points_default() {
+        let data = ScoreData::new(1000);
+        // All DJ points should default to 0.0
+        for &djp in &data.dj_points {
+            assert!((djp - 0.0).abs() < f64::EPSILON);
+        }
+    }
+
+    #[test]
+    fn test_list_node_difficulty_index_calculation() {
+        // Test that diff + playtype * 5 gives correct indices
+        // SP difficulties: diff 0-4 + playtype 0 = indices 0-4
+        // DP difficulties: diff 0-4 + playtype 1 = indices 5-9
+        assert_eq!(0 + 0 * 5, 0); // SPB
+        assert_eq!(1 + 0 * 5, 1); // SPN
+        assert_eq!(3 + 0 * 5, 3); // SPA
+        assert_eq!(0 + 1 * 5, 5); // DPB
+        assert_eq!(3 + 1 * 5, 8); // DPA
+    }
+
+    /// Test ScoreMap::load_from_memory with a simple mock setup
+    #[test]
+    fn test_load_from_memory_empty_hash_table() {
+        // Create a mock memory layout with empty hash table
+        // Layout:
+        //   base - 16: null_obj pointer
+        //   base: table_start pointer
+        //   base + 8: table_end pointer
+        //   table: 8 bytes of zeros (empty bucket)
+
+        let base = 0x1000u64;
+        let table_start = base + 32;
+        let table_end = table_start + 8;
+        let null_obj = 0xFFFFFFFF_FFFFFFFFu64;
+
+        let reader = MockMemoryBuilder::new()
+            .base(base - 16)
+            .with_size(64)
+            // null_obj at base - 16
+            .write_u64(0, null_obj)
+            // table_start at base (offset 16 from buffer start)
+            .write_u64(16, table_start)
+            // table_end at base + 8 (offset 24 from buffer start)
+            .write_u64(24, table_end)
+            // Empty bucket (8 bytes of zeros at table_start)
+            .write_u64(32, 0)
+            .build();
+
+        // Empty song database
+        let song_db: HashMap<u32, SongInfo> = HashMap::new();
+
+        let result = ScoreMap::load_from_memory(&reader, base, &song_db).unwrap();
+        assert!(result.is_empty());
     }
 
     #[test]

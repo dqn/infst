@@ -9,7 +9,7 @@ name = "reflux"
 path = "src/main.rs"
 
 [dependencies]
-reflux-core = { path = "../reflux-core" }
+reflux-core = { path = "../reflux-core", features = ["debug-tools"] }
 anyhow.workspace = true
 clap.workspace = true
 tracing.workspace = true

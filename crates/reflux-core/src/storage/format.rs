@@ -705,3 +705,182 @@ pub fn generate_tracker_tsv(
 
     lines.join("\n")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+
+    fn create_test_song(id: u32, title: &str) -> SongInfo {
+        SongInfo {
+            id,
+            title: Arc::from(title),
+            title_english: Arc::from(""),
+            artist: Arc::from("Test Artist"),
+            genre: Arc::from("Test Genre"),
+            bpm: Arc::from("150"),
+            folder: 1,
+            levels: [0, 5, 8, 10, 12, 0, 5, 8, 10, 12],
+            total_notes: [0, 500, 800, 1000, 1200, 0, 500, 800, 1000, 1200],
+            unlock_type: UnlockType::Base,
+        }
+    }
+
+    #[test]
+    fn test_format_tsv_header() {
+        let header = format_tsv_header();
+        assert!(header.contains("Timestamp"));
+        assert!(header.contains("Title"));
+        assert!(header.contains("Difficulty"));
+        assert!(header.contains("EX Score"));
+        assert!(header.contains("Lamp"));
+    }
+
+    #[test]
+    fn test_format_full_tsv_header() {
+        let header = format_full_tsv_header();
+        assert!(header.contains("title"));
+        assert!(header.contains("difficulty"));
+        assert!(header.contains("notecount"));
+        assert!(header.contains("exscore"));
+        assert!(header.contains("date"));
+    }
+
+    #[test]
+    fn test_format_tracker_tsv_header() {
+        let header = format_tracker_tsv_header();
+        assert!(header.contains("Title"));
+        assert!(header.contains("Type"));
+        assert!(header.contains("Label"));
+        assert!(header.contains("SP DJ Points"));
+        assert!(header.contains("DP DJ Points"));
+        assert!(header.contains("SPA Lamp"));
+        assert!(header.contains("DPA Lamp"));
+    }
+
+    #[test]
+    fn test_tsv_row_data() {
+        let data = TsvRowData {
+            timestamp: "2025-01-30T12:00:00Z",
+            title: "Test Song",
+            difficulty: "SPA",
+            level: 12,
+            ex_score: 2500,
+            grade: "AAA",
+            lamp: "HARD",
+            pgreat: 1200,
+            great: 100,
+            good: 5,
+            bad: 2,
+            poor: 1,
+            fast: 30,
+            slow: 20,
+            combo_break: 3,
+        };
+        let row = format_tsv_row(&data);
+
+        assert!(row.contains("Test Song"));
+        assert!(row.contains("SPA"));
+        assert!(row.contains("2500"));
+        assert!(row.contains("AAA"));
+        assert!(row.contains("HARD"));
+    }
+
+    #[test]
+    fn test_generate_tracker_json_empty() {
+        let song_db: HashMap<u32, SongInfo> = HashMap::new();
+        let unlock_db: HashMap<u32, UnlockData> = HashMap::new();
+        let score_map = ScoreMap::new();
+
+        let json = generate_tracker_json(&song_db, &unlock_db, &score_map).unwrap();
+
+        // Check output contains expected structure
+        assert!(json.contains("\"songs\""));
+        assert!(json.contains("[]"));
+    }
+
+    #[test]
+    fn test_generate_tracker_json_with_song() {
+        let mut song_db: HashMap<u32, SongInfo> = HashMap::new();
+        song_db.insert(1000, create_test_song(1000, "Test Song"));
+
+        let mut unlock_db: HashMap<u32, UnlockData> = HashMap::new();
+        unlock_db.insert(
+            1000,
+            UnlockData {
+                song_id: 1000,
+                unlock_type: UnlockType::Base,
+                unlocks: 0x3FF, // All 10 difficulties unlocked
+            },
+        );
+
+        let score_map = ScoreMap::new();
+
+        let json = generate_tracker_json(&song_db, &unlock_db, &score_map).unwrap();
+
+        // Verify JSON structure contains expected data
+        assert!(json.contains("\"song_id\": 1000"));
+        assert!(json.contains("\"title\": \"Test Song\""));
+    }
+
+    #[test]
+    fn test_generate_tracker_tsv_header_only_when_empty() {
+        let song_db: HashMap<u32, SongInfo> = HashMap::new();
+        let unlock_db: HashMap<u32, UnlockData> = HashMap::new();
+        let score_map = ScoreMap::new();
+        let custom_types: HashMap<u32, String> = HashMap::new();
+
+        let tsv = generate_tracker_tsv(&song_db, &unlock_db, &score_map, &custom_types);
+        let lines: Vec<&str> = tsv.lines().collect();
+
+        // Should only have header
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("Title"));
+    }
+
+    #[test]
+    fn test_format_play_summary() {
+        use crate::game::{ChartInfo, Judge, PlayType, Settings};
+
+        let play_data = PlayData {
+            chart: ChartInfo {
+                song_id: 1000,
+                title: Arc::from("Test Song"),
+                title_english: Arc::from(""),
+                artist: Arc::from(""),
+                genre: Arc::from(""),
+                bpm: Arc::from("150"),
+                difficulty: Difficulty::SpA,
+                level: 12,
+                total_notes: 1000,
+                unlocked: true,
+            },
+            judge: Judge {
+                play_type: PlayType::P1,
+                pgreat: 900,
+                great: 100,
+                good: 0,
+                bad: 0,
+                poor: 0,
+                fast: 30,
+                slow: 20,
+                combo_break: 0,
+                premature_end: false,
+            },
+            settings: Settings::default(),
+            ex_score: 1900,
+            lamp: Lamp::FullCombo,
+            grade: Grade::Aaa,
+            data_available: true,
+            timestamp: chrono::Utc::now(),
+        };
+
+        let summary = format_play_summary(&play_data);
+        assert!(summary.contains("Test Song"));
+        assert!(summary.contains("SPA"));
+        assert!(summary.contains("FC"));
+        assert!(summary.contains("AAA"));
+        assert!(summary.contains("1900"));
+        assert!(!summary.contains("INVALID"));
+    }
+}

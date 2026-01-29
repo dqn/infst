@@ -146,35 +146,7 @@ impl ReadMemory for MemoryReader<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// Mock memory reader for testing
-    struct MockMemoryReader {
-        data: Vec<u8>,
-        base: u64,
-    }
-
-    impl MockMemoryReader {
-        fn new(data: Vec<u8>) -> Self {
-            Self { data, base: 0x1000 }
-        }
-    }
-
-    impl ReadMemory for MockMemoryReader {
-        fn read_bytes(&self, address: u64, size: usize) -> Result<Vec<u8>> {
-            let offset = (address - self.base) as usize;
-            if offset + size > self.data.len() {
-                return Err(Error::MemoryReadFailed {
-                    address,
-                    message: "Out of bounds".to_string(),
-                });
-            }
-            Ok(self.data[offset..offset + size].to_vec())
-        }
-
-        fn base_address(&self) -> u64 {
-            self.base
-        }
-    }
+    use crate::memory::mock::MockMemoryReader;
 
     #[test]
     fn test_read_i32() {

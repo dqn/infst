@@ -7,7 +7,13 @@
 //! - Windows process memory reading
 //! - Offset detection via signature scanning
 //! - Score tracking and session management
+//!
+//! ## Feature Flags
+//!
+//! - `debug-tools`: Enables debug utilities for memory analysis and offset verification.
+//!   This feature is intended for CLI tools and development, not production use.
 
+#[cfg(feature = "debug-tools")]
 pub mod debug;
 pub mod error;
 pub mod game;
@@ -38,5 +44,6 @@ pub use storage::{
 };
 pub use stream::StreamOutput;
 
-// Debug utilities
+// Debug utilities (requires debug-tools feature)
+#[cfg(feature = "debug-tools")]
 pub use debug::{DumpInfo, MemoryDump, OffsetStatus, OffsetValidation, ScanResult, ScannedSong, StatusInfo};

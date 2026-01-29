@@ -1,35 +1,37 @@
 use serde::{Deserialize, Serialize};
+use strum::{Display, EnumString, FromRepr, IntoStaticStr};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, FromRepr, EnumString,
+    IntoStaticStr, Display,
+)]
 #[repr(u8)]
 pub enum Difficulty {
+    #[strum(serialize = "SPB")]
     SpB = 0,
+    #[strum(serialize = "SPN")]
     SpN = 1,
+    #[strum(serialize = "SPH")]
     SpH = 2,
+    #[strum(serialize = "SPA")]
     SpA = 3,
+    #[strum(serialize = "SPL")]
     SpL = 4,
+    #[strum(serialize = "DPB")]
     DpB = 5,
+    #[strum(serialize = "DPN")]
     DpN = 6,
+    #[strum(serialize = "DPH")]
     DpH = 7,
+    #[strum(serialize = "DPA")]
     DpA = 8,
+    #[strum(serialize = "DPL")]
     DpL = 9,
 }
 
 impl Difficulty {
     pub fn from_u8(value: u8) -> Option<Self> {
-        match value {
-            0 => Some(Self::SpB),
-            1 => Some(Self::SpN),
-            2 => Some(Self::SpH),
-            3 => Some(Self::SpA),
-            4 => Some(Self::SpL),
-            5 => Some(Self::DpB),
-            6 => Some(Self::DpN),
-            7 => Some(Self::DpH),
-            8 => Some(Self::DpA),
-            9 => Some(Self::DpL),
-            _ => None,
-        }
+        Self::from_repr(value)
     }
 
     pub fn is_sp(&self) -> bool {
@@ -44,25 +46,13 @@ impl Difficulty {
     }
 
     pub fn short_name(&self) -> &'static str {
-        match self {
-            Self::SpB => "SPB",
-            Self::SpN => "SPN",
-            Self::SpH => "SPH",
-            Self::SpA => "SPA",
-            Self::SpL => "SPL",
-            Self::DpB => "DPB",
-            Self::DpN => "DPN",
-            Self::DpH => "DPH",
-            Self::DpA => "DPA",
-            Self::DpL => "DPL",
-        }
+        self.into()
     }
 
     /// Get the expanded difficulty name (e.g., "NORMAL", "HYPER")
     pub fn expand_name(&self) -> &'static str {
         match self {
-            Self::SpB => "BEGINNER",
-            Self::DpB => "BEGINNER",
+            Self::SpB | Self::DpB => "BEGINNER",
             Self::SpN | Self::DpN => "NORMAL",
             Self::SpH | Self::DpH => "HYPER",
             Self::SpA | Self::DpA => "ANOTHER",
@@ -84,49 +74,38 @@ impl Difficulty {
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+    FromRepr, IntoStaticStr, Display,
 )]
 #[repr(u8)]
 pub enum Lamp {
     #[default]
+    #[strum(serialize = "NO PLAY")]
     NoPlay = 0,
+    #[strum(serialize = "FAILED")]
     Failed = 1,
+    #[strum(serialize = "ASSIST")]
     AssistClear = 2,
+    #[strum(serialize = "EASY")]
     EasyClear = 3,
+    #[strum(serialize = "CLEAR")]
     Clear = 4,
+    #[strum(serialize = "HARD")]
     HardClear = 5,
+    #[strum(serialize = "EX HARD")]
     ExHardClear = 6,
+    #[strum(serialize = "FC")]
     FullCombo = 7,
+    #[strum(serialize = "PFC")]
     Pfc = 8,
 }
 
 impl Lamp {
     pub fn from_u8(value: u8) -> Option<Self> {
-        match value {
-            0 => Some(Self::NoPlay),
-            1 => Some(Self::Failed),
-            2 => Some(Self::AssistClear),
-            3 => Some(Self::EasyClear),
-            4 => Some(Self::Clear),
-            5 => Some(Self::HardClear),
-            6 => Some(Self::ExHardClear),
-            7 => Some(Self::FullCombo),
-            8 => Some(Self::Pfc),
-            _ => None,
-        }
+        Self::from_repr(value)
     }
 
     pub fn short_name(&self) -> &'static str {
-        match self {
-            Self::NoPlay => "NO PLAY",
-            Self::Failed => "FAILED",
-            Self::AssistClear => "ASSIST",
-            Self::EasyClear => "EASY",
-            Self::Clear => "CLEAR",
-            Self::HardClear => "HARD",
-            Self::ExHardClear => "EX HARD",
-            Self::FullCombo => "FC",
-            Self::Pfc => "PFC",
-        }
+        self.into()
     }
 
     /// Get the expanded lamp name (for display and export)
@@ -146,10 +125,12 @@ impl Lamp {
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+    FromRepr, IntoStaticStr, Display,
 )]
 #[repr(u8)]
 pub enum Grade {
     #[default]
+    #[strum(serialize = "-")]
     NoPlay = 0,
     F = 1,
     E = 2,
@@ -157,24 +138,15 @@ pub enum Grade {
     C = 4,
     B = 5,
     A = 6,
+    #[strum(serialize = "AA")]
     Aa = 7,
+    #[strum(serialize = "AAA")]
     Aaa = 8,
 }
 
 impl Grade {
     pub fn from_u8(value: u8) -> Option<Self> {
-        match value {
-            0 => Some(Self::NoPlay),
-            1 => Some(Self::F),
-            2 => Some(Self::E),
-            3 => Some(Self::D),
-            4 => Some(Self::C),
-            5 => Some(Self::B),
-            6 => Some(Self::A),
-            7 => Some(Self::Aa),
-            8 => Some(Self::Aaa),
-            _ => None,
-        }
+        Self::from_repr(value)
     }
 
     pub fn from_score_ratio(ratio: f64) -> Self {
@@ -198,58 +170,48 @@ impl Grade {
     }
 
     pub fn short_name(&self) -> &'static str {
-        match self {
-            Self::NoPlay => "-",
-            Self::F => "F",
-            Self::E => "E",
-            Self::D => "D",
-            Self::C => "C",
-            Self::B => "B",
-            Self::A => "A",
-            Self::Aa => "AA",
-            Self::Aaa => "AAA",
-        }
+        self.into()
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default, IntoStaticStr, Display,
+)]
 pub enum PlayType {
     #[default]
+    #[strum(serialize = "1P")]
     P1,
+    #[strum(serialize = "2P")]
     P2,
+    #[strum(serialize = "DP")]
     Dp,
 }
 
 impl PlayType {
     pub fn short_name(&self) -> &'static str {
-        match self {
-            Self::P1 => "1P",
-            Self::P2 => "2P",
-            Self::Dp => "DP",
-        }
+        self.into()
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default, FromRepr,
+    IntoStaticStr, Display,
+)]
+#[repr(u8)]
 pub enum UnlockType {
     #[default]
-    Base,
-    Bits,
-    Sub,
+    Base = 0,
+    Bits = 1,
+    Sub = 2,
 }
 
 impl UnlockType {
     pub fn from_u8(value: u8) -> Option<Self> {
-        match value {
-            0 => Some(Self::Base),
-            1 => Some(Self::Bits),
-            2 => Some(Self::Sub),
-            _ => None,
-        }
+        Self::from_repr(value)
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, IntoStaticStr, Display)]
 pub enum GameState {
     #[default]
     Unknown,
