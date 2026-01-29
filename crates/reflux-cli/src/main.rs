@@ -636,11 +636,12 @@ fn search_consecutive_song_ids(reader: &MemoryReader, base: u64, module_size: u6
     println!("    Top entry size candidates:");
     for (delta, addresses) in sorted.iter().take(5) {
         println!("      Delta={} bytes: {} occurrences", delta, addresses.len());
-        if addresses.len() >= 10 {
-            // Try to count songs with this structure size
-            let first_addr = *addresses.first().unwrap();
-            let count = count_songs_with_size(reader, first_addr, *delta);
-            println!("        -> Starting at 0x{:X}: {} consecutive songs", first_addr, count);
+        if let Some(&first_addr) = addresses.first() {
+            if addresses.len() >= 10 {
+                // Try to count songs with this structure size
+                let count = count_songs_with_size(reader, first_addr, *delta);
+                println!("        -> Starting at 0x{:X}: {} consecutive songs", first_addr, count);
+            }
         }
     }
 }
