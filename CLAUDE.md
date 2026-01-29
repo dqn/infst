@@ -126,3 +126,4 @@ reflux validate song-entry --address 0x1431B08A0
 - Shift-JIS エンコーディング処理あり（日本語タイトル対応）
 - オフセットは組み込みシグネチャで検出し、`offsets.txt` は未使用
 - 任意サポートファイル: `encodingfixes.txt`, `customtypes.txt`
+- **このファイルは実装と同期して最新の状態を保つこと**
