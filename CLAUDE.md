@@ -18,6 +18,29 @@ cargo test           # テスト実行
 cargo run            # CLI 実行（Windows のみ動作）
 ```
 
+## デバッグコマンド
+
+INFINITAS のバージョン変更時にメモリ構造を調査するためのコマンド群。
+
+```bash
+# メモリの生バイトダンプ
+reflux hexdump --address 0x1431B08A0 --size 256 --ascii
+
+# メモリ検索
+reflux search --string "fun"              # 文字列検索（Shift-JIS）
+reflux search --i32 9003                  # 32bit整数検索
+reflux search --pattern "00 04 07 0A"     # バイトパターン検索（?? でワイルドカード）
+
+# アドレス間のオフセット計算
+reflux offset --from 0x1431B08A0 --to 0x1431B0BD0
+
+# カスタムエントリサイズでスキャン
+reflux scan --entry-size 1200
+
+# 楽曲エントリ構造の検証
+reflux validate song-entry --address 0x1431B08A0
+```
+
 ## アーキテクチャ
 
 ### reflux-core モジュール構成
