@@ -151,30 +151,64 @@ fn scan_metadata_table<R: ReadMemory>(
         return songs;
     }
 
-    let metadata_base = song_list_addr + SongInfo::METADATA_TABLE_OFFSET as u64;
+    // Entry structure:
+    // - text_entry[i] = song_list_addr + i * ENTRY_SIZE
+    // - meta_entry[i] = song_list_addr + METADATA_TABLE_OFFSET + i * ENTRY_SIZE
+    const ENTRY_SIZE: u64 = SongInfo::MEMORY_SIZE as u64; // 0x3F0 = 1008 bytes
+    const METADATA_OFFSET: u64 = SongInfo::METADATA_TABLE_OFFSET as u64; // 0x7E0 = 2016 bytes
 
-    // Read metadata area
-    let Ok(buffer) = reader.read_bytes(metadata_base, scan_range) else {
-        return songs;
-    };
+    let max_entries = (scan_range as u64 / ENTRY_SIZE).min(5000);
 
-    // Scan for valid (song_id, folder) pairs
-    for offset in (0..buffer.len().saturating_sub(32)).step_by(4) {
+    // Note: With lazy loading, songs may be scattered across the entry table.
+    // We scan all entries without early termination to find all loaded songs.
+    // Approach: first check if title exists, then read metadata.
+    for i in 0..max_entries {
+        let text_addr = song_list_addr + i * ENTRY_SIZE;
+        let meta_addr = text_addr + METADATA_OFFSET;
+
+        // First, check if title exists at this entry
+        let title = match reader.read_bytes(text_addr, 64) {
+            Ok(title_bytes) => {
+                let len = title_bytes.iter().position(|&b| b == 0).unwrap_or(64);
+                if len == 0 {
+                    continue;
+                }
+                let (decoded, _, _) = SHIFT_JIS.decode(&title_bytes[..len]);
+                let title = decoded.trim();
+                if title.is_empty()
+                    || !title
+                        .chars()
+                        .next()
+                        .is_some_and(|c| c.is_ascii_graphic() || !c.is_ascii())
+                {
+                    continue;
+                }
+                title.to_string()
+            }
+            Err(_) => continue,
+        };
+
+        // Read metadata for this entry
+        let Ok(meta_bytes) = reader.read_bytes(meta_addr, 20) else {
+            continue;
+        };
+
         let song_id = i32::from_le_bytes([
-            buffer[offset],
-            buffer[offset + 1],
-            buffer[offset + 2],
-            buffer[offset + 3],
+            meta_bytes[0],
+            meta_bytes[1],
+            meta_bytes[2],
+            meta_bytes[3],
         ]);
         let folder = i32::from_le_bytes([
-            buffer[offset + 4],
-            buffer[offset + 5],
-            buffer[offset + 6],
-            buffer[offset + 7],
+            meta_bytes[4],
+            meta_bytes[5],
+            meta_bytes[6],
+            meta_bytes[7],
         ]);
 
-        // Validate song_id and folder
-        if song_id < 1000 || song_id > 50000 || folder < 1 || folder > 50 {
+        // Validate song_id and folder ranges
+        // Note: folder values vary widely in new INFINITAS versions (e.g., 1-200+)
+        if song_id < 1000 || song_id > 90000 || folder < 1 || folder > 200 {
             continue;
         }
 
@@ -183,41 +217,11 @@ fn scan_metadata_table<R: ReadMemory>(
             continue;
         }
 
-        // Calculate title address: metadata_addr - 0x7E0
-        let metadata_addr = metadata_base + offset as u64;
-        let title_addr = metadata_addr.saturating_sub(SongInfo::METADATA_TABLE_OFFSET as u64);
-
-        // Read title
-        let title = if let Ok(title_bytes) = reader.read_bytes(title_addr, 64) {
-            let len = title_bytes.iter().position(|&b| b == 0).unwrap_or(64);
-            if len > 0 {
-                let (decoded, _, _) = SHIFT_JIS.decode(&title_bytes[..len]);
-                let title = decoded.trim();
-                if !title.is_empty()
-                    && title
-                        .chars()
-                        .next()
-                        .map(|c| c.is_ascii_graphic() || !c.is_ascii())
-                        .unwrap_or(false)
-                {
-                    title.to_string()
-                } else {
-                    continue;
-                }
-            } else {
-                continue;
-            }
-        } else {
-            continue;
-        };
-
-        // Parse levels (ASCII at offset 8)
+        // Parse levels from difficulty ASCII (offset 8 in metadata)
         let mut levels = [0u8; 10];
-        if offset + 18 <= buffer.len() {
-            for (i, &byte) in buffer[offset + 8..offset + 18].iter().enumerate() {
-                if byte >= b'0' && byte <= b'9' {
-                    levels[i] = byte - b'0';
-                }
+        for (j, &byte) in meta_bytes[8..18].iter().enumerate() {
+            if byte >= b'0' && byte <= b'9' {
+                levels[j] = byte - b'0';
             }
         }
 
@@ -226,7 +230,7 @@ fn scan_metadata_table<R: ReadMemory>(
             title,
             folder,
             levels,
-            source_offset: metadata_addr,
+            source_offset: meta_addr,
             source_type: "metadata_table".to_string(),
         });
     }

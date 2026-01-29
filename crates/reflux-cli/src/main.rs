@@ -272,6 +272,15 @@ enum Command {
         #[arg(short, long)]
         output: Option<String>,
     },
+    /// Explore memory structure at a specific address
+    Explore {
+        /// Base address to explore (hex, e.g., 0x1431865A0)
+        #[arg(long)]
+        address: String,
+        /// Process ID (skip automatic detection)
+        #[arg(long)]
+        pid: Option<u32>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -302,6 +311,10 @@ fn main() -> Result<()> {
             tsv,
             output,
         }) => run_scan_mode(offsets_file.as_deref(), pid, range, tsv.as_deref(), output.as_deref()),
+        Some(Command::Explore { address, pid }) => {
+            let addr = u64::from_str_radix(address.trim_start_matches("0x").trim_start_matches("0X"), 16)?;
+            run_explore_mode(addr, pid)
+        }
         None => run_tracking_mode(args.offsets_file.as_deref()),
     }
 }
@@ -996,6 +1009,125 @@ fn run_dump_mode(offsets_file: Option<&str>, pid: Option<u32>, output: Option<&s
         if dump.detected_songs.len() > 20 {
             println!("  ... and {} more", dump.detected_songs.len() - 20);
         }
+    }
+
+    Ok(())
+}
+
+/// Run the memory explore command
+fn run_explore_mode(base_addr: u64, pid: Option<u32>) -> Result<()> {
+    let current_version = env!("CARGO_PKG_VERSION");
+    println!("Reflux-RS {} - Memory Explore Mode", current_version);
+
+    let process = if let Some(pid) = pid {
+        ProcessHandle::open(pid)?
+    } else {
+        ProcessHandle::find_and_open()?
+    };
+
+    println!("Found process (PID: {}, Base: 0x{:X})", process.pid, process.base_address);
+    let reader = MemoryReader::new(&process);
+
+    // Read and analyze entry structure
+    println!();
+    println!("=== Entry Structure at 0x{:X} ===", base_addr);
+
+    const ENTRY_SIZE: u64 = 0x3F0; // 1008 bytes
+    const METADATA_OFFSET: u64 = 0x7E0; // 2016 bytes
+
+    for i in 0..10u64 {
+        let text_addr = base_addr + i * ENTRY_SIZE;
+        let meta_addr = text_addr + METADATA_OFFSET;
+
+        // Read title (64 bytes)
+        let title = match reader.read_bytes(text_addr, 64) {
+            Ok(bytes) => {
+                let len = bytes.iter().position(|&b| b == 0).unwrap_or(64);
+                if len > 0 {
+                    let (decoded, _, _) = encoding_rs::SHIFT_JIS.decode(&bytes[..len]);
+                    decoded.trim().to_string()
+                } else {
+                    String::new()
+                }
+            }
+            Err(_) => continue,
+        };
+
+        // Read metadata
+        let (song_id, folder, difficulty) = match reader.read_bytes(meta_addr, 20) {
+            Ok(bytes) => {
+                let id = i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+                let folder = i32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
+                let diff: String = bytes[8..18]
+                    .iter()
+                    .map(|&b| if b >= 0x30 && b <= 0x39 { b as char } else { '?' })
+                    .collect();
+                (id, folder, diff)
+            }
+            Err(_) => continue,
+        };
+
+        if !title.is_empty() || song_id >= 1000 {
+            println!(
+                "  [{}] text=0x{:X} meta=0x{:X}",
+                i, text_addr, meta_addr
+            );
+            println!(
+                "       title={:?}, song_id={}, folder={}, diff={}",
+                title, song_id, folder, difficulty
+            );
+        }
+    }
+
+    // Now scan metadata table more aggressively
+    println!();
+    println!("=== Scanning metadata table (entry_size={}) ===", ENTRY_SIZE);
+
+    let mut found_songs: Vec<(u32, i32, String, u64)> = Vec::new();
+    let max_entries = 5000u64;
+
+    for i in 0..max_entries {
+        let text_addr = base_addr + i * ENTRY_SIZE;
+        let meta_addr = text_addr + METADATA_OFFSET;
+
+        // Read metadata first (faster check)
+        let (song_id, folder) = match reader.read_bytes(meta_addr, 8) {
+            Ok(bytes) => {
+                let id = i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+                let folder = i32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
+                (id, folder)
+            }
+            Err(_) => break,
+        };
+
+        if song_id >= 1000 && song_id <= 50000 && folder >= 1 && folder <= 50 {
+            // Valid metadata, read title
+            let title = match reader.read_bytes(text_addr, 64) {
+                Ok(bytes) => {
+                    let len = bytes.iter().position(|&b| b == 0).unwrap_or(64);
+                    if len > 0 {
+                        let (decoded, _, _) = encoding_rs::SHIFT_JIS.decode(&bytes[..len]);
+                        decoded.trim().to_string()
+                    } else {
+                        String::new()
+                    }
+                }
+                Err(_) => String::new(),
+            };
+
+            found_songs.push((song_id as u32, folder, title, text_addr));
+        }
+    }
+
+    println!("Found {} songs with valid metadata", found_songs.len());
+    for (i, (song_id, folder, title, addr)) in found_songs.iter().take(30).enumerate() {
+        println!(
+            "  [{:3}] id={:5}, folder={:2}, addr=0x{:X}, title={:?}",
+            i, song_id, folder, addr, title
+        );
+    }
+    if found_songs.len() > 30 {
+        println!("  ... and {} more", found_songs.len() - 30);
     }
 
     Ok(())

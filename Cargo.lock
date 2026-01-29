@@ -533,6 +533,7 @@ dependencies = [
  "clap",
  "crossterm",
  "ctrlc",
+ "encoding_rs",
  "reflux-core",
  "serde_json",
  "tracing",
