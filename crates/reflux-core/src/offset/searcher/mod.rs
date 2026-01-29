@@ -1415,6 +1415,15 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                 target = target.wrapping_add_signed(signature.addend);
             }
 
+            // Validate address is within expected range (above ImageBase)
+            if target < MIN_VALID_DATA_ADDRESS {
+                debug!(
+                    "  Rejecting invalid address 0x{:X} (below MIN_VALID_DATA_ADDRESS 0x{:X})",
+                    target, MIN_VALID_DATA_ADDRESS
+                );
+                continue;
+            }
+
             if target != 0 {
                 targets.push(target);
             }

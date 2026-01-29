@@ -129,3 +129,17 @@ pub const JUDGE_DATA_SEARCH_RANGE: usize = 0x10000;
 /// This specific value (0x494fdce0) appears in the data map hash table as a
 /// special marker and should be filtered out when counting valid entries.
 pub const DATA_MAP_SENTINEL: u64 = 0x494fdce0;
+
+// ============================================================================
+// Address validation
+// ============================================================================
+
+/// Expected ImageBase for INFINITAS executable (64-bit Windows default)
+///
+/// All valid data addresses should be above this value.
+pub const IMAGE_BASE: u64 = 0x140000000;
+
+/// Minimum valid data address (ImageBase + typical code section)
+///
+/// Data sections are typically above the code sections.
+pub const MIN_VALID_DATA_ADDRESS: u64 = IMAGE_BASE + 0x1000000;
