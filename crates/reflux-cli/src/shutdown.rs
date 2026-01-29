@@ -41,7 +41,15 @@ impl ShutdownSignal {
             return true;
         }
 
-        let guard = self.mutex.lock().unwrap();
+        let guard = match self.mutex.lock() {
+            Ok(guard) => guard,
+            Err(_poisoned) => {
+                // Mutex poisoned (another thread panicked while holding the lock)
+                // Treat as shutdown signal to gracefully exit
+                return true;
+            }
+        };
+
         let result = self
             .condvar
             .wait_timeout_while(guard, duration, |_| !self.is_shutdown());
@@ -52,7 +60,7 @@ impl ShutdownSignal {
                 !timeout_result.timed_out()
             }
             Err(_) => {
-                // Mutex poisoned, treat as shutdown
+                // Condvar wait failed (mutex poisoned), treat as shutdown
                 true
             }
         }
