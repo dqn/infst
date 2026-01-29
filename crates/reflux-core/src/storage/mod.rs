@@ -1,3 +1,17 @@
+//! Score storage and session management.
+//!
+//! This module handles persistent storage of play data:
+//!
+//! - **Score map**: In-memory cache of scores read from game
+//! - **Session management**: TSV/JSON session file output
+//! - **Export formats**: TSV and JSON formatting for tracker data
+//!
+//! ## Session Files
+//!
+//! Sessions are stored in timestamped files under `sessions/`:
+//! - TSV format for human-readable logs
+//! - JSON format for programmatic access
+
 mod format;
 mod score_map;
 mod session;

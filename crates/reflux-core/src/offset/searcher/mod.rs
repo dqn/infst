@@ -20,7 +20,7 @@ use tracing::{debug, info, warn};
 
 use crate::error::{Error, Result};
 use crate::game::{PlayType, SongInfo};
-use crate::memory::ReadMemory;
+use crate::memory::{ByteBuffer, ReadMemory, decode_shift_jis_to_string};
 use crate::memory::layout::{judge, settings};
 use crate::offset::{CodeSignature, OffsetSignatureSet, OffsetsCollection};
 
@@ -28,14 +28,6 @@ use constants::*;
 pub use types::*;
 use utils::is_power_of_two;
 pub use utils::merge_byte_representations;
-
-/// Simple Shift-JIS decoder for searcher (avoids circular dependency)
-fn decode_shift_jis_simple(bytes: &[u8]) -> String {
-    use encoding_rs::SHIFT_JIS;
-    let len = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
-    let (decoded, _, _) = SHIFT_JIS.decode(&bytes[..len]);
-    decoded.into_owned()
-}
 
 /// Probe result for DataMap candidate validation
 ///
@@ -609,6 +601,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
 
                         // Dump full structure for analysis
                         if let Ok(bytes) = self.reader.read_bytes(*addr_1001, NEW_STRUCT_SIZE as usize) {
+                            let struct_buf = ByteBuffer::new(&bytes);
                             debug!("    Full structure dump (312 bytes):");
                             debug!("      Bytes 0-31:   {:02X?}", &bytes[0..32]);
                             debug!("      Bytes 32-63:  {:02X?}", &bytes[32..64]);
@@ -618,15 +611,10 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                             // Try different pointer offsets
                             for ptr_offset in [8usize, 12, 16, 20, 24, 28, 32] {
                                 if ptr_offset + 8 <= bytes.len() {
-                                    let ptr = u64::from_le_bytes([
-                                        bytes[ptr_offset], bytes[ptr_offset + 1],
-                                        bytes[ptr_offset + 2], bytes[ptr_offset + 3],
-                                        bytes[ptr_offset + 4], bytes[ptr_offset + 5],
-                                        bytes[ptr_offset + 6], bytes[ptr_offset + 7],
-                                    ]);
+                                    let ptr = struct_buf.read_u64_at(ptr_offset).unwrap_or(0);
                                     if ptr > 0x140000000 && ptr < 0x150000000 {
                                         if let Ok(str_bytes) = self.reader.read_bytes(ptr, 32) {
-                                            let s = decode_shift_jis_simple(&str_bytes);
+                                            let s = decode_shift_jis_to_string(&str_bytes);
                                             if !s.is_empty() {
                                                 debug!(
                                                     "      Ptr at offset {}: 0x{:X} -> {:?}",
@@ -785,8 +773,10 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                 continue;
             };
 
+            let buf = ByteBuffer::new(&buffer);
+
             // Read song_id (offset 0)
-            let song_id = i32::from_le_bytes([buffer[0], buffer[1], buffer[2], buffer[3]]);
+            let song_id = buf.read_i32_at(0).unwrap_or(0);
             if song_id < 1000 || song_id > 50000 {
                 info!("  Entry {}: Invalid song_id={}, stopping", entry_idx, song_id);
                 break;
@@ -800,10 +790,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                 if ptr_offset + 4 > 312 {
                     break;
                 }
-                let ptr32 = u32::from_le_bytes([
-                    buffer[ptr_offset], buffer[ptr_offset + 1],
-                    buffer[ptr_offset + 2], buffer[ptr_offset + 3],
-                ]);
+                let ptr32 = buf.read_u32_at(ptr_offset).unwrap_or(0);
 
                 // Check if this looks like a compressed pointer (high nibble 0x4)
                 if ptr32 > 0x40000000 && ptr32 < 0x50000000 {
@@ -813,7 +800,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                     // Try to read and decode what the pointer points to
                     if let Ok(target_bytes) = self.reader.read_bytes(ptr64, 128) {
                         // Try as Shift-JIS string
-                        let s = decode_shift_jis_simple(&target_bytes);
+                        let s = decode_shift_jis_to_string(&target_bytes);
                         if !s.is_empty() && s.len() > 1 && s.chars().take(10).all(|c| c.is_ascii_graphic() || c == ' ') {
                             info!("        -> String: {:?}", s.chars().take(60).collect::<String>());
                         }
@@ -822,21 +809,18 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                         info!("        -> Raw: {:02X?}", &target_bytes[0..48.min(target_bytes.len())]);
 
                         // Check for nested compressed pointer
-                        let nested32 = u32::from_le_bytes([
-                            target_bytes[0], target_bytes[1], target_bytes[2], target_bytes[3],
-                        ]);
+                        let target_buf = ByteBuffer::new(&target_bytes);
+                        let nested32 = target_buf.read_u32_at(0).unwrap_or(0);
                         if nested32 > 0x40000000 && nested32 < 0x50000000 {
                             let nested64 = (nested32 as u64) + 0x100000000;
                             if let Ok(nested_bytes) = self.reader.read_bytes(nested64, 64) {
-                                let nested_s = decode_shift_jis_simple(&nested_bytes);
+                                let nested_s = decode_shift_jis_to_string(&nested_bytes);
                                 info!("          -> Nested ptr 0x{:X}: {:?}", nested64, nested_s.chars().take(40).collect::<String>());
                             }
                         }
 
                         // Also check for embedded song_id at target
-                        let target_id = i32::from_le_bytes([
-                            target_bytes[0], target_bytes[1], target_bytes[2], target_bytes[3],
-                        ]);
+                        let target_id = target_buf.read_i32_at(0).unwrap_or(0);
                         if target_id >= 1000 && target_id <= 50000 {
                             info!("        -> Possible song_id at target: {}", target_id);
                         }
@@ -850,10 +834,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                 if i32_offset + 4 > 312 {
                     break;
                 }
-                let val = i32::from_le_bytes([
-                    buffer[i32_offset], buffer[i32_offset + 1],
-                    buffer[i32_offset + 2], buffer[i32_offset + 3],
-                ]);
+                let val = buf.read_i32_at(i32_offset).unwrap_or(0);
 
                 // Show non-zero values that might be meaningful
                 if val != 0 && (val > 0 && val < 10000 || val >= 1000 && val <= 50000) {
@@ -1163,21 +1144,13 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         let scan_size = table_size.min(DATA_MAP_SCAN_BYTES);
         let buffer = self.reader.read_bytes(table_start, scan_size).ok()?;
 
+        let buf = ByteBuffer::new(&buffer);
         let mut non_null_entries = 0usize;
         let mut entry_points = Vec::new();
         let scanned_entries = buffer.len() / 8;
 
         for i in 0..scanned_entries {
-            let addr = u64::from_le_bytes([
-                buffer[i * 8],
-                buffer[i * 8 + 1],
-                buffer[i * 8 + 2],
-                buffer[i * 8 + 3],
-                buffer[i * 8 + 4],
-                buffer[i * 8 + 5],
-                buffer[i * 8 + 6],
-                buffer[i * 8 + 7],
-            ]);
+            let addr = buf.read_u64_at(i * 8).unwrap_or(0);
 
             if addr != 0 && addr != null_obj && addr != DATA_MAP_SENTINEL {
                 non_null_entries += 1;
@@ -1213,12 +1186,13 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             return false;
         }
 
-        let diff = i32::from_le_bytes([buffer[16], buffer[17], buffer[18], buffer[19]]);
-        let song_id = i32::from_le_bytes([buffer[20], buffer[21], buffer[22], buffer[23]]);
-        let playtype = i32::from_le_bytes([buffer[24], buffer[25], buffer[26], buffer[27]]);
-        let score = u32::from_le_bytes([buffer[32], buffer[33], buffer[34], buffer[35]]);
-        let miss_count = u32::from_le_bytes([buffer[36], buffer[37], buffer[38], buffer[39]]);
-        let lamp = i32::from_le_bytes([buffer[48], buffer[49], buffer[50], buffer[51]]);
+        let buf = ByteBuffer::new(&buffer);
+        let diff = buf.read_i32_at(16).unwrap_or(-1);
+        let song_id = buf.read_i32_at(20).unwrap_or(0);
+        let playtype = buf.read_i32_at(24).unwrap_or(-1);
+        let score = buf.read_u32_at(32).unwrap_or(u32::MAX);
+        let miss_count = buf.read_u32_at(36).unwrap_or(u32::MAX);
+        let lamp = buf.read_i32_at(48).unwrap_or(-1);
 
         if !(0..=4).contains(&diff) {
             return false;
@@ -1298,8 +1272,9 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             return false;
         };
 
-        let song_id = i32::from_le_bytes([metadata[0], metadata[1], metadata[2], metadata[3]]);
-        let folder = i32::from_le_bytes([metadata[4], metadata[5], metadata[6], metadata[7]]);
+        let buf = ByteBuffer::new(&metadata);
+        let song_id = buf.read_i32_at(0).unwrap_or(0);
+        let folder = buf.read_i32_at(4).unwrap_or(0);
 
         // Validate: first song in list should be song_id ~1000-2000 range (5.1.1. is id=1001)
         // folder should be 1-50
@@ -1479,8 +1454,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                 Err(_) => continue,
             };
 
-            let disp =
-                i32::from_le_bytes([disp_bytes[0], disp_bytes[1], disp_bytes[2], disp_bytes[3]]);
+            let disp = ByteBuffer::new(&disp_bytes).read_i32_at(0).unwrap_or(0);
             let next_ip = instr_addr + signature.instr_len as u64;
             let mut target = next_ip.wrapping_add_signed(disp as i64);
 

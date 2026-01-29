@@ -100,3 +100,118 @@ impl StreamOutput {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::UnlockType;
+    use std::sync::Arc;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_stream_output_disabled() {
+        let output = StreamOutput::new(false, "/nonexistent".to_string());
+
+        // When disabled, all writes should succeed without actually writing
+        assert!(output.write_play_state(GameState::Playing).is_ok());
+        assert!(output.write_current_song("Test", "SPA", 12).is_ok());
+        assert!(output.write_latest_result("Test", "SPA", 12, "AAA", "HARD CLEAR", 2000).is_ok());
+        assert!(output.write_marquee("Test marquee").is_ok());
+    }
+
+    #[test]
+    fn test_stream_output_write_play_state() {
+        let temp_dir = TempDir::new().unwrap();
+        let base_dir = temp_dir.path().to_str().unwrap().to_string();
+        let output = StreamOutput::new(true, base_dir.clone());
+
+        output.write_play_state(GameState::SongSelect).unwrap();
+        let content = fs::read_to_string(temp_dir.path().join("playstate.txt")).unwrap();
+        assert_eq!(content, "menu");
+
+        output.write_play_state(GameState::Playing).unwrap();
+        let content = fs::read_to_string(temp_dir.path().join("playstate.txt")).unwrap();
+        assert_eq!(content, "play");
+
+        output.write_play_state(GameState::Unknown).unwrap();
+        let content = fs::read_to_string(temp_dir.path().join("playstate.txt")).unwrap();
+        assert_eq!(content, "off");
+    }
+
+    #[test]
+    fn test_stream_output_write_current_song() {
+        let temp_dir = TempDir::new().unwrap();
+        let base_dir = temp_dir.path().to_str().unwrap().to_string();
+        let output = StreamOutput::new(true, base_dir);
+
+        output.write_current_song("Test Song", "SPA", 12).unwrap();
+        let content = fs::read_to_string(temp_dir.path().join("currentsong.txt")).unwrap();
+        assert_eq!(content, "Test Song [SPA12]");
+    }
+
+    #[test]
+    fn test_stream_output_write_latest_result() {
+        let temp_dir = TempDir::new().unwrap();
+        let base_dir = temp_dir.path().to_str().unwrap().to_string();
+        let output = StreamOutput::new(true, base_dir);
+
+        output.write_latest_result("Test Song", "SPA", 12, "AAA", "HARD CLEAR", 2000).unwrap();
+
+        let content = fs::read_to_string(temp_dir.path().join("latest.txt")).unwrap();
+        assert_eq!(content, "Test Song [SPA12] AAA HARD CLEAR 2000");
+
+        let grade = fs::read_to_string(temp_dir.path().join("latest-grade.txt")).unwrap();
+        assert_eq!(grade, "AAA");
+
+        let lamp = fs::read_to_string(temp_dir.path().join("latest-lamp.txt")).unwrap();
+        assert_eq!(lamp, "HARD CLEAR");
+    }
+
+    #[test]
+    fn test_stream_output_write_full_song_info() {
+        let temp_dir = TempDir::new().unwrap();
+        let base_dir = temp_dir.path().to_str().unwrap().to_string();
+        let output = StreamOutput::new(true, base_dir);
+
+        let mut levels = [0u8; 10];
+        levels[3] = 11; // SPA
+
+        let song = SongInfo {
+            id: 1001,
+            title: Arc::from("Test Title"),
+            title_english: Arc::from("Test Title EN"),
+            artist: Arc::from("Test Artist"),
+            genre: Arc::from("Test Genre"),
+            bpm: Arc::from("150"),
+            folder: 1,
+            levels,
+            total_notes: [0; 10],
+            unlock_type: UnlockType::Base,
+        };
+
+        output.write_full_song_info(&song, Difficulty::SpA).unwrap();
+
+        assert_eq!(fs::read_to_string(temp_dir.path().join("title.txt")).unwrap(), "Test Title");
+        assert_eq!(fs::read_to_string(temp_dir.path().join("artist.txt")).unwrap(), "Test Artist");
+        assert_eq!(fs::read_to_string(temp_dir.path().join("englishtitle.txt")).unwrap(), "Test Title EN");
+        assert_eq!(fs::read_to_string(temp_dir.path().join("genre.txt")).unwrap(), "Test Genre");
+        assert_eq!(fs::read_to_string(temp_dir.path().join("level.txt")).unwrap(), "11");
+    }
+
+    #[test]
+    fn test_stream_output_clear_full_song_info() {
+        let temp_dir = TempDir::new().unwrap();
+        let base_dir = temp_dir.path().to_str().unwrap().to_string();
+        let output = StreamOutput::new(true, base_dir);
+
+        // First write some content
+        output.write_file("title.txt", "Test").unwrap();
+        output.write_file("artist.txt", "Test").unwrap();
+
+        // Then clear
+        output.clear_full_song_info().unwrap();
+
+        assert_eq!(fs::read_to_string(temp_dir.path().join("title.txt")).unwrap(), "");
+        assert_eq!(fs::read_to_string(temp_dir.path().join("artist.txt")).unwrap(), "");
+    }
+}

@@ -9,7 +9,7 @@ use tracing::{debug, info, warn};
 
 use crate::error::Result;
 use crate::game::{EncodingFixes, UnlockType};
-use crate::memory::ReadMemory;
+use crate::memory::{ByteBuffer, ReadMemory, decode_shift_jis};
 
 /// Song metadata
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -78,40 +78,29 @@ impl SongInfo {
     pub fn read_from_memory<R: ReadMemory>(reader: &R, address: u64) -> Result<Option<Self>> {
         // Read entire song block
         let buffer = reader.read_bytes(address, Self::MEMORY_SIZE)?;
+        let buf = ByteBuffer::new(&buffer);
 
         // Check if entry is valid (first 4 bytes should not be 0)
-        if buffer[0..4] == [0, 0, 0, 0] {
+        if buf.read_i32_at(0).unwrap_or(0) == 0 {
             return Ok(None);
         }
 
         // Parse strings (Shift-JIS encoded)
-        let title = decode_shift_jis(&buffer[Self::TITLE_OFFSET..Self::TITLE_ENGLISH_OFFSET]);
-        let title_english =
-            decode_shift_jis(&buffer[Self::TITLE_ENGLISH_OFFSET..Self::GENRE_OFFSET]);
-        let genre = decode_shift_jis(&buffer[Self::GENRE_OFFSET..Self::ARTIST_OFFSET]);
-        let artist =
-            decode_shift_jis(&buffer[Self::ARTIST_OFFSET..Self::ARTIST_OFFSET + Self::SLAB]);
+        let title = decode_shift_jis(buf.slice_at(Self::TITLE_OFFSET, Self::SLAB)?);
+        let title_english = decode_shift_jis(buf.slice_at(Self::TITLE_ENGLISH_OFFSET, Self::SLAB)?);
+        let genre = decode_shift_jis(buf.slice_at(Self::GENRE_OFFSET, Self::SLAB)?);
+        let artist = decode_shift_jis(buf.slice_at(Self::ARTIST_OFFSET, Self::SLAB)?);
 
         // Parse folder (1 byte)
         let folder = buffer[Self::FOLDER_OFFSET] as i32;
 
         // Parse difficulty levels (10 bytes)
         let mut levels = [0u8; 10];
-        levels.copy_from_slice(&buffer[Self::LEVELS_OFFSET..Self::LEVELS_OFFSET + 10]);
+        levels.copy_from_slice(buf.slice_at(Self::LEVELS_OFFSET, 10)?);
 
         // Parse BPM (8 bytes: max, min)
-        let bpm_max = i32::from_le_bytes([
-            buffer[Self::BPM_OFFSET],
-            buffer[Self::BPM_OFFSET + 1],
-            buffer[Self::BPM_OFFSET + 2],
-            buffer[Self::BPM_OFFSET + 3],
-        ]);
-        let bpm_min = i32::from_le_bytes([
-            buffer[Self::BPM_OFFSET + Self::WORD],
-            buffer[Self::BPM_OFFSET + Self::WORD + 1],
-            buffer[Self::BPM_OFFSET + Self::WORD + 2],
-            buffer[Self::BPM_OFFSET + Self::WORD + 3],
-        ]);
+        let bpm_max = buf.read_i32_at(Self::BPM_OFFSET)?;
+        let bpm_min = buf.read_i32_at(Self::BPM_OFFSET + Self::WORD)?;
 
         let bpm: Arc<str> = if bpm_min != 0 && bpm_min != bpm_max {
             format!("{:03}~{:03}", bpm_min, bpm_max).into()
@@ -122,22 +111,11 @@ impl SongInfo {
         // Parse note counts (40 bytes = 10 x i32)
         let mut total_notes = [0u32; 10];
         for (i, note_count) in total_notes.iter_mut().enumerate() {
-            let offset = Self::NOTES_OFFSET + i * Self::WORD;
-            *note_count = u32::from_le_bytes([
-                buffer[offset],
-                buffer[offset + 1],
-                buffer[offset + 2],
-                buffer[offset + 3],
-            ]);
+            *note_count = buf.read_u32_at(Self::NOTES_OFFSET + i * Self::WORD)?;
         }
 
         // Parse song ID (4 bytes)
-        let song_id = i32::from_le_bytes([
-            buffer[Self::SONG_ID_OFFSET],
-            buffer[Self::SONG_ID_OFFSET + 1],
-            buffer[Self::SONG_ID_OFFSET + 2],
-            buffer[Self::SONG_ID_OFFSET + 3],
-        ]);
+        let song_id = buf.read_i32_at(Self::SONG_ID_OFFSET)?;
 
         Ok(Some(SongInfo {
             id: song_id as u32,
@@ -180,12 +158,9 @@ impl SongInfo {
                     text_base + Self::METADATA_TABLE_OFFSET as u64 + entry_index * Self::MEMORY_SIZE as u64;
 
                 if let Ok(metadata) = reader.read_bytes(metadata_addr, 32) {
-                    let alt_song_id = i32::from_le_bytes([
-                        metadata[0], metadata[1], metadata[2], metadata[3],
-                    ]);
-                    let alt_folder = i32::from_le_bytes([
-                        metadata[4], metadata[5], metadata[6], metadata[7],
-                    ]);
+                    let buf = ByteBuffer::new(&metadata);
+                    let alt_song_id = buf.read_i32_at(0).unwrap_or(0);
+                    let alt_folder = buf.read_i32_at(4).unwrap_or(0);
 
                     // Validate: song_id should be 1000-50000, folder 1-50
                     if alt_song_id >= 1000 && alt_song_id <= 50000 {
@@ -216,24 +191,6 @@ impl SongInfo {
     }
 }
 
-/// Decode Shift-JIS bytes to Arc<str>, removing null terminators
-fn decode_shift_jis(bytes: &[u8]) -> Arc<str> {
-    use encoding_rs::SHIFT_JIS;
-
-    // Find null terminator
-    let len = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
-    let bytes = &bytes[..len];
-
-    let (decoded, _, had_errors) = SHIFT_JIS.decode(bytes);
-    if had_errors {
-        debug!(
-            "Shift-JIS decoding had errors for bytes: {:?}",
-            &bytes[..bytes.len().min(20)]
-        );
-    }
-    Arc::from(decoded.into_owned())
-}
-
 /// Analyze metadata table structure for new INFINITAS versions
 ///
 /// This function scans the metadata table to find valid song_ids and determine
@@ -248,22 +205,14 @@ pub fn analyze_metadata_table<R: ReadMemory>(reader: &R, text_base: u64) {
         return;
     };
 
+    let buf = ByteBuffer::new(&buffer);
+
     // Scan for valid song_ids (pattern: 1000-50000 followed by reasonable folder 1-50)
     let mut found_ids: Vec<(usize, i32, i32)> = Vec::new();
 
     for offset in (0..buffer.len() - 8).step_by(4) {
-        let song_id = i32::from_le_bytes([
-            buffer[offset],
-            buffer[offset + 1],
-            buffer[offset + 2],
-            buffer[offset + 3],
-        ]);
-        let folder = i32::from_le_bytes([
-            buffer[offset + 4],
-            buffer[offset + 5],
-            buffer[offset + 6],
-            buffer[offset + 7],
-        ]);
+        let song_id = buf.read_i32_at(offset).unwrap_or(0);
+        let folder = buf.read_i32_at(offset + 4).unwrap_or(0);
 
         if song_id >= 1000 && song_id <= 50000 && folder >= 1 && folder <= 50 {
             found_ids.push((offset, song_id, folder));
@@ -301,8 +250,8 @@ pub fn analyze_metadata_table<R: ReadMemory>(reader: &R, text_base: u64) {
         );
 
         // Show bytes around this entry
-        if offset + 32 <= buffer.len() {
-            debug!("    Bytes: {:02X?}", &buffer[*offset..*offset + 32]);
+        if let Ok(entry_bytes) = buf.slice_at(*offset, 32) {
+            debug!("    Bytes: {:02X?}", entry_bytes);
         }
     }
 }
@@ -321,8 +270,6 @@ pub fn build_song_id_title_map<R: ReadMemory>(
     text_base: u64,
     scan_size: usize,
 ) -> HashMap<u32, Arc<str>> {
-    use encoding_rs::SHIFT_JIS;
-
     const ENTRY_SIZE: u64 = SongInfo::MEMORY_SIZE as u64; // 0x3F0 = 1008 bytes
     const METADATA_OFFSET: u64 = SongInfo::METADATA_TABLE_OFFSET as u64; // 0x7E0 = 2016 bytes
 
@@ -340,18 +287,9 @@ pub fn build_song_id_title_map<R: ReadMemory>(
             continue;
         };
 
-        let song_id = i32::from_le_bytes([
-            meta_bytes[0],
-            meta_bytes[1],
-            meta_bytes[2],
-            meta_bytes[3],
-        ]);
-        let folder = i32::from_le_bytes([
-            meta_bytes[4],
-            meta_bytes[5],
-            meta_bytes[6],
-            meta_bytes[7],
-        ]);
+        let buf = ByteBuffer::new(&meta_bytes);
+        let song_id = buf.read_i32_at(0).unwrap_or(0);
+        let folder = buf.read_i32_at(4).unwrap_or(0);
 
         // Validate song_id and folder ranges
         // Note: folder values vary widely in new INFINITAS versions (e.g., 1-200+)
@@ -366,22 +304,19 @@ pub fn build_song_id_title_map<R: ReadMemory>(
 
         // Read title from text table
         if let Ok(title_bytes) = reader.read_bytes(text_addr, 64) {
-            let len = title_bytes.iter().position(|&b| b == 0).unwrap_or(64);
-            if len > 0 {
-                let (decoded, _, _) = SHIFT_JIS.decode(&title_bytes[..len]);
-                let title = decoded.trim();
-                if !title.is_empty()
-                    && title
-                        .chars()
-                        .next()
-                        .is_some_and(|c| c.is_ascii_graphic() || !c.is_ascii())
-                {
-                    debug!(
-                        "Mapped song_id={} to title={:?} (folder={})",
-                        song_id, title, folder
-                    );
-                    result.insert(song_id as u32, Arc::from(title));
-                }
+            let title_arc = decode_shift_jis(&title_bytes);
+            let title = title_arc.trim();
+            if !title.is_empty()
+                && title
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_ascii_graphic() || !c.is_ascii())
+            {
+                debug!(
+                    "Mapped song_id={} to title={:?} (folder={})",
+                    song_id, title, folder
+                );
+                result.insert(song_id as u32, Arc::from(title));
             }
         }
     }

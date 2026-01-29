@@ -1,3 +1,25 @@
+//! Main application logic for the Reflux score tracker.
+//!
+//! This module contains the core `Reflux` struct which orchestrates:
+//! - Game state detection and tracking
+//! - Score data collection from memory
+//! - Session management and data export
+//! - Integration with game memory via offsets
+//!
+//! ## Example
+//!
+//! ```ignore
+//! let offsets = OffsetsCollection::default();
+//! let mut reflux = Reflux::new(offsets);
+//!
+//! // Set up song database and score map
+//! reflux.set_song_db(song_db);
+//! reflux.set_score_map(score_map);
+//!
+//! // Run the tracking loop
+//! reflux.run(&process, &running)?;
+//! ```
+
 mod game_loop;
 
 use std::collections::HashMap;

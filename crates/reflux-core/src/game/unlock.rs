@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::error::Result;
 use crate::game::{Difficulty, SongInfo, UnlockType};
-use crate::memory::ReadMemory;
+use crate::memory::{ByteBuffer, ReadMemory};
 
 /// Unlock data structure from memory
 #[derive(Debug, Clone, Default)]
@@ -28,9 +28,10 @@ impl UnlockData {
             return None;
         }
 
-        let song_id = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
-        let unlock_type_val = i32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
-        let unlocks = i32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]);
+        let buf = ByteBuffer::new(bytes);
+        let song_id = buf.read_u32_at(0).ok()?;
+        let unlock_type_val = buf.read_i32_at(4).ok()?;
+        let unlocks = buf.read_i32_at(8).ok()?;
 
         let unlock_type = match unlock_type_val {
             1 => UnlockType::Base,

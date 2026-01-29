@@ -31,7 +31,7 @@ pub use game::{
     fetch_song_database, fetch_song_database_with_fixes, get_unlock_state_for_difficulty,
     get_unlock_states,
 };
-pub use memory::{MemoryReader, ProcessHandle, ReadMemory};
+pub use memory::{ByteBuffer, MemoryReader, ProcessHandle, ReadMemory, decode_shift_jis, decode_shift_jis_to_string};
 pub use offset::{
     CodeSignature, InteractiveSearchResult, JudgeInput, OffsetDump, OffsetSearcher,
     OffsetSignatureEntry, OffsetSignatureSet, OffsetsCollection, SearchPrompter, SearchResult,

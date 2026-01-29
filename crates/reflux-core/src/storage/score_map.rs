@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::error::Result;
 use crate::game::{Difficulty, Lamp, SongInfo};
-use crate::memory::ReadMemory;
+use crate::memory::{ByteBuffer, ReadMemory};
 
 /// Score data for a single song (all difficulties)
 #[derive(Debug, Clone, Default)]
@@ -69,22 +69,18 @@ impl ListNode {
     const SIZE: usize = 64;
 
     fn from_bytes(bytes: &[u8]) -> Self {
+        let buf = ByteBuffer::new(bytes);
         Self {
-            next: u64::from_le_bytes([
-                bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
-            ]),
-            prev: u64::from_le_bytes([
-                bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14],
-                bytes[15],
-            ]),
-            diff: i32::from_le_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]),
-            song: i32::from_le_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]),
-            playtype: i32::from_le_bytes([bytes[24], bytes[25], bytes[26], bytes[27]]),
+            next: buf.read_u64_at(0).unwrap_or(0),
+            prev: buf.read_u64_at(8).unwrap_or(0),
+            diff: buf.read_i32_at(16).unwrap_or(0),
+            song: buf.read_i32_at(20).unwrap_or(0),
+            playtype: buf.read_i32_at(24).unwrap_or(0),
             // uk2 at 28-31
-            score: u32::from_le_bytes([bytes[32], bytes[33], bytes[34], bytes[35]]),
-            miss_count: u32::from_le_bytes([bytes[36], bytes[37], bytes[38], bytes[39]]),
+            score: buf.read_u32_at(32).unwrap_or(0),
+            miss_count: buf.read_u32_at(36).unwrap_or(0),
             // uk3 at 40-43, uk4 at 44-47
-            lamp: i32::from_le_bytes([bytes[48], bytes[49], bytes[50], bytes[51]]),
+            lamp: buf.read_i32_at(48).unwrap_or(0),
         }
     }
 
@@ -127,18 +123,10 @@ impl ScoreMap {
         let buffer = reader.read_bytes(start_address, buffer_size)?;
 
         // Collect entry points from the hash table
+        let buf = ByteBuffer::new(&buffer);
         let mut entry_points = Vec::new();
         for i in 0..(buffer_size / 8) {
-            let addr = u64::from_le_bytes([
-                buffer[i * 8],
-                buffer[i * 8 + 1],
-                buffer[i * 8 + 2],
-                buffer[i * 8 + 3],
-                buffer[i * 8 + 4],
-                buffer[i * 8 + 5],
-                buffer[i * 8 + 6],
-                buffer[i * 8 + 7],
-            ]);
+            let addr = buf.read_u64_at(i * 8).unwrap_or(0);
 
             // Skip null entries and magic number entries
             if addr != 0 && addr != null_obj && addr != 0x494fdce0 {
