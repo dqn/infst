@@ -966,4 +966,130 @@ mod tests {
         assert!(summary.contains("1900"));
         assert!(!summary.contains("INVALID"));
     }
+
+    fn create_test_play_data(ex_score: u32, grade: Grade, lamp: Lamp) -> PlayData {
+        use crate::game::{ChartInfo, Judge, PlayType, Settings};
+
+        PlayData {
+            chart: ChartInfo {
+                song_id: 1000,
+                title: Arc::from("Test Song"),
+                title_english: Arc::from(""),
+                artist: Arc::from(""),
+                genre: Arc::from(""),
+                bpm: Arc::from("150"),
+                difficulty: Difficulty::SpA,
+                level: 12,
+                total_notes: 1000, // max EX = 2000
+                unlocked: true,
+            },
+            judge: Judge {
+                play_type: PlayType::P1,
+                pgreat: 900,
+                great: 100,
+                good: 0,
+                bad: 0,
+                poor: 0,
+                fast: 30,
+                slow: 20,
+                combo_break: 0,
+                premature_end: false,
+            },
+            settings: Settings::default(),
+            ex_score,
+            lamp,
+            grade,
+            data_available: true,
+            timestamp: chrono::Utc::now(),
+        }
+    }
+
+    #[test]
+    fn test_compare_with_personal_best_no_best() {
+        let play_data = create_test_play_data(1800, Grade::Aaa, Lamp::HardClear);
+        let comparison = compare_with_personal_best(&play_data, None);
+
+        assert!(comparison.score_diff.is_none());
+        assert!(comparison.previous_grade.is_none());
+        assert!(comparison.previous_lamp.is_none());
+    }
+
+    #[test]
+    fn test_compare_with_personal_best_score_improvement() {
+        // Current: AAA (1800), Best: AAA (1780) - same grade, score up
+        let play_data = create_test_play_data(1800, Grade::Aaa, Lamp::HardClear);
+
+        let mut best = ScoreData::new(1000);
+        best.score[Difficulty::SpA as usize] = 1780; // Also AAA
+        best.lamp[Difficulty::SpA as usize] = Lamp::HardClear;
+
+        let comparison = compare_with_personal_best(&play_data, Some(&best));
+
+        assert_eq!(comparison.score_diff, Some(20));
+        assert!(comparison.previous_grade.is_none()); // Both AAA
+        assert!(comparison.previous_lamp.is_none()); // Same lamp
+    }
+
+    #[test]
+    fn test_compare_with_personal_best_grade_improvement() {
+        // Current: AAA (1778+), Best: AA (1556-1777)
+        let play_data = create_test_play_data(1800, Grade::Aaa, Lamp::Clear);
+
+        let mut best = ScoreData::new(1000);
+        best.score[Difficulty::SpA as usize] = 1600; // AA
+        best.lamp[Difficulty::SpA as usize] = Lamp::Clear;
+
+        let comparison = compare_with_personal_best(&play_data, Some(&best));
+
+        assert_eq!(comparison.score_diff, Some(200));
+        assert_eq!(comparison.previous_grade, Some(Grade::Aa));
+        assert!(comparison.previous_lamp.is_none());
+    }
+
+    #[test]
+    fn test_compare_with_personal_best_lamp_improvement() {
+        let play_data = create_test_play_data(1800, Grade::Aaa, Lamp::HardClear);
+
+        let mut best = ScoreData::new(1000);
+        best.score[Difficulty::SpA as usize] = 1800; // Same score
+        best.lamp[Difficulty::SpA as usize] = Lamp::Clear;
+
+        let comparison = compare_with_personal_best(&play_data, Some(&best));
+
+        assert!(comparison.score_diff.is_none()); // Same score
+        assert!(comparison.previous_grade.is_none()); // Both AAA
+        assert_eq!(comparison.previous_lamp, Some(Lamp::Clear));
+    }
+
+    #[test]
+    fn test_compare_with_personal_best_no_improvement() {
+        let play_data = create_test_play_data(1600, Grade::Aa, Lamp::Clear);
+
+        let mut best = ScoreData::new(1000);
+        best.score[Difficulty::SpA as usize] = 1800; // Better
+        best.lamp[Difficulty::SpA as usize] = Lamp::HardClear; // Better
+
+        let comparison = compare_with_personal_best(&play_data, Some(&best));
+
+        assert!(comparison.score_diff.is_none());
+        assert!(comparison.previous_grade.is_none());
+        assert!(comparison.previous_lamp.is_none());
+    }
+
+    #[test]
+    fn test_compare_with_personal_best_first_clear() {
+        // First clear: best lamp is NoPlay
+        let play_data = create_test_play_data(1800, Grade::Aaa, Lamp::HardClear);
+
+        let mut best = ScoreData::new(1000);
+        best.score[Difficulty::SpA as usize] = 0;
+        best.lamp[Difficulty::SpA as usize] = Lamp::NoPlay;
+
+        let comparison = compare_with_personal_best(&play_data, Some(&best));
+
+        // NoPlay to something is not shown as lamp improvement
+        assert!(comparison.score_diff.is_none()); // No previous score
+        assert!(comparison.previous_grade.is_none()); // No previous grade
+        assert!(comparison.previous_lamp.is_none()); // NoPlay is not shown
+    }
 }

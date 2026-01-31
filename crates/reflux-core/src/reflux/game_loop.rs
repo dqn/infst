@@ -244,8 +244,11 @@ impl Reflux {
 
     /// Process and save play result data
     fn process_play_result(&mut self, play_data: &PlayData) {
-        // Print detailed play data to console
-        println!("{}", format_play_data_console(play_data));
+        // Get personal best for comparison
+        let personal_best = self.game_data.score_map.get(play_data.chart.song_id);
+
+        // Print detailed play data to console (with PB comparison)
+        println!("{}", format_play_data_console(play_data, personal_best));
 
         // Save to session files
         self.save_session_data(play_data);
