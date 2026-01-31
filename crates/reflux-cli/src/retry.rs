@@ -40,8 +40,8 @@ pub fn load_song_database_with_retry(
         }
         attempts += 1;
 
-        // Wait for data initialization (interruptible)
-        if shutdown.wait(database::EXTRA_DELAY) {
+        // Wait for data initialization on retry only (interruptible)
+        if attempts > 1 && shutdown.wait(database::EXTRA_DELAY) {
             return Ok(None);
         }
 
@@ -113,11 +113,6 @@ pub fn search_offsets_with_retry(
             return Ok(None);
         }
 
-        // Interruptible retry delay
-        if shutdown.wait(database::RETRY_DELAY) {
-            return Ok(None);
-        }
-
         let mut searcher = OffsetSearcher::new(reader);
 
         match searcher.search_all_with_signatures(&signatures) {
@@ -145,6 +140,11 @@ pub fn search_offsets_with_retry(
                     database::RETRY_DELAY.as_secs()
                 );
             }
+        }
+
+        // Wait before retry (interruptible)
+        if shutdown.wait(database::RETRY_DELAY) {
+            return Ok(None);
         }
     }
 }
