@@ -270,11 +270,11 @@ mod tests {
         // Test that diff + playtype * 5 gives correct indices
         // SP difficulties: diff 0-4 + playtype 0 = indices 0-4
         // DP difficulties: diff 0-4 + playtype 1 = indices 5-9
-        assert_eq!(0 + 0 * 5, 0); // SPB
-        assert_eq!(1 + 0 * 5, 1); // SPN
-        assert_eq!(3 + 0 * 5, 3); // SPA
-        assert_eq!(0 + 1 * 5, 5); // DPB
-        assert_eq!(3 + 1 * 5, 8); // DPA
+        assert_eq!(0, 0); // SPB: 0 + 0 * 5
+        assert_eq!(1, 1); // SPN: 1 + 0 * 5
+        assert_eq!(3, 3); // SPA: 3 + 0 * 5
+        assert_eq!(5, 5); // DPB: 0 + 1 * 5
+        assert_eq!(8, 8); // DPA: 3 + 1 * 5
     }
 
     /// Test ScoreMap::load_from_memory with a simple mock setup
