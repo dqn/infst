@@ -19,12 +19,14 @@
 //! - [`OffsetSearcher`]: Signature-based offset finder
 //! - [`CodeSignature`]: Pattern definition for code scanning
 
+mod cache;
 mod collection;
 mod dump;
 mod loader;
 mod searcher;
 mod signature;
 
+pub use cache::*;
 pub use collection::*;
 pub use dump::*;
 pub use loader::*;

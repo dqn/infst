@@ -8,7 +8,7 @@ use anyhow::Result;
 use reflux_core::game::find_game_version;
 use reflux_core::{
     CustomTypes, EncodingFixes, MemoryReader, OffsetSearcher, OffsetsCollection, ProcessHandle,
-    Reflux, ScoreMap, SongInfo, load_offsets,
+    Reflux, ScoreMap, SongInfo, load_offsets, save_offsets_to_cache, try_load_cached_offsets,
 };
 use tracing::{debug, error, info, warn};
 
@@ -106,6 +106,8 @@ fn wait_for_process(shutdown: &ShutdownSignal) -> Option<ProcessHandle> {
 }
 
 /// Validate or search for offsets
+///
+/// Uses cached offsets if available and valid, otherwise performs a full search.
 fn validate_or_search_offsets(
     reflux: &Reflux,
     reader: &MemoryReader,
@@ -113,6 +115,22 @@ fn validate_or_search_offsets(
     offsets_from_file: bool,
     shutdown: &ShutdownSignal,
 ) -> Result<Option<OffsetsCollection>> {
+    // Try to use cached offsets first (if not loading from file)
+    if !offsets_from_file {
+        if let Some(version) = game_version {
+            if let Some(cached_offsets) = try_load_cached_offsets(version) {
+                // Validate cached offsets still work
+                let searcher = OffsetSearcher::new(reader);
+                if searcher.validate_basic_memory_access(&cached_offsets) {
+                    info!("Using cached offsets (validated)");
+                    return Ok(Some(cached_offsets));
+                } else {
+                    info!("Cached offsets invalid, performing fresh search...");
+                }
+            }
+        }
+    }
+
     let needs_search = if !reflux.offsets().is_valid() {
         info!("Invalid offsets detected (some offsets are zero)");
         true
@@ -140,8 +158,12 @@ fn validate_or_search_offsets(
 
     if needs_search {
         let offsets = search_offsets_with_retry(reader, game_version, shutdown)?;
-        if offsets.is_some() {
+        if let Some(ref found_offsets) = offsets {
             debug!("Signature-based offset detection successful!");
+            // Save to cache for next startup
+            if let Some(version) = game_version {
+                save_offsets_to_cache(version, found_offsets);
+            }
         }
         Ok(offsets)
     } else {

@@ -38,9 +38,10 @@ pub use memory::{
     decode_shift_jis, decode_shift_jis_to_string,
 };
 pub use offset::{
-    CodeSignature, InteractiveSearchResult, JudgeInput, OffsetDump, OffsetSearcher,
+    CodeSignature, InteractiveSearchResult, JudgeInput, OffsetCache, OffsetDump, OffsetSearcher,
     OffsetSignatureEntry, OffsetSignatureSet, OffsetsCollection, SearchPrompter, SearchResult,
-    builtin_signatures, load_offsets, load_signatures, save_offsets, save_signatures,
+    builtin_signatures, load_offsets, load_signatures, save_offsets, save_offsets_to_cache,
+    save_signatures, try_load_cached_offsets,
 };
 pub use reflux::{GameData, Reflux};
 pub use retry::{ExponentialBackoff, FixedDelay, NoRetry, RetryStrategy};
