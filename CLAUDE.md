@@ -180,9 +180,12 @@ reflux export -f json
 オフセット検索は**相対オフセット検索**を主軸としている：
 
 1. **SongList**: パターン検索（`"5.1.1."` バージョン文字列）でアンカーを取得
+   - 期待位置 `base + 0x3180000` から検索開始（高速化のため）
 2. **JudgeData**: SongList からの相対オフセット（-0x94E3C8）で検索
-3. **PlaySettings**: JudgeData からの相対オフセット（-0x2ACEE8）で検索
-4. **PlayData**: PlaySettings からの相対オフセット（+0x2C0）で検索
+   - **Cross-validation**: 推論された CurrentSong 位置も検証
+3. **PlaySettings**: JudgeData からの相対オフセット（-0x2ACFA8）で検索
+   - **Cross-validation**: 推論された PlayData 位置も検証
+4. **PlayData**: PlaySettings からの相対オフセット（+0x2A0）で検索
 5. **CurrentSong**: JudgeData からの相対オフセット（+0x1E4）で検索
 6. **DataMap/UnlockData**: パターン検索
 
@@ -198,21 +201,39 @@ reflux export -f json
 
 コードは将来のために残しているが、デフォルトでは使用しない。
 
-### 相対オフセットの安定性
+### 相対オフセットの定数値
 
 バージョン間での相対オフセット差分（Version 1 → Version 2）：
 
 | 関係 | Version 1 | Version 2 | 定数値 | 検索範囲 |
 |------|-----------|-----------|--------|---------|
 | SongList - JudgeData | 0x94E374 | 0x94E4B4 | 0x94E3C8 | ±64KB |
-| JudgeData - PlaySettings | 0x2ACEE8 | 0x2ACFA8 | 0x2ACEE8 | ±8KB |
-| PlayData - PlaySettings | 0x2C0 | 0x2A0 | 0x2C0 | ±256B |
+| JudgeData - PlaySettings | 0x2ACEE8 | 0x2ACFA8 | **0x2ACFA8** | ±512B |
+| PlayData - PlaySettings | 0x2C0 | 0x2A0 | **0x2A0** | ±256B |
 | CurrentSong - JudgeData | 0x1E4 | 0x1E4 | 0x1E4 | ±256B |
 
-`CurrentSong - JudgeData` は両バージョンで完全に一致している。
+**注意**: 定数値は Version 2 に合わせて更新済み。検索範囲を狭めることで誤検出を防止。
+
+### バリデーション戦略
+
+オフセット検出の信頼性を高めるため、以下のバリデーションを実施：
+
+1. **JudgeData**: 判定データ領域（72バイト）が all zeros または妥当な範囲内
+2. **PlaySettings**: 設定値が有効範囲内 + song_select_marker チェック
+3. **PlayData**: song_id が 1000-50000 の範囲内（all zeros は拒否）
+4. **CurrentSong**: song_id が有効範囲内 + 2のべき乗を除外（all zeros は拒否）
+5. **Cross-validation**: 関連オフセット同士の整合性を検証
 
 ### 新バージョン対応時
 
 1. `cargo run --features debug-tools -- status` でオフセット検出状態を確認
-2. 相対オフセットが tolerance 範囲内なら自動対応
-3. 範囲外の場合は `constants.rs` の定数を更新
+2. 検出されたオフセットと `.agent/offsets-*.txt` の期待値を比較
+3. 差分が検索範囲を超える場合は `constants.rs` の定数を更新
+4. バリデーションが誤検出を起こす場合は検索範囲を狭める
+
+### 過去の教訓
+
+- **検索範囲は狭い方が安全**: 広い検索範囲は誤検出の原因になる
+- **Cross-validation が重要**: 単体のバリデーションは弱いため、関連オフセット同士の整合性をチェック
+- **all zeros の許容は危険**: 間違ったアドレスでも zeros が入っている可能性があるため、オフセット検索時は拒否する
+- **定数値はバージョンごとに検証**: 新バージョン対応時は必ず実際の値と比較して更新
