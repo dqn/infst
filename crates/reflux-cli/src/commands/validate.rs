@@ -3,7 +3,7 @@
 use anyhow::Result;
 use reflux_core::{MemoryReader, ProcessHandle, ReadMemory};
 
-use super::offset::parse_hex_address;
+use super::hex_utils::parse_hex_address;
 use crate::cli::ValidateTarget;
 
 /// Run the validate command

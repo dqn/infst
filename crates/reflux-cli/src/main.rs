@@ -48,10 +48,7 @@ fn main() -> Result<()> {
             entry_size,
         ),
         Some(Command::Explore { address, pid }) => {
-            let addr = u64::from_str_radix(
-                address.trim_start_matches("0x").trim_start_matches("0X"),
-                16,
-            )?;
+            let addr = commands::hex_utils::parse_hex_address(&address)?;
             commands::explore::run(addr, pid)
         }
         Some(Command::Hexdump {
@@ -60,7 +57,7 @@ fn main() -> Result<()> {
             ascii,
             pid,
         }) => {
-            let addr = commands::offset::parse_hex_address(&address)?;
+            let addr = commands::hex_utils::parse_hex_address(&address)?;
             commands::hexdump::run(addr, size, ascii, pid)
         }
         Some(Command::Search {

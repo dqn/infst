@@ -1,12 +1,7 @@
 //! Offset command implementation.
 
+use super::hex_utils::parse_hex_address;
 use anyhow::Result;
-
-/// Parse a hex address string (with or without 0x prefix)
-pub fn parse_hex_address(s: &str) -> Result<u64> {
-    let s = s.trim_start_matches("0x").trim_start_matches("0X");
-    u64::from_str_radix(s, 16).map_err(|e| anyhow::anyhow!("Invalid hex address: {}", e))
-}
 
 /// Run the offset command
 pub fn run(from: &str, to: &str) -> Result<()> {

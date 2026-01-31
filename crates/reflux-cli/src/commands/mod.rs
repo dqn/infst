@@ -7,6 +7,7 @@ pub mod dump;
 pub mod explore;
 pub mod export;
 pub mod find_offsets;
+pub mod hex_utils;
 pub mod hexdump;
 pub mod offset;
 pub mod scan;
