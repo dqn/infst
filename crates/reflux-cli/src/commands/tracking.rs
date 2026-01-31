@@ -32,7 +32,7 @@ pub fn run(offsets_file: Option<&str>) -> Result<()> {
             {
                 error!("Tracking session error: {}", e);
             }
-            info!("Process disconnected, waiting for reconnect...");
+            println!("Waiting for INFINITAS...");
         }
 
         if shutdown.wait(Duration::from_secs(5)) {
@@ -40,7 +40,7 @@ pub fn run(offsets_file: Option<&str>) -> Result<()> {
         }
     }
 
-    info!("Shutdown complete");
+    println!("Shutdown complete.");
     Ok(())
 }
 
@@ -51,7 +51,7 @@ fn setup_shutdown_handler() -> Result<Arc<ShutdownSignal>> {
     // Ctrl+C handler
     let shutdown_ctrlc = Arc::clone(&shutdown);
     ctrlc::set_handler(move || {
-        info!("Received shutdown signal, stopping...");
+        println!("\nShutting down...");
         shutdown_ctrlc.trigger();
     })?;
 
@@ -60,7 +60,7 @@ fn setup_shutdown_handler() -> Result<Arc<ShutdownSignal>> {
     let _keyboard_handle = input::spawn_keyboard_monitor(shutdown_keyboard);
 
     let current_version = env!("CARGO_PKG_VERSION");
-    info!("Reflux-RS {}", current_version);
+    println!("Reflux-RS v{}", current_version);
 
     Ok(shutdown)
 }
@@ -95,10 +95,8 @@ fn wait_for_process(shutdown: &ShutdownSignal) -> Option<ProcessHandle> {
 
     match ProcessHandle::find_and_open() {
         Ok(process) => {
-            info!(
-                "Connected to INFINITAS (PID: {}, base: {:#x})",
-                process.pid, process.base_address
-            );
+            println!("Connected to INFINITAS (PID: {})", process.pid);
+            debug!("Process base: {:#x}", process.base_address);
             Some(process)
         }
         Err(e) => {
@@ -276,6 +274,7 @@ fn run_tracking_session(
     shutdown: &ShutdownSignal,
     offsets_from_file: bool,
 ) -> Result<()> {
+    println!("Initializing...");
     let reader = MemoryReader::new(process);
 
     // Game version detection
