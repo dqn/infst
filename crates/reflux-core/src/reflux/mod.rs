@@ -28,7 +28,7 @@ use std::path::Path;
 use tracing::{debug, info};
 
 use crate::error::Result;
-use crate::game::{GameStateDetector, SongInfo, UnlockData};
+use crate::game::{Difficulty, GameStateDetector, SongInfo, UnlockData};
 use crate::offset::OffsetsCollection;
 use crate::storage::{ScoreMap, SessionManager};
 use crate::stream::StreamOutput;
@@ -63,9 +63,13 @@ pub struct Reflux {
     pub(crate) game_data: GameData,
     pub(crate) state_detector: GameStateDetector,
     pub(crate) session_manager: SessionManager,
-    /// Stream output for OBS integration (not yet implemented)
+    /// Stream output for OBS integration.
+    /// Reserved for future use - OBS file output during tracking.
     #[allow(dead_code)]
     pub(crate) stream_output: StreamOutput,
+    /// Currently playing chart (set during Playing state)
+    /// Used for cross-validation when fetching play data on ResultScreen
+    pub(crate) current_playing: Option<(u32, Difficulty)>,
 }
 
 impl Reflux {
@@ -91,6 +95,7 @@ impl Reflux {
             state_detector: GameStateDetector::new(),
             session_manager: SessionManager::new("sessions"),
             stream_output,
+            current_playing: None,
         }
     }
 

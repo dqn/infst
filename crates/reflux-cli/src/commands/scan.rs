@@ -1,4 +1,9 @@
 //! Scan command implementation.
+//!
+//! Scans the song list memory region to extract song information. Can optionally
+//! validate against a TSV file to verify detected songs match expected data.
+//!
+//! Supports custom entry sizes for investigating different structure layouts.
 
 use anyhow::Result;
 use reflux_core::{

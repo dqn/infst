@@ -1,4 +1,8 @@
 //! Dump command implementation.
+//!
+//! Collects and exports detailed memory structure information including offsets,
+//! song entries, and raw memory dumps. Output can be saved as JSON for further
+//! analysis.
 
 use anyhow::Result;
 use reflux_core::{

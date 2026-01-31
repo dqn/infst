@@ -1,4 +1,10 @@
 //! Explore command implementation.
+//!
+//! Comprehensive memory structure exploration for understanding the song
+//! database layout in INFINITAS. Analyzes entry structure, validates metadata,
+//! and searches for specific patterns to reverse-engineer memory layout.
+//!
+//! This is a debugging tool used when investigating new game versions.
 
 use anyhow::Result;
 use reflux_core::{MemoryReader, ProcessHandle, ReadMemory};

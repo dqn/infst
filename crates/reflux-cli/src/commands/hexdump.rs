@@ -1,4 +1,13 @@
 //! Hexdump command implementation.
+//!
+//! Displays raw memory bytes in traditional hexdump format, useful for
+//! investigating memory structures and debugging offset calculations.
+//!
+//! # Output Format
+//!
+//! ```text
+//! 0x000: 48 65 6C 6C 6F 20 57 6F  72 6C 64 00 00 00 00 00  |Hello World.....|
+//! ```
 
 use anyhow::Result;
 use reflux_core::{MemoryReader, ProcessHandle, ReadMemory};

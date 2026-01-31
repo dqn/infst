@@ -1,4 +1,10 @@
 //! Find offsets command implementation.
+//!
+//! Interactive mode for discovering memory offsets in new game versions.
+//! Requires user interaction (playing a song) to detect play-related offsets
+//! through state changes.
+//!
+//! The output file can be used as input for other commands via `--offsets-file`.
 
 use std::sync::Arc;
 use std::time::Duration;
