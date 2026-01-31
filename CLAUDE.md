@@ -168,6 +168,51 @@ reflux export -f json
 - Windows 専用（INFINITAS のメモリを読み取るため）
 - macOS/Linux ではビルドは通るがメモリ読み取り機能は動作しない
 - Shift-JIS エンコーディング処理あり（日本語タイトル対応）
-- オフセットは組み込みシグネチャで検出し、`offsets.txt` は未使用
+- オフセットは相対検索で検出（シグネチャ検索は無効化、後述）
+- `offsets.txt` は未使用
 - 任意サポートファイル: `encodingfixes.txt`, `customtypes.txt`
 - **このファイルは実装と同期して最新の状態を保つこと**
+
+## オフセット検索の仕組み
+
+### 検索戦略
+
+オフセット検索は**相対オフセット検索**を主軸としている：
+
+1. **SongList**: パターン検索（`"5.1.1."` バージョン文字列）でアンカーを取得
+2. **JudgeData**: SongList からの相対オフセット（-0x94E3C8）で検索
+3. **PlaySettings**: JudgeData からの相対オフセット（-0x2ACEE8）で検索
+4. **PlayData**: PlaySettings からの相対オフセット（+0x2C0）で検索
+5. **CurrentSong**: JudgeData からの相対オフセット（+0x1E4）で検索
+6. **DataMap/UnlockData**: パターン検索
+
+### シグネチャ検索の無効化
+
+シグネチャ（AOB）検索は **Version 2 (2026012800) で完全に機能しなくなった**ため無効化した：
+
+| シグネチャ | Version 2 での検索結果 |
+|-----------|----------------------|
+| judgeData | 0件 |
+| playSettings | 0件 |
+| currentSong | 0件 |
+
+コードは将来のために残しているが、デフォルトでは使用しない。
+
+### 相対オフセットの安定性
+
+バージョン間での相対オフセット差分（Version 1 → Version 2）：
+
+| 関係 | Version 1 | Version 2 | 定数値 | 検索範囲 |
+|------|-----------|-----------|--------|---------|
+| SongList - JudgeData | 0x94E374 | 0x94E4B4 | 0x94E3C8 | ±64KB |
+| JudgeData - PlaySettings | 0x2ACEE8 | 0x2ACFA8 | 0x2ACEE8 | ±8KB |
+| PlayData - PlaySettings | 0x2C0 | 0x2A0 | 0x2C0 | ±256B |
+| CurrentSong - JudgeData | 0x1E4 | 0x1E4 | 0x1E4 | ±256B |
+
+`CurrentSong - JudgeData` は両バージョンで完全に一致している。
+
+### 新バージョン対応時
+
+1. `cargo run --features debug-tools -- status` でオフセット検出状態を確認
+2. 相対オフセットが tolerance 範囲内なら自動対応
+3. 範囲外の場合は `constants.rs` の定数を更新

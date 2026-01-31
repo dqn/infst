@@ -101,80 +101,26 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         offsets.song_list = self.search_song_list_by_signature(signatures)?;
         debug!("  SongList: 0x{:X}", offsets.song_list);
 
-        // Phase 2: JudgeData
-        debug!("Phase 2: Searching JudgeData via signatures...");
-        offsets.judge_data =
-            match self.search_offset_by_signature(signatures, "judgeData", |this, addr| {
-                this.reader.validate_judge_data_candidate(addr)
-            }) {
-                Ok(addr) => addr,
-                Err(e) => {
-                    warn!(
-                        "JudgeData signature search failed: {}. Falling back to relative search...",
-                        e
-                    );
-                    self.search_judge_data_near_song_list(offsets.song_list)?
-                }
-            };
+        // Phase 2: JudgeData (relative search from SongList)
+        // NOTE: Signature search is disabled because existing signatures don't work
+        // on Version 2 (2026012800+). Relative offset search is reliable and stable.
+        debug!("Phase 2: Searching JudgeData via relative offset from SongList...");
+        offsets.judge_data = self.search_judge_data_near_song_list(offsets.song_list)?;
         debug!("  JudgeData: 0x{:X}", offsets.judge_data);
 
-        // Phase 3: PlaySettings
-        debug!("Phase 3: Searching PlaySettings via signatures...");
-        offsets.play_settings = match self.search_offset_by_signature(
-            signatures,
-            "playSettings",
-            |this, addr| this.reader.validate_play_settings_at(addr).is_some(),
-        ) {
-            Ok(addr) => addr,
-            Err(e) => {
-                warn!(
-                    "PlaySettings signature search failed: {}. Falling back to relative search...",
-                    e
-                );
-                self.search_play_settings_near_judge_data(offsets.judge_data)?
-            }
-        };
+        // Phase 3: PlaySettings (relative search from JudgeData)
+        debug!("Phase 3: Searching PlaySettings via relative offset from JudgeData...");
+        offsets.play_settings = self.search_play_settings_near_judge_data(offsets.judge_data)?;
         debug!("  PlaySettings: 0x{:X}", offsets.play_settings);
 
-        // Phase 4: PlayData
-        debug!("Phase 4: Searching PlayData via signatures...");
-        offsets.play_data =
-            match self.search_offset_by_signature(signatures, "playData", |this, addr| {
-                this.reader
-                    .validate_play_data_address(addr)
-                    .unwrap_or(false)
-            }) {
-                Ok(addr) => addr,
-                Err(e) => {
-                    info!(
-                        "PlayData signature search failed: {}. Falling back to relative search...",
-                        e
-                    );
-                    self.search_play_data_near_play_settings(offsets.play_settings)?
-                }
-            };
+        // Phase 4: PlayData (relative search from PlaySettings)
+        debug!("Phase 4: Searching PlayData via relative offset from PlaySettings...");
+        offsets.play_data = self.search_play_data_near_play_settings(offsets.play_settings)?;
         debug!("  PlayData: 0x{:X}", offsets.play_data);
 
-        // Phase 5: CurrentSong
-        debug!("Phase 5: Searching CurrentSong via signatures...");
-        offsets.current_song = match self.search_offset_by_signature(
-            signatures,
-            "currentSong",
-            |this, addr| {
-                this.reader
-                    .validate_current_song_address(addr)
-                    .unwrap_or(false)
-            },
-        ) {
-            Ok(addr) => addr,
-            Err(e) => {
-                warn!(
-                    "CurrentSong signature search failed: {}. Falling back to relative search...",
-                    e
-                );
-                self.search_current_song_near_judge_data(offsets.judge_data)?
-            }
-        };
+        // Phase 5: CurrentSong (relative search from JudgeData)
+        debug!("Phase 5: Searching CurrentSong via relative offset from JudgeData...");
+        offsets.current_song = self.search_current_song_near_judge_data(offsets.judge_data)?;
         debug!("  CurrentSong: 0x{:X}", offsets.current_song);
 
         // Phase 6: DataMap / UnlockData (pattern search, using SongList as hint)
@@ -1027,11 +973,19 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         }
 
         // Fallback to pattern-based search if signature search fails
-        warn!("SongList signature search failed. Falling back to pattern search...");
+        // NOTE: This is expected behavior - signature search often fails on new versions.
+        // Pattern search ("5.1.1." version string) is the reliable primary method.
+        debug!("SongList signature search did not find valid candidates. Using pattern search...");
         let base = self.reader.base_address();
         self.search_song_list_offset(base)
     }
 
+    /// Search for an offset using code signatures (AOB scan)
+    ///
+    /// NOTE: This method is currently unused because existing signatures don't work
+    /// on newer game versions (2026012800+). Kept for potential future use when
+    /// stable signatures are discovered.
+    #[allow(dead_code)]
     fn search_offset_by_signature<F>(
         &self,
         signatures: &OffsetSignatureSet,

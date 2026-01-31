@@ -120,6 +120,167 @@ mod tests {
     use crate::memory::MockMemoryBuilder;
     use crate::memory::layout::judge;
 
+    // ========================================================================
+    // Version offset tests
+    //
+    // These tests verify that relative offsets between structures are stable
+    // across game versions. The tolerance values used in searches should
+    // accommodate any observed differences.
+    // ========================================================================
+
+    /// Known offsets from Version 1 (2025122400)
+    mod version1 {
+        pub const SONG_LIST: u64 = 0x14315A380;
+        pub const JUDGE_DATA: u64 = 0x14280C00C;
+        pub const PLAY_SETTINGS: u64 = 0x14255F124;
+        pub const PLAY_DATA: u64 = 0x14255F3E4;
+        pub const CURRENT_SONG: u64 = 0x14280C1F0;
+    }
+
+    /// Known offsets from Version 2 (2026012800)
+    mod version2 {
+        pub const SONG_LIST: u64 = 0x1431865A0;
+        pub const JUDGE_DATA: u64 = 0x1428380EC;
+        pub const PLAY_SETTINGS: u64 = 0x14258B144;
+        pub const PLAY_DATA: u64 = 0x14258B3E4;
+        pub const CURRENT_SONG: u64 = 0x1428382D0;
+    }
+
+    #[test]
+    fn test_judge_to_song_list_offset_stability() {
+        // Calculate actual offsets for both versions
+        let v1_offset = version1::SONG_LIST - version1::JUDGE_DATA;
+        let v2_offset = version2::SONG_LIST - version2::JUDGE_DATA;
+
+        // Expected: ~0x94E3C8
+        let expected = JUDGE_TO_SONG_LIST;
+
+        // Both versions should be within search range
+        let v1_diff = (v1_offset as i64 - expected as i64).unsigned_abs();
+        let v2_diff = (v2_offset as i64 - expected as i64).unsigned_abs();
+
+        assert!(
+            v1_diff <= JUDGE_DATA_SEARCH_RANGE as u64,
+            "Version 1 offset 0x{:X} exceeds tolerance from expected 0x{:X} (diff: 0x{:X}, range: 0x{:X})",
+            v1_offset,
+            expected,
+            v1_diff,
+            JUDGE_DATA_SEARCH_RANGE
+        );
+        assert!(
+            v2_diff <= JUDGE_DATA_SEARCH_RANGE as u64,
+            "Version 2 offset 0x{:X} exceeds tolerance from expected 0x{:X} (diff: 0x{:X}, range: 0x{:X})",
+            v2_offset,
+            expected,
+            v2_diff,
+            JUDGE_DATA_SEARCH_RANGE
+        );
+    }
+
+    #[test]
+    fn test_judge_to_play_settings_offset_stability() {
+        // Calculate actual offsets for both versions
+        let v1_offset = version1::JUDGE_DATA - version1::PLAY_SETTINGS;
+        let v2_offset = version2::JUDGE_DATA - version2::PLAY_SETTINGS;
+
+        // Expected: ~0x2ACEE8
+        let expected = JUDGE_TO_PLAY_SETTINGS;
+
+        // Both versions should be within search range
+        let v1_diff = (v1_offset as i64 - expected as i64).unsigned_abs();
+        let v2_diff = (v2_offset as i64 - expected as i64).unsigned_abs();
+
+        assert!(
+            v1_diff <= PLAY_SETTINGS_SEARCH_RANGE as u64,
+            "Version 1 offset 0x{:X} exceeds tolerance from expected 0x{:X} (diff: 0x{:X}, range: 0x{:X})",
+            v1_offset,
+            expected,
+            v1_diff,
+            PLAY_SETTINGS_SEARCH_RANGE
+        );
+        assert!(
+            v2_diff <= PLAY_SETTINGS_SEARCH_RANGE as u64,
+            "Version 2 offset 0x{:X} exceeds tolerance from expected 0x{:X} (diff: 0x{:X}, range: 0x{:X})",
+            v2_offset,
+            expected,
+            v2_diff,
+            PLAY_SETTINGS_SEARCH_RANGE
+        );
+    }
+
+    #[test]
+    fn test_play_settings_to_play_data_offset_stability() {
+        // Calculate actual offsets for both versions
+        let v1_offset = version1::PLAY_DATA - version1::PLAY_SETTINGS;
+        let v2_offset = version2::PLAY_DATA - version2::PLAY_SETTINGS;
+
+        // Expected: ~0x2C0
+        let expected = PLAY_SETTINGS_TO_PLAY_DATA;
+
+        // Both versions should be within search range
+        let v1_diff = (v1_offset as i64 - expected as i64).unsigned_abs();
+        let v2_diff = (v2_offset as i64 - expected as i64).unsigned_abs();
+
+        assert!(
+            v1_diff <= PLAY_DATA_SEARCH_RANGE as u64,
+            "Version 1 offset 0x{:X} exceeds tolerance from expected 0x{:X} (diff: 0x{:X}, range: 0x{:X})",
+            v1_offset,
+            expected,
+            v1_diff,
+            PLAY_DATA_SEARCH_RANGE
+        );
+        assert!(
+            v2_diff <= PLAY_DATA_SEARCH_RANGE as u64,
+            "Version 2 offset 0x{:X} exceeds tolerance from expected 0x{:X} (diff: 0x{:X}, range: 0x{:X})",
+            v2_offset,
+            expected,
+            v2_diff,
+            PLAY_DATA_SEARCH_RANGE
+        );
+    }
+
+    #[test]
+    fn test_judge_to_current_song_offset_stability() {
+        // Calculate actual offsets for both versions
+        let v1_offset = version1::CURRENT_SONG - version1::JUDGE_DATA;
+        let v2_offset = version2::CURRENT_SONG - version2::JUDGE_DATA;
+
+        // Expected: 0x1E4
+        let expected = JUDGE_TO_CURRENT_SONG;
+
+        // Both versions should be within search range
+        let v1_diff = (v1_offset as i64 - expected as i64).unsigned_abs();
+        let v2_diff = (v2_offset as i64 - expected as i64).unsigned_abs();
+
+        assert!(
+            v1_diff <= CURRENT_SONG_SEARCH_RANGE as u64,
+            "Version 1 offset 0x{:X} exceeds tolerance from expected 0x{:X} (diff: 0x{:X}, range: 0x{:X})",
+            v1_offset,
+            expected,
+            v1_diff,
+            CURRENT_SONG_SEARCH_RANGE
+        );
+        assert!(
+            v2_diff <= CURRENT_SONG_SEARCH_RANGE as u64,
+            "Version 2 offset 0x{:X} exceeds tolerance from expected 0x{:X} (diff: 0x{:X}, range: 0x{:X})",
+            v2_offset,
+            expected,
+            v2_diff,
+            CURRENT_SONG_SEARCH_RANGE
+        );
+
+        // This offset should be exactly the same for both versions
+        assert_eq!(
+            v1_offset, v2_offset,
+            "currentSong offset changed between versions (v1: 0x{:X}, v2: 0x{:X})",
+            v1_offset, v2_offset
+        );
+    }
+
+    // ========================================================================
+    // Original tests
+    // ========================================================================
+
     #[test]
     fn test_search_near_expected_exact_match() {
         let reader = MockMemoryBuilder::new()
