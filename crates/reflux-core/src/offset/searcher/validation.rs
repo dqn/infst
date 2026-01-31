@@ -67,15 +67,20 @@ pub trait OffsetValidation: ReadMemory {
     }
 
     /// Validate if an address contains valid PlayData
+    ///
+    /// Initial state (all zeros) is NOT accepted during offset search.
+    /// We need actual play data with valid song_id to verify the offset is correct.
     fn validate_play_data_address(&self, addr: u64) -> Result<bool> {
         let song_id = self.read_i32(addr).unwrap_or(-1);
         let difficulty = self.read_i32(addr + 4).unwrap_or(-1);
         let ex_score = self.read_i32(addr + 8).unwrap_or(-1);
         let miss_count = self.read_i32(addr + 12).unwrap_or(-1);
 
-        // Accept initial state (all zeros) - common when not in song select
+        // Do NOT accept initial state (all zeros) during offset search.
+        // Zero values can appear at wrong addresses - we need actual data to validate.
+        // The game should have play data populated when we're searching for offsets.
         if song_id == 0 && difficulty == 0 && ex_score == 0 && miss_count == 0 {
-            return Ok(true);
+            return Ok(false);
         }
 
         // Require song_id in valid IIDX range (>= 1000)
@@ -88,13 +93,18 @@ pub trait OffsetValidation: ReadMemory {
     }
 
     /// Validate if an address contains valid CurrentSong data
+    ///
+    /// Initial state (all zeros) is NOT accepted during offset search.
+    /// We need actual song selection data to verify the offset is correct.
     fn validate_current_song_address(&self, addr: u64) -> Result<bool> {
         let song_id = self.read_i32(addr).unwrap_or(-1);
         let difficulty = self.read_i32(addr + 4).unwrap_or(-1);
 
-        // Accept initial state (zeros)
+        // Do NOT accept initial state (zeros) during offset search.
+        // Zero values can appear at wrong addresses - we need actual data to validate.
+        // The game should have a song selected when we're searching for offsets.
         if song_id == 0 && difficulty == 0 {
-            return Ok(true);
+            return Ok(false);
         }
 
         // song_id must be in realistic range (IIDX song IDs start from ~1000)

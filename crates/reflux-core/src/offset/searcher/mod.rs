@@ -108,24 +108,24 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         // Phase 2: JudgeData (relative search from SongList)
         // NOTE: Signature search is disabled because existing signatures don't work
         // on Version 2 (2026012800+). Relative offset search is reliable and stable.
-        debug!("Phase 2: Searching JudgeData via relative offset from SongList...");
+        info!("Phase 2: Searching JudgeData via relative offset from SongList...");
         offsets.judge_data = self.search_judge_data_near_song_list(offsets.song_list)?;
-        debug!("  JudgeData: 0x{:X}", offsets.judge_data);
+        info!("  JudgeData: 0x{:X}", offsets.judge_data);
 
         // Phase 3: PlaySettings (relative search from JudgeData)
-        debug!("Phase 3: Searching PlaySettings via relative offset from JudgeData...");
+        info!("Phase 3: Searching PlaySettings via relative offset from JudgeData...");
         offsets.play_settings = self.search_play_settings_near_judge_data(offsets.judge_data)?;
-        debug!("  PlaySettings: 0x{:X}", offsets.play_settings);
+        info!("  PlaySettings: 0x{:X}", offsets.play_settings);
 
         // Phase 4: PlayData (relative search from PlaySettings)
-        debug!("Phase 4: Searching PlayData via relative offset from PlaySettings...");
+        info!("Phase 4: Searching PlayData via relative offset from PlaySettings...");
         offsets.play_data = self.search_play_data_near_play_settings(offsets.play_settings)?;
-        debug!("  PlayData: 0x{:X}", offsets.play_data);
+        info!("  PlayData: 0x{:X}", offsets.play_data);
 
         // Phase 5: CurrentSong (relative search from JudgeData)
-        debug!("Phase 5: Searching CurrentSong via relative offset from JudgeData...");
+        info!("Phase 5: Searching CurrentSong via relative offset from JudgeData...");
         offsets.current_song = self.search_current_song_near_judge_data(offsets.judge_data)?;
-        debug!("  CurrentSong: 0x{:X}", offsets.current_song);
+        info!("  CurrentSong: 0x{:X}", offsets.current_song);
 
         // Phase 6: DataMap / UnlockData (pattern search, using SongList as hint)
         debug!("Phase 6: Searching remaining offsets with patterns...");
@@ -1765,8 +1765,9 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_play_data_all_zeros_is_valid() {
-        // Initial state (all zeros) should be valid
+    fn test_validate_play_data_all_zeros_is_rejected() {
+        // Initial state (all zeros) should be rejected during offset search
+        // to avoid false positives at wrong addresses
         let reader = MockMemoryBuilder::new()
             .base(0x1000)
             .with_size(0x100)
@@ -1777,7 +1778,7 @@ mod tests {
             .build();
 
         let result = reader.validate_play_data_address(0x1000).unwrap();
-        assert!(result);
+        assert!(!result);
     }
 
     #[test]
