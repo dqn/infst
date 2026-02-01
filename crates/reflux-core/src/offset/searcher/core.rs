@@ -164,12 +164,12 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
     }
 
     /// Find all matches of a pattern in the current buffer
+    ///
+    /// Uses SIMD-optimized search via `memchr::memmem` for best performance.
     pub fn find_all_matches(&self, pattern: &[u8]) -> Vec<u64> {
-        self.buffer
-            .windows(pattern.len())
-            .enumerate()
-            .filter(|(_, window)| *window == pattern)
-            .map(|(pos, _)| self.buffer_base + pos as u64)
+        use memchr::memmem;
+        memmem::find_iter(&self.buffer, pattern)
+            .map(|pos| self.buffer_base + pos as u64)
             .collect()
     }
 

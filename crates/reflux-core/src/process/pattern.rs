@@ -2,10 +2,15 @@
 //!
 //! This module provides functions for searching byte patterns in memory buffers,
 //! with support for wildcard bytes.
+//!
+//! Uses the `memchr` crate for SIMD-optimized searching when possible.
+
+use memchr::memmem;
 
 /// Find all occurrences of a pattern in a buffer.
 ///
 /// Returns the byte offsets where the pattern starts.
+/// Uses SIMD-optimized search via `memchr::memmem` for best performance.
 ///
 /// # Arguments
 ///
@@ -26,11 +31,7 @@ pub fn find_pattern(buffer: &[u8], pattern: &[u8]) -> Vec<usize> {
         return Vec::new();
     }
 
-    buffer
-        .windows(pattern.len())
-        .enumerate()
-        .filter_map(|(i, window)| if window == pattern { Some(i) } else { None })
-        .collect()
+    memmem::find_iter(buffer, pattern).collect()
 }
 
 /// Find all occurrences of a pattern with wildcards in a buffer.
@@ -81,14 +82,13 @@ pub fn find_pattern_with_wildcards(
 /// Find the first occurrence of a pattern in a buffer.
 ///
 /// Returns the byte offset where the pattern starts, or None if not found.
+/// Uses SIMD-optimized search via `memchr::memmem` for best performance.
 pub fn find_first_pattern(buffer: &[u8], pattern: &[u8]) -> Option<usize> {
     if pattern.is_empty() || pattern.len() > buffer.len() {
         return None;
     }
 
-    buffer
-        .windows(pattern.len())
-        .position(|window| window == pattern)
+    memmem::find(buffer, pattern)
 }
 
 /// Find the first occurrence of a pattern with wildcards in a buffer.
