@@ -21,6 +21,7 @@ pub mod error;
 pub mod export;
 pub mod offset;
 pub mod play;
+pub mod prelude;
 pub mod process;
 pub mod reflux;
 pub mod retry;

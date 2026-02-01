@@ -121,7 +121,19 @@ reflux export -f json
 | `offset/searcher/` | オフセット検索のサブモジュール群                   |
 | `debug/`           | メモリダンプ、スキャン、ステータス表示（要 feature） |
 | `reflux/`          | メインアプリケーションロジック                     |
+| `prelude.rs`       | よく使う型の再エクスポート                         |
 | `error.rs`         | エラー型定義                                       |
+
+### export サブモジュール
+
+| サブモジュール    | 役割                                     |
+| ----------------- | ---------------------------------------- |
+| `format.rs`       | ExportFormat trait 定義                  |
+| `tsv.rs`          | TSV エクスポーター実装                   |
+| `json.rs`         | JSON エクスポーター実装                  |
+| `console.rs`      | コンソール出力（色付き表示）             |
+| `comparison.rs`   | 自己ベスト比較ロジック                   |
+| `tracker.rs`      | トラッカーデータエクスポート（TSV/JSON） |
 
 ### offset/searcher サブモジュール
 
@@ -129,7 +141,7 @@ reflux export -f json
 | -------------------- | ------------------------------------------ |
 | `core.rs`            | OffsetSearcher 構造体と基本操作            |
 | `song_list.rs`       | SongList 検索ロジック                      |
-| `relative_search.rs` | 相対オフセット検索                         |
+| `relative_search.rs` | 相対オフセット検索（テスト含む）           |
 | `data_map.rs`        | DataMap/UnlockData 検索・検証              |
 | `buffer.rs`          | バッファ管理とパターン検索ヘルパー         |
 | `interactive.rs`     | 対話的オフセット検索ワークフロー           |
@@ -137,6 +149,7 @@ reflux export -f json
 | `pattern.rs`         | パターン検索ユーティリティ（memchr 使用）  |
 | `constants.rs`       | 検索関連の定数                             |
 | `types.rs`           | 検索結果の型定義                           |
+| `utils.rs`           | ユーティリティ関数                         |
 | `legacy.rs`          | レガシーシグネチャ検索（feature-gated）    |
 
 ### 主要な型
@@ -146,7 +159,7 @@ reflux export -f json
 - `SongInfo` - 楽曲メタデータ
 - `Chart`, `ChartInfo` - 楽曲+難易度情報
 - `UnlockData` - アンロック状態
-- `Settings` - プレイ設定
+- `Settings`, `RawSettings` - プレイ設定（生データ構造含む）
 - `GameStateDetector` - ゲーム状態検出
 - `ScoreMap`, `ScoreData` - ゲーム内スコアデータ
 - `OffsetsCollection` - メモリオフセット集
@@ -154,6 +167,7 @@ reflux export -f json
 - `SessionManager` - セッション管理
 - `Reflux`, `RefluxConfig`, `GameData` - メインアプリケーション（設定外部化対応）
 - `ExportFormat`, `TsvExporter`, `JsonExporter` - エクスポート形式（trait ベース）
+- `PersonalBestComparison` - 自己ベスト比較結果
 
 ### Feature Flags
 

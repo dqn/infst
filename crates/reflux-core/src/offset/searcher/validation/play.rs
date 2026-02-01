@@ -1,6 +1,5 @@
 //! Play settings and play data validation.
 
-use crate::error::Result;
 use crate::process::ReadMemory;
 use crate::process::layout::settings;
 
@@ -46,7 +45,7 @@ pub fn validate_play_settings_at<R: ReadMemory + ?Sized>(reader: &R, addr: u64) 
 ///
 /// Initial state (all zeros) is NOT accepted during offset search.
 /// We need actual play data with valid song_id to verify the offset is correct.
-pub fn validate_play_data_address<R: ReadMemory + ?Sized>(reader: &R, addr: u64) -> Result<bool> {
+pub fn validate_play_data_address<R: ReadMemory + ?Sized>(reader: &R, addr: u64) -> bool {
     let song_id = reader.read_i32(addr).unwrap_or(-1);
     let difficulty = reader.read_i32(addr + 4).unwrap_or(-1);
     let ex_score = reader.read_i32(addr + 8).unwrap_or(-1);
@@ -56,14 +55,12 @@ pub fn validate_play_data_address<R: ReadMemory + ?Sized>(reader: &R, addr: u64)
     // Zero values can appear at wrong addresses - we need actual data to validate.
     // The game should have play data populated when we're searching for offsets.
     if song_id == 0 && difficulty == 0 && ex_score == 0 && miss_count == 0 {
-        return Ok(false);
+        return false;
     }
 
     // Require song_id in valid IIDX range (>= 1000)
-    let is_valid_play_data = (MIN_SONG_ID..=MAX_SONG_ID).contains(&song_id)
+    (MIN_SONG_ID..=MAX_SONG_ID).contains(&song_id)
         && (0..=9).contains(&difficulty)
         && (0..=10000).contains(&ex_score)
-        && (0..=3000).contains(&miss_count);
-
-    Ok(is_valid_play_data)
+        && (0..=3000).contains(&miss_count)
 }

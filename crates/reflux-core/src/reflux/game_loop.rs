@@ -16,7 +16,7 @@ use crate::chart::{
 use crate::config::{check_version_match, find_game_version, polling, retry};
 use crate::error::Result;
 use crate::export::format_play_data_console;
-use crate::play::{AssistType, GameState, PlayData, PlayType, Settings};
+use crate::play::{AssistType, GameState, PlayData, PlayType, RawSettings, Settings};
 use crate::process::layout::{judge, play, settings, timing};
 use crate::process::{MemoryReader, ProcessHandle, ReadMemory};
 use crate::score::{Grade, Judge, Lamp, PlayerJudge, RawJudgeData};
@@ -509,7 +509,7 @@ impl Reflux {
         let word: u64 = 4;
         let base = self.offsets.play_settings;
 
-        let (style_val, assist_val, range_val, h_ran_val, style2_val) = match play_type {
+        let (style, assist, range, h_ran, style2) = match play_type {
             PlayType::P1 | PlayType::Dp => {
                 let style = reader.read_i32(base)?;
                 let assist = reader.read_i32(base + word * 2)?;
@@ -532,13 +532,19 @@ impl Reflux {
             }
         };
 
-        let flip_val = reader.read_i32(base + word * 3)?;
-        let battle_val = reader.read_i32(base + word * 8)?;
+        let flip = reader.read_i32(base + word * 3)?;
+        let battle = reader.read_i32(base + word * 8)?;
 
-        Ok(Settings::from_raw_values(
-            play_type, style_val, style2_val, assist_val, range_val, flip_val, battle_val,
-            h_ran_val,
-        ))
+        Ok(Settings::from_raw(RawSettings {
+            play_type,
+            style,
+            style2,
+            assist,
+            range,
+            flip,
+            battle,
+            h_ran,
+        }))
     }
 
     /// Load current unlock state from memory

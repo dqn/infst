@@ -481,6 +481,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "encoding_rs",
+ "memchr",
  "owo-colors",
  "serde",
  "serde_json",

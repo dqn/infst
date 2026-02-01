@@ -31,6 +31,19 @@ pub struct Settings {
     pub h_ran: bool,
 }
 
+/// Raw settings values read directly from memory
+#[derive(Debug, Clone, Default)]
+pub struct RawSettings {
+    pub play_type: PlayType,
+    pub style: i32,
+    pub style2: i32,
+    pub assist: i32,
+    pub range: i32,
+    pub flip: i32,
+    pub battle: i32,
+    pub h_ran: i32,
+}
+
 impl Settings {
     /// P2 settings offset (4 * 15 = 60 bytes)
     pub const P2_OFFSET: u64 = 60;
@@ -40,38 +53,28 @@ impl Settings {
     ///
     /// Invalid enum values are replaced with defaults and logged as warnings.
     /// This can occur when memory contains unexpected values during state transitions.
-    #[allow(clippy::too_many_arguments)] // Mapping raw memory layout requires many parameters
-    pub fn from_raw_values(
-        play_type: PlayType,
-        style_val: i32,
-        style2_val: i32,
-        assist_val: i32,
-        range_val: i32,
-        flip_val: i32,
-        battle_val: i32,
-        h_ran_val: i32,
-    ) -> Self {
-        let style = style_val.try_into().unwrap_or_else(|_| {
-            warn!("Invalid style value: {}, using default", style_val);
+    pub fn from_raw(raw: RawSettings) -> Self {
+        let style = raw.style.try_into().unwrap_or_else(|_| {
+            warn!("Invalid style value: {}, using default", raw.style);
             Style::default()
         });
 
-        let style2 = if play_type == PlayType::Dp {
-            Some(style2_val.try_into().unwrap_or_else(|_| {
-                warn!("Invalid style2 value: {}, using default", style2_val);
+        let style2 = if raw.play_type == PlayType::Dp {
+            Some(raw.style2.try_into().unwrap_or_else(|_| {
+                warn!("Invalid style2 value: {}, using default", raw.style2);
                 Style::default()
             }))
         } else {
             None
         };
 
-        let assist = assist_val.try_into().unwrap_or_else(|_| {
-            warn!("Invalid assist value: {}, using default", assist_val);
+        let assist = raw.assist.try_into().unwrap_or_else(|_| {
+            warn!("Invalid assist value: {}, using default", raw.assist);
             AssistType::default()
         });
 
-        let range = range_val.try_into().unwrap_or_else(|_| {
-            warn!("Invalid range value: {}, using default", range_val);
+        let range = raw.range.try_into().unwrap_or_else(|_| {
+            warn!("Invalid range value: {}, using default", raw.range);
             RangeType::default()
         });
 
@@ -80,9 +83,9 @@ impl Settings {
             style2,
             assist,
             range,
-            flip: flip_val == 1,
-            battle: battle_val == 1,
-            h_ran: h_ran_val == 1,
+            flip: raw.flip == 1,
+            battle: raw.battle == 1,
+            h_ran: raw.h_ran == 1,
         }
     }
 }
@@ -262,8 +265,17 @@ mod tests {
     }
 
     #[test]
-    fn test_settings_from_raw_values_p1() {
-        let settings = Settings::from_raw_values(PlayType::P1, 1, 0, 0, 1, 0, 0, 0);
+    fn test_settings_from_raw_p1() {
+        let settings = Settings::from_raw(RawSettings {
+            play_type: PlayType::P1,
+            style: 1,
+            style2: 0,
+            assist: 0,
+            range: 1,
+            flip: 0,
+            battle: 0,
+            h_ran: 0,
+        });
         assert_eq!(settings.style, Style::Random);
         assert!(settings.style2.is_none());
         assert_eq!(settings.range, RangeType::SuddenPlus);
@@ -273,8 +285,17 @@ mod tests {
     }
 
     #[test]
-    fn test_settings_from_raw_values_dp() {
-        let settings = Settings::from_raw_values(PlayType::Dp, 4, 1, 0, 0, 1, 1, 1);
+    fn test_settings_from_raw_dp() {
+        let settings = Settings::from_raw(RawSettings {
+            play_type: PlayType::Dp,
+            style: 4,
+            style2: 1,
+            assist: 0,
+            range: 0,
+            flip: 1,
+            battle: 1,
+            h_ran: 1,
+        });
         assert_eq!(settings.style, Style::Mirror);
         assert_eq!(settings.style2, Some(Style::Random));
         assert!(settings.flip);
@@ -283,9 +304,18 @@ mod tests {
     }
 
     #[test]
-    fn test_settings_from_raw_values_invalid_defaults() {
+    fn test_settings_from_raw_invalid_defaults() {
         // Invalid values should default to Off
-        let settings = Settings::from_raw_values(PlayType::P1, 100, 0, 100, 100, 0, 0, 0);
+        let settings = Settings::from_raw(RawSettings {
+            play_type: PlayType::P1,
+            style: 100,
+            style2: 0,
+            assist: 100,
+            range: 100,
+            flip: 0,
+            battle: 0,
+            h_ran: 0,
+        });
         assert_eq!(settings.style, Style::Off);
         assert_eq!(settings.assist, AssistType::Off);
         assert_eq!(settings.range, RangeType::Off);

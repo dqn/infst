@@ -12,7 +12,6 @@ mod unlock;
 
 use tracing::debug;
 
-use crate::error::Result;
 use crate::offset::OffsetsCollection;
 use crate::process::ReadMemory;
 
@@ -44,7 +43,7 @@ pub trait OffsetValidation: ReadMemory {
     }
 
     /// Validate if an address contains valid PlayData.
-    fn validate_play_data_address(&self, addr: u64) -> Result<bool>
+    fn validate_play_data_address(&self, addr: u64) -> bool
     where
         Self: Sized,
     {
@@ -52,7 +51,7 @@ pub trait OffsetValidation: ReadMemory {
     }
 
     /// Validate if an address contains valid CurrentSong data.
-    fn validate_current_song_address(&self, addr: u64) -> Result<bool>
+    fn validate_current_song_address(&self, addr: u64) -> bool
     where
         Self: Sized,
     {
@@ -157,13 +156,13 @@ pub fn validate_signature_offsets<R: ReadMemory>(reader: &R, offsets: &OffsetsCo
         offsets.play_settings
     );
 
-    if !validate_play_data_address(reader, offsets.play_data).unwrap_or(false) {
+    if !validate_play_data_address(reader, offsets.play_data) {
         debug!("Play data validation failed at 0x{:X}", offsets.play_data);
         return false;
     }
     debug!("Play data validation passed at 0x{:X}", offsets.play_data);
 
-    if !validate_current_song_address(reader, offsets.current_song).unwrap_or(false) {
+    if !validate_current_song_address(reader, offsets.current_song) {
         debug!(
             "Current song validation failed at 0x{:X}",
             offsets.current_song
@@ -374,7 +373,7 @@ mod tests {
             .write_i32(12, 25) // miss_count
             .build();
 
-        assert!(validate_play_data_address(&reader, 0x1000).unwrap());
+        assert!(validate_play_data_address(&reader, 0x1000));
     }
 
     #[test]
@@ -387,6 +386,6 @@ mod tests {
             .write_i32(8, 500) // field3
             .build();
 
-        assert!(validate_current_song_address(&reader, 0x1000).unwrap());
+        assert!(validate_current_song_address(&reader, 0x1000));
     }
 }

@@ -15,7 +15,6 @@
 //! - [`interactive`]: User-guided offset discovery workflow
 //! - [`validation`]: Offset validation functions
 //! - [`pattern`]: Pattern search utilities
-//! - [`relative`]: Relative offset utilities
 //! - [`legacy`]: Legacy signature-based search (feature-gated)
 //!
 //! ## Search Strategy
@@ -37,7 +36,6 @@ mod interactive;
 #[cfg(feature = "legacy-signatures")]
 pub mod legacy;
 pub mod pattern;
-pub mod relative;
 mod relative_search;
 #[cfg(feature = "legacy-signatures")]
 pub mod search;
