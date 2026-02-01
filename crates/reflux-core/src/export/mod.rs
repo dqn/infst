@@ -1,9 +1,5 @@
 //! Export formats for play data and tracking data.
 
-mod stream;
-
-pub use stream::StreamOutput;
-
 use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::fs;
@@ -116,41 +112,35 @@ pub fn format_full_tsv_row(play_data: &PlayData) -> String {
     values.join("\t")
 }
 
-/// Generate JSON entry for session file (Kamaitachi format)
+/// Generate JSON entry for session file (simple format)
 pub fn format_json_entry(play_data: &PlayData) -> JsonValue {
-    let playtype = if play_data.chart.difficulty.is_sp() {
-        "SP"
+    let miss_count = if play_data.miss_count_valid() {
+        Some(play_data.miss_count())
     } else {
-        "DP"
+        None
     };
 
-    let mut entry = json!({
-        "score": play_data.ex_score,
+    json!({
+        "timestamp": play_data.timestamp.to_rfc3339(),
+        "song_id": play_data.chart.song_id,
+        "title": play_data.chart.title,
+        "difficulty": play_data.chart.difficulty.short_name(),
+        "level": play_data.chart.level,
+        "ex_score": play_data.ex_score,
+        "grade": play_data.grade.short_name(),
         "lamp": play_data.lamp.expand_name(),
-        "matchType": "title",
-        "identifier": play_data.chart.title,
-        "playtype": playtype,
-        "difficulty": play_data.chart.difficulty.expand_name(),
-        "timeAchieved": play_data.timestamp.timestamp_millis(),
-        "hitData": {
+        "judge": {
             "pgreat": play_data.judge.pgreat,
             "great": play_data.judge.great,
             "good": play_data.judge.good,
             "bad": play_data.judge.bad,
-            "poor": play_data.judge.poor
-        },
-        "hitMeta": {
+            "poor": play_data.judge.poor,
             "fast": play_data.judge.fast,
             "slow": play_data.judge.slow,
-            "comboBreak": play_data.judge.combo_break
-        }
-    });
-
-    if play_data.miss_count_valid() {
-        entry["hitMeta"]["bp"] = json!(play_data.miss_count());
-    }
-
-    entry
+            "combo_break": play_data.judge.combo_break
+        },
+        "miss_count": miss_count
+    })
 }
 
 pub struct TsvRowData<'a> {
@@ -254,7 +244,6 @@ pub fn export_tracker_tsv<P: AsRef<Path>>(
     song_db: &HashMap<u32, SongInfo>,
     unlock_db: &HashMap<u32, UnlockData>,
     score_map: &ScoreMap,
-    custom_types: &HashMap<u32, String>,
 ) -> Result<()> {
     let mut lines = vec![format_tracker_tsv_header()];
 
@@ -263,9 +252,7 @@ pub fn export_tracker_tsv<P: AsRef<Path>>(
     song_ids.sort();
 
     for &song_id in song_ids {
-        if let Some(entry) =
-            generate_tracker_entry(song_id, song_db, unlock_db, score_map, custom_types)
-        {
+        if let Some(entry) = generate_tracker_entry(song_id, song_db, unlock_db, score_map) {
             lines.push(entry);
         }
     }
@@ -279,7 +266,6 @@ fn generate_tracker_entry(
     song_db: &HashMap<u32, SongInfo>,
     unlock_db: &HashMap<u32, UnlockData>,
     score_map: &ScoreMap,
-    custom_types: &HashMap<u32, String>,
 ) -> Option<String> {
     let song = song_db.get(&song_id)?;
     let unlock = unlock_db.get(&song_id)?;
@@ -290,25 +276,19 @@ fn generate_tracker_entry(
     // Title
     columns.push(song.title.to_string());
 
-    // Type and Label
+    // Type and Label (Label is same as Type)
     let type_name = match unlock.unlock_type {
         UnlockType::Base => "Base",
         UnlockType::Bits => "Bits",
         UnlockType::Sub => "Sub",
     };
     columns.push(type_name.to_string());
-
-    let label = custom_types
-        .get(&song_id)
-        .cloned()
-        .unwrap_or_else(|| type_name.to_string());
-    columns.push(label);
+    columns.push(type_name.to_string()); // Label = Type
 
     // Bit costs (for N, H, A)
     for i in [1, 2, 3] {
         // SPN, SPH, SPA indices
-        let cost = if unlock.unlock_type == UnlockType::Bits && !custom_types.contains_key(&song_id)
-        {
+        let cost = if unlock.unlock_type == UnlockType::Bits {
             let sp_level = song.levels[i] as i32;
             let dp_level = song.levels[i + 5] as i32; // DPN, DPH, DPA
             500 * (sp_level + dp_level)
@@ -774,7 +754,6 @@ pub fn generate_tracker_tsv(
     song_db: &HashMap<u32, SongInfo>,
     unlock_db: &HashMap<u32, UnlockData>,
     score_map: &ScoreMap,
-    custom_types: &HashMap<u32, String>,
 ) -> String {
     let mut lines = vec![format_tracker_tsv_header()];
 
@@ -783,9 +762,7 @@ pub fn generate_tracker_tsv(
     song_ids.sort();
 
     for &song_id in song_ids {
-        if let Some(entry) =
-            generate_tracker_entry(song_id, song_db, unlock_db, score_map, custom_types)
-        {
+        if let Some(entry) = generate_tracker_entry(song_id, song_db, unlock_db, score_map) {
             lines.push(entry);
         }
     }
@@ -915,9 +892,8 @@ mod tests {
         let song_db: HashMap<u32, SongInfo> = HashMap::new();
         let unlock_db: HashMap<u32, UnlockData> = HashMap::new();
         let score_map = ScoreMap::new();
-        let custom_types: HashMap<u32, String> = HashMap::new();
 
-        let tsv = generate_tracker_tsv(&song_db, &unlock_db, &score_map, &custom_types);
+        let tsv = generate_tracker_tsv(&song_db, &unlock_db, &score_map);
         let lines: Vec<&str> = tsv.lines().collect();
 
         // Should only have header

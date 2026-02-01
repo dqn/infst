@@ -30,11 +30,11 @@ pub mod session;
 // Re-export from chart module
 pub use chart::{
     Chart, ChartInfo, Difficulty, SongInfo, UnlockData, fetch_song_database,
-    fetch_song_database_with_fixes, get_unlock_state_for_difficulty, get_unlock_states,
+    get_unlock_state_for_difficulty, get_unlock_states,
 };
 
 // Re-export from config module
-pub use config::{CustomTypes, EncodingFixes, check_version_match, extract_date_code, find_game_version};
+pub use config::{check_version_match, extract_date_code, find_game_version};
 
 // Re-export from error module
 pub use error::{Error, Result};
@@ -70,7 +70,7 @@ pub use score::{Grade, Judge, Lamp, ScoreData, ScoreMap};
 
 // Re-export from export module
 pub use export::{
-    StreamOutput, TsvRowData, export_song_list, export_tracker_json, export_tracker_tsv,
+    TsvRowData, export_song_list, export_tracker_json, export_tracker_tsv,
     format_tracker_tsv_header, generate_tracker_json, generate_tracker_tsv,
 };
 

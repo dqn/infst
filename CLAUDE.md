@@ -114,7 +114,6 @@ reflux export -f json
 | `game/`            | ゲームデータ構造（PlayData, Judge, Settings 等）   |
 | `memory/`          | Windows プロセスメモリ読み取り                     |
 | `storage/`         | セッション管理、スコアマップ、TSV/JSON 形式        |
-| `stream/`          | OBS 向けファイル出力                               |
 | `offset/`          | シグネチャベースのメモリオフセット検索・管理       |
 | `offset/searcher/` | オフセット検索のサブモジュール群                   |
 | `debug/`           | メモリダンプ、スキャン、ステータス表示（要 feature） |
@@ -145,7 +144,6 @@ reflux export -f json
 - `OffsetsCollection` - メモリオフセット集
 - `SessionManager` - セッション管理
 - `Reflux`, `GameData` - メインアプリケーション
-- `StreamOutput` - OBS 出力用ファイル生成
 
 ### Feature Flags
 
@@ -170,7 +168,6 @@ reflux export -f json
 - Shift-JIS エンコーディング処理あり（日本語タイトル対応）
 - オフセットは相対検索で検出（シグネチャ検索は無効化、後述）
 - `offsets.txt` は未使用
-- 任意サポートファイル: `encodingfixes.txt`, `customtypes.txt`
 - **このファイルは実装と同期して最新の状態を保つこと**
 
 ## オフセット検索の仕組み

@@ -32,7 +32,6 @@ use crate::error::Result;
 use crate::offset::OffsetsCollection;
 use crate::play::GameStateDetector;
 use crate::score::ScoreMap;
-use crate::export::StreamOutput;
 use crate::session::SessionManager;
 
 /// Game data loaded from memory and files
@@ -43,8 +42,6 @@ pub struct GameData {
     pub score_map: ScoreMap,
     /// Current unlock state from memory
     pub unlock_state: HashMap<u32, UnlockData>,
-    /// Custom unlock types from customtypes.txt
-    pub custom_types: HashMap<u32, String>,
 }
 
 impl GameData {
@@ -53,7 +50,6 @@ impl GameData {
             song_db: HashMap::new(),
             score_map: ScoreMap::new(),
             unlock_state: HashMap::new(),
-            custom_types: HashMap::new(),
         }
     }
 }
@@ -65,10 +61,6 @@ pub struct Reflux {
     pub(crate) game_data: GameData,
     pub(crate) state_detector: GameStateDetector,
     pub(crate) session_manager: SessionManager,
-    /// Stream output for OBS integration.
-    /// Reserved for future use - OBS file output during tracking.
-    #[allow(dead_code)]
-    pub(crate) stream_output: StreamOutput,
     /// Currently playing chart (set during Playing state)
     /// Used for cross-validation when fetching play data on ResultScreen
     pub(crate) current_playing: Option<(u32, Difficulty)>,
@@ -76,8 +68,6 @@ pub struct Reflux {
 
 impl Reflux {
     pub fn new(offsets: OffsetsCollection) -> Self {
-        let stream_output = StreamOutput::new(false, ".".to_string());
-
         // Log offset validation status
         if offsets.has_state_detection_offsets() {
             debug!(
@@ -96,7 +86,6 @@ impl Reflux {
             game_data: GameData::new(),
             state_detector: GameStateDetector::new(),
             session_manager: SessionManager::new("sessions"),
-            stream_output,
             current_playing: None,
         }
     }
@@ -104,11 +93,6 @@ impl Reflux {
     /// Set score map
     pub fn set_score_map(&mut self, score_map: ScoreMap) {
         self.game_data.score_map = score_map;
-    }
-
-    /// Set custom types
-    pub fn set_custom_types(&mut self, custom_types: HashMap<u32, String>) {
-        self.game_data.custom_types = custom_types;
     }
 
     /// Set song database
@@ -147,7 +131,6 @@ impl Reflux {
             &self.game_data.song_db,
             &self.game_data.unlock_state,
             &self.game_data.score_map,
-            &self.game_data.custom_types,
         )
     }
 }
