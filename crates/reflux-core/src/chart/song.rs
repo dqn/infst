@@ -7,10 +7,9 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
-use crate::config::EncodingFixes;
 use crate::error::Result;
-use crate::process::{ByteBuffer, ReadMemory, decode_shift_jis};
 use crate::play::UnlockType;
+use crate::process::{ByteBuffer, ReadMemory, decode_shift_jis};
 
 /// Song metadata
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -336,15 +335,6 @@ pub fn fetch_song_database<R: ReadMemory>(
     reader: &R,
     song_list_addr: u64,
 ) -> Result<HashMap<u32, SongInfo>> {
-    fetch_song_database_with_fixes(reader, song_list_addr, None)
-}
-
-/// Fetch entire song database from memory with optional encoding fixes
-pub fn fetch_song_database_with_fixes<R: ReadMemory>(
-    reader: &R,
-    song_list_addr: u64,
-    encoding_fixes: Option<&EncodingFixes>,
-) -> Result<HashMap<u32, SongInfo>> {
     let mut result = HashMap::new();
     let mut entry_index: u64 = 0;
     let mut consecutive_failures = 0;
@@ -360,17 +350,7 @@ pub fn fetch_song_database_with_fixes<R: ReadMemory>(
             song_list_addr,
             entry_index,
         )? {
-            Some(mut song) if !song.title.is_empty() && song.id > 0 => {
-                // Apply encoding fixes if provided
-                if let Some(fixes) = encoding_fixes {
-                    if fixes.has_fix(&song.title) {
-                        song.title = fixes.apply(&song.title).into();
-                    }
-                    if fixes.has_fix(&song.artist) {
-                        song.artist = fixes.apply(&song.artist).into();
-                    }
-                }
-
+            Some(song) if !song.title.is_empty() && song.id > 0 => {
                 // Avoid duplicates
                 result.entry(song.id).or_insert(song);
                 consecutive_failures = 0;

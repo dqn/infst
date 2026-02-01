@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use anyhow::{Result, bail};
 use reflux_core::config::database;
 use reflux_core::{
-    EncodingFixes, MemoryReader, OffsetSearcher, OffsetsCollection, SongInfo, builtin_signatures,
-    fetch_song_database_with_fixes,
+    MemoryReader, OffsetSearcher, OffsetsCollection, SongInfo, builtin_signatures,
+    fetch_song_database,
 };
 use tracing::{debug, info, warn};
 
@@ -20,7 +20,6 @@ use crate::validation::{ValidationResult, validate_song_database};
 pub fn load_song_database_with_retry(
     reader: &MemoryReader,
     song_list: u64,
-    encoding_fixes: Option<&EncodingFixes>,
     shutdown: &ShutdownSignal,
 ) -> Result<Option<HashMap<u32, SongInfo>>> {
     let mut attempts = 0u32;
@@ -45,7 +44,7 @@ pub fn load_song_database_with_retry(
             return Ok(None);
         }
 
-        match fetch_song_database_with_fixes(reader, song_list, encoding_fixes) {
+        match fetch_song_database(reader, song_list) {
             Ok(db) => match validate_song_database(&db) {
                 ValidationResult::Valid => return Ok(Some(db)),
                 ValidationResult::TooFewSongs(count) => {

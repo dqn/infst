@@ -7,8 +7,8 @@ use std::time::Duration;
 use anyhow::Result;
 use reflux_core::config::find_game_version;
 use reflux_core::{
-    CustomTypes, EncodingFixes, MemoryReader, OffsetSearcher, OffsetsCollection, ProcessHandle,
-    Reflux, ScoreMap, SongInfo, load_offsets, save_offsets_to_cache, try_load_cached_offsets,
+    MemoryReader, OffsetSearcher, OffsetsCollection, ProcessHandle, Reflux, ScoreMap, SongInfo,
+    load_offsets, save_offsets_to_cache, try_load_cached_offsets,
 };
 use tracing::{debug, error, info, warn};
 
@@ -171,29 +171,10 @@ fn validate_or_search_offsets(
     }
 }
 
-/// Load encoding fixes from file
-fn load_encoding_fixes() -> Option<EncodingFixes> {
-    match EncodingFixes::load("encodingfixes.txt") {
-        Ok(ef) => {
-            debug!("Loaded {} encoding fixes", ef.len());
-            Some(ef)
-        }
-        Err(e) => {
-            if e.is_not_found() {
-                debug!("Encoding fixes file not found, using defaults");
-            } else {
-                warn!("Failed to load encoding fixes: {}", e);
-            }
-            None
-        }
-    }
-}
-
 /// Load song database using various strategies
 fn load_song_database(
     reader: &MemoryReader,
     song_list: u64,
-    encoding_fixes: Option<&EncodingFixes>,
     shutdown: &ShutdownSignal,
 ) -> Result<Option<HashMap<u32, SongInfo>>> {
     let tsv_path = "tracker.tsv";
@@ -206,7 +187,7 @@ fn load_song_database(
 
         if db.is_empty() {
             debug!("TSV+memory approach returned empty, trying legacy...");
-            return load_song_database_with_retry(reader, song_list, encoding_fixes, shutdown);
+            return load_song_database_with_retry(reader, song_list, shutdown);
         }
         return Ok(Some(db));
     }
@@ -218,52 +199,11 @@ fn load_song_database(
 
     if song_db.is_empty() {
         debug!("Memory scan found no songs, trying legacy approach...");
-        return load_song_database_with_retry(reader, song_list, encoding_fixes, shutdown);
+        return load_song_database_with_retry(reader, song_list, shutdown);
     }
 
     info!("Loaded {} songs from memory scan", song_db.len());
     Ok(Some(song_db))
-}
-
-/// Load custom types from file
-fn load_custom_types() -> HashMap<u32, String> {
-    match CustomTypes::load("customtypes.txt") {
-        Ok(ct) => {
-            let mut types = HashMap::new();
-            let mut parse_failures = 0usize;
-
-            for (k, v) in ct.iter() {
-                match k.parse::<u32>() {
-                    Ok(id) => {
-                        types.insert(id, v.clone());
-                    }
-                    Err(_) => {
-                        if parse_failures == 0 {
-                            warn!(
-                                "Failed to parse custom type ID '{}' (further errors suppressed)",
-                                k
-                            );
-                        }
-                        parse_failures += 1;
-                    }
-                }
-            }
-
-            if parse_failures > 1 {
-                warn!("{} custom type IDs failed to parse", parse_failures);
-            }
-            debug!("Loaded {} custom types", types.len());
-            types
-        }
-        Err(e) => {
-            if e.is_not_found() {
-                debug!("Custom types file not found, using defaults");
-            } else {
-                warn!("Failed to load custom types: {}", e);
-            }
-            HashMap::new()
-        }
-    }
 }
 
 /// Run a single tracking session with a connected process
@@ -293,14 +233,7 @@ fn run_tracking_session(
     }
 
     // Load game resources
-    let encoding_fixes = load_encoding_fixes();
-
-    let song_db = match load_song_database(
-        &reader,
-        reflux.offsets().song_list,
-        encoding_fixes.as_ref(),
-        shutdown,
-    )? {
+    let song_db = match load_song_database(&reader, reflux.offsets().song_list, shutdown)? {
         Some(db) => db,
         None => return Ok(()), // Shutdown requested
     };
@@ -311,10 +244,6 @@ fn run_tracking_session(
     // Load score map
     let score_map = load_score_map(&reader, reflux.offsets().data_map, &song_db);
     reflux.set_score_map(score_map);
-
-    // Load custom types
-    let custom_types = load_custom_types();
-    reflux.set_custom_types(custom_types);
 
     // Load unlock state
     if let Err(e) = reflux.load_unlock_state(&reader) {
