@@ -5,8 +5,8 @@
 
 use reflux_core::chart::Difficulty;
 use reflux_core::play::{GameState, GameStateDetector};
-use reflux_core::score::{Grade, Lamp};
 use reflux_core::retry::{ExponentialBackoff, FixedDelay, NoRetry, RetryStrategy};
+use reflux_core::score::{Grade, Lamp};
 
 /// Test game state detection
 mod game_state_tests {

@@ -454,11 +454,7 @@ pub fn format_play_data_console(play_data: &PlayData, personal_best: Option<&Sco
 
     // Build score string with optional diff
     let score_str = match comparison.score_diff {
-        Some(diff) => format!(
-            "{} ({})",
-            play_data.ex_score,
-            format!("+{}", diff).green()
-        ),
+        Some(diff) => format!("{} ({})", play_data.ex_score, format!("+{}", diff).green()),
         None => play_data.ex_score.to_string(),
     };
 

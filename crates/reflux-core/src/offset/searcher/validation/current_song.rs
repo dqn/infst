@@ -9,7 +9,10 @@ use super::super::utils::is_power_of_two;
 ///
 /// Initial state (all zeros) is NOT accepted during offset search.
 /// We need actual song selection data to verify the offset is correct.
-pub fn validate_current_song_address<R: ReadMemory + ?Sized>(reader: &R, addr: u64) -> Result<bool> {
+pub fn validate_current_song_address<R: ReadMemory + ?Sized>(
+    reader: &R,
+    addr: u64,
+) -> Result<bool> {
     let song_id = reader.read_i32(addr).unwrap_or(-1);
     let difficulty = reader.read_i32(addr + 4).unwrap_or(-1);
 

@@ -6,8 +6,8 @@
 use tracing::debug;
 
 use crate::error::{Error, Result};
-use crate::process::ReadMemory;
 use crate::offset::CodeSignature;
+use crate::process::ReadMemory;
 
 use super::constants::*;
 use super::types::SearchResult;

@@ -13,8 +13,8 @@ mod unlock;
 use tracing::debug;
 
 use crate::error::Result;
-use crate::process::ReadMemory;
 use crate::offset::OffsetsCollection;
+use crate::process::ReadMemory;
 
 use super::constants::*;
 

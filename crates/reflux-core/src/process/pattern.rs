@@ -204,8 +204,7 @@ mod tests {
     #[test]
     fn test_find_first_pattern_with_wildcards() {
         let buffer = [1, 9, 3, 1, 5, 3];
-        let result =
-            find_first_pattern_with_wildcards(&buffer, &[1, 0, 3], &[false, true, false]);
+        let result = find_first_pattern_with_wildcards(&buffer, &[1, 0, 3], &[false, true, false]);
         assert_eq!(result, Some(0));
     }
 }

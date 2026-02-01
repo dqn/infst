@@ -11,7 +11,7 @@ mod song;
 mod types;
 mod unlock;
 
-pub use types::*;
 pub use difficulty::*;
 pub use song::*;
+pub use types::*;
 pub use unlock::*;

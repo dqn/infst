@@ -19,11 +19,11 @@ pub mod validation;
 
 use tracing::{debug, info, warn};
 
-use crate::error::{Error, Result};
 use crate::chart::SongInfo;
+use crate::error::{Error, Result};
+use crate::offset::{CodeSignature, OffsetSignatureSet, OffsetsCollection};
 use crate::play::PlayType;
 use crate::process::{ByteBuffer, ReadMemory, decode_shift_jis_to_string};
-use crate::offset::{CodeSignature, OffsetSignatureSet, OffsetsCollection};
 
 // Re-export validation functions and trait
 pub use validation::{
@@ -1719,9 +1719,9 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::offset::OffsetsCollection;
     use crate::process::MockMemoryBuilder;
     use crate::process::layout::{judge, settings};
-    use crate::offset::OffsetsCollection;
 
     #[test]
     fn test_validate_judge_data_candidate_valid() {

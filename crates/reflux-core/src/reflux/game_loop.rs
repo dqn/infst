@@ -9,14 +9,17 @@ use std::time::Duration;
 use chrono::Utc;
 use tracing::{debug, error, info, warn};
 
-use crate::chart::{ChartInfo, Difficulty, fetch_song_by_id, fetch_song_database_from_memory_scan, get_unlock_states};
+use crate::chart::{
+    ChartInfo, Difficulty, fetch_song_by_id, fetch_song_database_from_memory_scan,
+    get_unlock_states,
+};
 use crate::config::{check_version_match, find_game_version, polling, retry};
 use crate::error::Result;
+use crate::export::format_play_data_console;
+use crate::play::{AssistType, GameState, PlayData, PlayType, Settings};
 use crate::process::layout::{judge, play, settings, timing};
 use crate::process::{MemoryReader, ProcessHandle, ReadMemory};
-use crate::play::{AssistType, GameState, PlayData, PlayType, Settings};
 use crate::score::{Grade, Judge, Lamp, PlayerJudge, RawJudgeData};
-use crate::export::format_play_data_console;
 
 use super::Reflux;
 

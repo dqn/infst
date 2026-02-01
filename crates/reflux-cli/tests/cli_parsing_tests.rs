@@ -107,8 +107,8 @@ fn test_parse_status_with_json() {
 
 #[test]
 fn test_parse_hexdump() {
-    let args =
-        Args::try_parse_from(["reflux", "hexdump", "--address", "0x1000", "--size", "512"]).unwrap();
+    let args = Args::try_parse_from(["reflux", "hexdump", "--address", "0x1000", "--size", "512"])
+        .unwrap();
     match args.command {
         Some(Command::Hexdump {
             address,
@@ -126,10 +126,8 @@ fn test_parse_hexdump() {
 
 #[test]
 fn test_parse_hexdump_with_ascii() {
-    let args = Args::try_parse_from([
-        "reflux", "hexdump", "--address", "0x1000", "--ascii",
-    ])
-    .unwrap();
+    let args =
+        Args::try_parse_from(["reflux", "hexdump", "--address", "0x1000", "--ascii"]).unwrap();
     match args.command {
         Some(Command::Hexdump { ascii, .. }) => {
             assert!(ascii);
@@ -165,7 +163,8 @@ fn test_parse_export_default_format() {
 
 #[test]
 fn test_parse_export_json_format() {
-    let args = Args::try_parse_from(["reflux", "export", "-f", "json", "-o", "scores.json"]).unwrap();
+    let args =
+        Args::try_parse_from(["reflux", "export", "-f", "json", "-o", "scores.json"]).unwrap();
     match args.command {
         Some(Command::Export { format, output, .. }) => {
             assert!(matches!(format, ExportFormat::Json));

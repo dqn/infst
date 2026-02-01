@@ -7,9 +7,9 @@
 use tracing::debug;
 
 use crate::error::{Error, Result};
-use crate::process::{ByteBuffer, ReadMemory};
 use crate::offset::searcher::validation::OffsetValidation;
 use crate::offset::{CodeSignature, OffsetSignatureSet};
+use crate::process::{ByteBuffer, ReadMemory};
 
 use super::super::constants::{
     CODE_SCAN_CHUNK_SIZE, CODE_SCAN_LIMIT, MIN_EXPECTED_SONGS, MIN_VALID_DATA_ADDRESS,

@@ -1,5 +1,5 @@
-use crate::process::ReadMemory;
 use crate::offset::OffsetsCollection;
+use crate::process::ReadMemory;
 use anyhow::Result;
 use serde::Serialize;
 use std::fs;

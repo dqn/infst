@@ -2,8 +2,8 @@
 
 use anyhow::Result;
 use reflux_core::{
-    MemoryReader, OffsetSearcher, ProcessHandle, ScoreMap, builtin_signatures,
-    fetch_song_database, generate_tracker_json, generate_tracker_tsv, get_unlock_states,
+    MemoryReader, OffsetSearcher, ProcessHandle, ScoreMap, builtin_signatures, fetch_song_database,
+    generate_tracker_json, generate_tracker_tsv, get_unlock_states,
 };
 
 use crate::cli::ExportFormat;

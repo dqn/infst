@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::chart::{Difficulty, SongInfo};
 use crate::error::Result;
-use crate::process::{ByteBuffer, ReadMemory};
 use crate::play::UnlockType;
+use crate::process::{ByteBuffer, ReadMemory};
 
 /// Unlock data structure from memory
 #[derive(Debug, Clone, Default)]

@@ -50,10 +50,7 @@ mod tests {
 
     #[test]
     fn test_parse_hex_address_large() {
-        assert_eq!(
-            parse_hex_address("0x1431B08A0").unwrap(),
-            0x1431B08A0
-        );
+        assert_eq!(parse_hex_address("0x1431B08A0").unwrap(), 0x1431B08A0);
     }
 
     #[test]

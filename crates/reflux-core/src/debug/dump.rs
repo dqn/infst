@@ -3,8 +3,8 @@
 use serde::Serialize;
 
 use crate::chart::SongInfo;
-use crate::process::ReadMemory;
 use crate::offset::OffsetsCollection;
+use crate::process::ReadMemory;
 
 /// Memory dump at a specific location
 #[derive(Debug, Clone, Serialize)]

@@ -10,7 +10,7 @@ mod reader;
 pub mod mock;
 
 pub use bytes::{ByteBuffer, decode_shift_jis, decode_shift_jis_to_string};
-pub use chunked_reader::{ChunkedMemoryIterator, MemoryChunk, DEFAULT_CHUNK_SIZE};
+pub use chunked_reader::{ChunkedMemoryIterator, DEFAULT_CHUNK_SIZE, MemoryChunk};
 pub use handle::*;
 pub use provider::{ProcessInfo, ProcessProvider};
 pub use reader::{MemoryReader, ReadMemory};

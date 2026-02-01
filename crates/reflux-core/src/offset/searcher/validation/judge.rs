@@ -18,12 +18,8 @@ pub fn validate_judge_data_candidate<R: ReadMemory + ?Sized>(reader: &R, addr: u
     }
 
     // Check state markers (must be 0-100)
-    let marker1 = reader
-        .read_i32(addr + judge::STATE_MARKER_1)
-        .unwrap_or(-1);
-    let marker2 = reader
-        .read_i32(addr + judge::STATE_MARKER_2)
-        .unwrap_or(-1);
+    let marker1 = reader.read_i32(addr + judge::STATE_MARKER_1).unwrap_or(-1);
+    let marker2 = reader.read_i32(addr + judge::STATE_MARKER_2).unwrap_or(-1);
     if !(0..=100).contains(&marker1) || !(0..=100).contains(&marker2) {
         return false;
     }

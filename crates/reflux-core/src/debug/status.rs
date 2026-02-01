@@ -3,8 +3,8 @@
 use serde::Serialize;
 
 use crate::chart::SongInfo;
-use crate::process::ReadMemory;
 use crate::offset::{OffsetSearcher, OffsetsCollection};
+use crate::process::ReadMemory;
 
 /// Validation result for an individual offset
 #[derive(Debug, Clone, Serialize)]
