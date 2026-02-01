@@ -18,7 +18,7 @@ use crate::shutdown::ShutdownSignal;
 
 /// Run the main tracking mode
 pub fn run(offsets_file: Option<&str>) -> Result<()> {
-    let shutdown = setup_shutdown_handler()?;
+    let shutdown = setup_shutdown_handler();
     let (initial_offsets, offsets_from_file) = load_initial_offsets(offsets_file);
 
     let mut reflux = Reflux::new(initial_offsets);
@@ -44,16 +44,9 @@ pub fn run(offsets_file: Option<&str>) -> Result<()> {
     Ok(())
 }
 
-/// Setup graceful shutdown handler with Ctrl+C and keyboard input
-fn setup_shutdown_handler() -> Result<Arc<ShutdownSignal>> {
+/// Setup graceful shutdown handler with keyboard input
+fn setup_shutdown_handler() -> Arc<ShutdownSignal> {
     let shutdown = Arc::new(ShutdownSignal::new());
-
-    // Ctrl+C handler
-    let shutdown_ctrlc = Arc::clone(&shutdown);
-    ctrlc::set_handler(move || {
-        println!("\nShutting down...");
-        shutdown_ctrlc.trigger();
-    })?;
 
     // Keyboard input monitor (Esc, q, Q to quit)
     let shutdown_keyboard = Arc::clone(&shutdown);
@@ -62,7 +55,7 @@ fn setup_shutdown_handler() -> Result<Arc<ShutdownSignal>> {
     let current_version = env!("CARGO_PKG_VERSION");
     println!("Reflux-RS v{}", current_version);
 
-    Ok(shutdown)
+    shutdown
 }
 
 /// Load offsets from file if specified

@@ -1,5 +1,5 @@
 use crate::shutdown::ShutdownSignal;
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -10,7 +10,6 @@ use tracing::debug;
 /// The thread polls for keyboard events and triggers shutdown when:
 /// - Esc key is pressed
 /// - 'q' or 'Q' key is pressed
-/// - Ctrl+C is pressed (as backup to ctrlc handler)
 ///
 /// Returns a JoinHandle that can be used to wait for the thread to finish.
 pub fn spawn_keyboard_monitor(shutdown: Arc<ShutdownSignal>) -> JoinHandle<()> {
@@ -35,17 +34,16 @@ pub fn spawn_keyboard_monitor(shutdown: Arc<ShutdownSignal>) -> JoinHandle<()> {
 
 /// Check if the key event should trigger shutdown.
 fn should_shutdown(event: &KeyEvent) -> bool {
-    match event.code {
-        KeyCode::Esc => true,
-        KeyCode::Char('q') | KeyCode::Char('Q') => true,
-        KeyCode::Char('c') if event.modifiers.contains(KeyModifiers::CONTROL) => true,
-        _ => false,
-    }
+    matches!(
+        event.code,
+        KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q')
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crossterm::event::KeyModifiers;
 
     #[test]
     fn test_should_shutdown_esc() {
@@ -62,12 +60,6 @@ mod tests {
     #[test]
     fn test_should_shutdown_q_upper() {
         let event = KeyEvent::new(KeyCode::Char('Q'), KeyModifiers::SHIFT);
-        assert!(should_shutdown(&event));
-    }
-
-    #[test]
-    fn test_should_shutdown_ctrl_c() {
-        let event = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL);
         assert!(should_shutdown(&event));
     }
 

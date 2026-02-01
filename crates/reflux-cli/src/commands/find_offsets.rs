@@ -6,7 +6,6 @@
 //!
 //! The output file can be used as input for other commands via `--offsets-file`.
 
-use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
@@ -15,18 +14,9 @@ use reflux_core::{MemoryReader, OffsetSearcher, OffsetsCollection, ProcessHandle
 use tracing::{debug, info, warn};
 
 use crate::prompter::CliPrompter;
-use crate::shutdown::ShutdownSignal;
 
 /// Run the find-offsets interactive mode
 pub fn run(output: &str, pid: Option<u32>) -> Result<()> {
-    // Setup graceful shutdown handler (Ctrl+C only, no keyboard monitor)
-    let shutdown = Arc::new(ShutdownSignal::new());
-    let shutdown_ctrlc = Arc::clone(&shutdown);
-    ctrlc::set_handler(move || {
-        info!("Received shutdown signal, stopping...");
-        shutdown_ctrlc.trigger();
-    })?;
-
     let current_version = env!("CARGO_PKG_VERSION");
     info!("Reflux-RS {} - Offset Search Mode", current_version);
 
@@ -35,22 +25,14 @@ pub fn run(output: &str, pid: Option<u32>) -> Result<()> {
         println!("Opening process with PID {}...", pid);
         ProcessHandle::open(pid)?
     } else {
-        println!("Waiting for INFINITAS... (Press Ctrl+C to cancel)");
+        println!("Waiting for INFINITAS...");
 
         // Wait for process
         loop {
-            if shutdown.is_shutdown() {
-                info!("Cancelled");
-                return Ok(());
-            }
-
             match ProcessHandle::find_and_open() {
                 Ok(p) => break p,
                 Err(_) => {
-                    if shutdown.wait(Duration::from_secs(2)) {
-                        info!("Cancelled");
-                        return Ok(());
-                    }
+                    std::thread::sleep(Duration::from_secs(2));
                 }
             }
         }
