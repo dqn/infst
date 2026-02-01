@@ -9,11 +9,52 @@ use crate::process::ReadMemory;
 use super::constants::*;
 use super::validation::{validate_basic_memory_access, validate_signature_offsets};
 
+/// Builder for creating OffsetSearcher with optional configuration
+pub struct OffsetSearcherBuilder<'a, R: ReadMemory> {
+    reader: &'a R,
+    initial_buffer_size: usize,
+    song_list_hint: Option<u64>,
+}
+
+impl<'a, R: ReadMemory> OffsetSearcherBuilder<'a, R> {
+    /// Create a new builder with the given memory reader
+    pub fn new(reader: &'a R) -> Self {
+        Self {
+            reader,
+            initial_buffer_size: INITIAL_SEARCH_SIZE,
+            song_list_hint: None,
+        }
+    }
+
+    /// Set the initial buffer size for searching
+    pub fn with_buffer_size(mut self, size: usize) -> Self {
+        self.initial_buffer_size = size;
+        self
+    }
+
+    /// Set a hint for the SongList address to speed up searching
+    pub fn with_song_list_hint(mut self, hint: u64) -> Self {
+        self.song_list_hint = Some(hint);
+        self
+    }
+
+    /// Build the OffsetSearcher
+    pub fn build(self) -> OffsetSearcher<'a, R> {
+        OffsetSearcher {
+            reader: self.reader,
+            buffer: Vec::with_capacity(self.initial_buffer_size),
+            buffer_base: 0,
+            song_list_hint: self.song_list_hint,
+        }
+    }
+}
+
 /// Core offset searcher for INFINITAS memory
 pub struct OffsetSearcher<'a, R: ReadMemory> {
     pub(crate) reader: &'a R,
     pub(crate) buffer: Vec<u8>,
     pub(crate) buffer_base: u64,
+    pub(crate) song_list_hint: Option<u64>,
 }
 
 impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
@@ -23,7 +64,13 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             reader,
             buffer: Vec::new(),
             buffer_base: 0,
+            song_list_hint: None,
         }
+    }
+
+    /// Create a builder for configuring the offset searcher
+    pub fn builder(reader: &'a R) -> OffsetSearcherBuilder<'a, R> {
+        OffsetSearcherBuilder::new(reader)
     }
 
     /// Get the underlying reader
@@ -53,7 +100,9 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         // Phase 1: SongList (anchor)
         debug!("Phase 1: Searching SongList via pattern search...");
         let base = self.reader.base_address();
-        let song_list_hint = base + EXPECTED_SONG_LIST_OFFSET;
+        let song_list_hint = self
+            .song_list_hint
+            .unwrap_or(base + EXPECTED_SONG_LIST_OFFSET);
         offsets.song_list = self.search_song_list_offset(song_list_hint)?;
         debug!("  SongList: 0x{:X}", offsets.song_list);
 

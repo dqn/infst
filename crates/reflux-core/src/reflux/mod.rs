@@ -9,8 +9,18 @@
 //! ## Example
 //!
 //! ```ignore
+//! use reflux_core::reflux::{Reflux, RefluxConfig};
+//! use reflux_core::offset::OffsetsCollection;
+//!
+//! // Create with default configuration
 //! let offsets = OffsetsCollection::default();
 //! let mut reflux = Reflux::new(offsets);
+//!
+//! // Or create with custom configuration
+//! let config = RefluxConfig::builder()
+//!     .session_dir("my_sessions")
+//!     .build();
+//! let mut reflux = Reflux::with_config(offsets, config);
 //!
 //! // Set up song database and score map
 //! reflux.set_song_db(song_db);
@@ -23,7 +33,7 @@
 mod game_loop;
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use tracing::{debug, info};
 
@@ -33,6 +43,72 @@ use crate::offset::OffsetsCollection;
 use crate::play::GameStateDetector;
 use crate::score::ScoreMap;
 use crate::session::SessionManager;
+
+/// Configuration for the Reflux application
+#[derive(Debug, Clone)]
+pub struct RefluxConfig {
+    /// Directory for session files
+    pub session_dir: PathBuf,
+    /// Whether to automatically export tracker data on song select
+    pub auto_export: bool,
+    /// Path for auto-exported tracker file
+    pub tracker_path: PathBuf,
+}
+
+impl Default for RefluxConfig {
+    fn default() -> Self {
+        Self {
+            session_dir: PathBuf::from("sessions"),
+            auto_export: true,
+            tracker_path: PathBuf::from("tracker.tsv"),
+        }
+    }
+}
+
+impl RefluxConfig {
+    /// Create a new configuration builder
+    pub fn builder() -> RefluxConfigBuilder {
+        RefluxConfigBuilder::default()
+    }
+}
+
+/// Builder for RefluxConfig
+#[derive(Debug, Clone, Default)]
+pub struct RefluxConfigBuilder {
+    session_dir: Option<PathBuf>,
+    auto_export: Option<bool>,
+    tracker_path: Option<PathBuf>,
+}
+
+impl RefluxConfigBuilder {
+    /// Set the session directory
+    pub fn session_dir<P: Into<PathBuf>>(mut self, path: P) -> Self {
+        self.session_dir = Some(path.into());
+        self
+    }
+
+    /// Enable or disable auto-export on song select
+    pub fn auto_export(mut self, enabled: bool) -> Self {
+        self.auto_export = Some(enabled);
+        self
+    }
+
+    /// Set the tracker file path for auto-export
+    pub fn tracker_path<P: Into<PathBuf>>(mut self, path: P) -> Self {
+        self.tracker_path = Some(path.into());
+        self
+    }
+
+    /// Build the configuration
+    pub fn build(self) -> RefluxConfig {
+        let default = RefluxConfig::default();
+        RefluxConfig {
+            session_dir: self.session_dir.unwrap_or(default.session_dir),
+            auto_export: self.auto_export.unwrap_or(default.auto_export),
+            tracker_path: self.tracker_path.unwrap_or(default.tracker_path),
+        }
+    }
+}
 
 /// Game data loaded from memory and files
 pub struct GameData {
@@ -57,6 +133,8 @@ impl GameData {
 /// Main Reflux application
 pub struct Reflux {
     pub(crate) offsets: OffsetsCollection,
+    /// Application configuration
+    pub(crate) config: RefluxConfig,
     /// Game data from memory
     pub(crate) game_data: GameData,
     pub(crate) state_detector: GameStateDetector,
@@ -67,7 +145,13 @@ pub struct Reflux {
 }
 
 impl Reflux {
+    /// Create a new Reflux instance with default configuration
     pub fn new(offsets: OffsetsCollection) -> Self {
+        Self::with_config(offsets, RefluxConfig::default())
+    }
+
+    /// Create a new Reflux instance with custom configuration
+    pub fn with_config(offsets: OffsetsCollection, config: RefluxConfig) -> Self {
         // Log offset validation status
         if offsets.has_state_detection_offsets() {
             debug!(
@@ -81,13 +165,21 @@ impl Reflux {
             );
         }
 
+        let session_dir = config.session_dir.to_string_lossy().to_string();
+
         Self {
             offsets,
+            config,
             game_data: GameData::new(),
             state_detector: GameStateDetector::new(),
-            session_manager: SessionManager::new("sessions"),
+            session_manager: SessionManager::new(&session_dir),
             current_playing: None,
         }
+    }
+
+    /// Get a reference to the configuration
+    pub fn config(&self) -> &RefluxConfig {
+        &self.config
     }
 
     /// Set score map

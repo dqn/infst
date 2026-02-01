@@ -1,4 +1,23 @@
 //! Export formats for play data and tracking data.
+//!
+//! This module provides various export formats for play data:
+//! - TSV (Tab-Separated Values) for spreadsheet compatibility
+//! - JSON for programmatic access
+//!
+//! # ExportFormat Trait
+//!
+//! The `ExportFormat` trait provides a common interface for different export formats:
+//!
+//! ```ignore
+//! use reflux_core::export::{ExportFormat, TsvExporter, JsonExporter};
+//!
+//! let tsv = TsvExporter;
+//! println!("{}", tsv.header());
+//! println!("{}", tsv.format_row(&play_data));
+//!
+//! let json = JsonExporter;
+//! println!("{}", json.format_row(&play_data));
+//! ```
 
 use std::collections::HashMap;
 use std::fmt::Write as _;
@@ -13,6 +32,59 @@ use crate::chart::{Difficulty, SongInfo, UnlockData, get_unlock_state_for_diffic
 use crate::error::Result;
 use crate::play::{PlayData, UnlockType, calculate_dj_points};
 use crate::score::{Grade, Lamp, ScoreData, ScoreMap};
+
+/// Trait for export format implementations
+///
+/// Provides a common interface for different export formats (TSV, JSON, etc.)
+pub trait ExportFormat {
+    /// Returns the header line for the format (empty for formats without headers)
+    fn header(&self) -> Option<String>;
+
+    /// Format a single row of play data
+    fn format_row(&self, play_data: &PlayData) -> String;
+
+    /// Format multiple rows of play data
+    fn format_rows(&self, play_data: &[PlayData]) -> String {
+        let mut output = String::new();
+        if let Some(header) = self.header() {
+            output.push_str(&header);
+            output.push('\n');
+        }
+        for data in play_data {
+            output.push_str(&self.format_row(data));
+            output.push('\n');
+        }
+        output
+    }
+}
+
+/// TSV (Tab-Separated Values) exporter
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TsvExporter;
+
+impl ExportFormat for TsvExporter {
+    fn header(&self) -> Option<String> {
+        Some(format_full_tsv_header())
+    }
+
+    fn format_row(&self, play_data: &PlayData) -> String {
+        format_full_tsv_row(play_data)
+    }
+}
+
+/// JSON exporter (one object per line, NDJSON format)
+#[derive(Debug, Clone, Copy, Default)]
+pub struct JsonExporter;
+
+impl ExportFormat for JsonExporter {
+    fn header(&self) -> Option<String> {
+        None // JSON doesn't need a header
+    }
+
+    fn format_row(&self, play_data: &PlayData) -> String {
+        format_json_entry(play_data).to_string()
+    }
+}
 
 pub fn format_tsv_header() -> String {
     [

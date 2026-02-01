@@ -48,9 +48,9 @@ pub use process::{
 // Re-export from offset module
 pub use offset::{
     CodeSignature, InteractiveSearchResult, JudgeInput, OffsetCache, OffsetDump, OffsetSearcher,
-    OffsetSignatureEntry, OffsetSignatureSet, OffsetsCollection, SearchPrompter, SearchResult,
-    builtin_signatures, load_offsets, load_signatures, save_offsets, save_offsets_to_cache,
-    save_signatures, try_load_cached_offsets,
+    OffsetSearcherBuilder, OffsetSignatureEntry, OffsetSignatureSet, OffsetsCollection,
+    SearchPrompter, SearchResult, builtin_signatures, load_offsets, load_signatures, save_offsets,
+    save_offsets_to_cache, save_signatures, try_load_cached_offsets,
 };
 
 // Re-export from play module
@@ -60,7 +60,7 @@ pub use play::{
 };
 
 // Re-export from reflux module
-pub use reflux::{GameData, Reflux};
+pub use reflux::{GameData, Reflux, RefluxConfig, RefluxConfigBuilder};
 
 // Re-export from retry module
 pub use retry::{ExponentialBackoff, FixedDelay, NoRetry, RetryStrategy};
@@ -70,8 +70,8 @@ pub use score::{Grade, Judge, Lamp, ScoreData, ScoreMap};
 
 // Re-export from export module
 pub use export::{
-    TsvRowData, export_song_list, export_tracker_json, export_tracker_tsv,
-    format_tracker_tsv_header, generate_tracker_json, generate_tracker_tsv,
+    ExportFormat, JsonExporter, TsvExporter, TsvRowData, export_song_list, export_tracker_json,
+    export_tracker_tsv, format_tracker_tsv_header, generate_tracker_json, generate_tracker_tsv,
 };
 
 // Re-export from session module

@@ -288,9 +288,11 @@ impl Reflux {
         // Poll unlock state changes
         self.poll_unlock_changes(reader);
 
-        // Export tracker.tsv
-        if let Err(e) = self.export_tracker_tsv("tracker.tsv") {
-            error!("Failed to export tracker.tsv: {}", e);
+        // Export tracker file if auto-export is enabled
+        if self.config.auto_export
+            && let Err(e) = self.export_tracker_tsv(&self.config.tracker_path)
+        {
+            error!("Failed to export tracker file: {}", e);
         }
     }
 

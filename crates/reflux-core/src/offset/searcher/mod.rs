@@ -47,7 +47,7 @@ mod utils;
 pub mod validation;
 
 // Re-export core types
-pub use core::OffsetSearcher;
+pub use core::{OffsetSearcher, OffsetSearcherBuilder};
 pub use types::*;
 pub use utils::merge_byte_representations;
 
