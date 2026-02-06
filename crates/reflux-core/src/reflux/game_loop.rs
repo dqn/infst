@@ -19,7 +19,7 @@ use crate::export::format_play_data_console;
 use crate::play::{AssistType, GameState, PlayData, PlayType, RawSettings, Settings};
 use crate::process::layout::{judge, play, settings, timing};
 use crate::process::{MemoryReader, ProcessHandle, ReadMemory};
-use crate::score::{Grade, Judge, Lamp, PlayerJudge, RawJudgeData};
+use crate::score::{Grade, Judge, Lamp, PlayerJudge, RawJudgeData, ScoreMap};
 
 use super::Reflux;
 
@@ -283,16 +283,36 @@ impl Reflux {
     /// Handle transition to song select screen
     fn handle_song_select(&mut self, reader: &MemoryReader) {
         // Re-scan for newly loaded songs (handles lazy loading)
+        let prev_count = self.game_data.song_db.len();
         self.rescan_song_database(reader);
 
         // Poll unlock state changes
         self.poll_unlock_changes(reader);
+
+        // Reload score map if new songs were discovered
+        if self.game_data.song_db.len() > prev_count {
+            self.reload_score_map(reader);
+        }
 
         // Export tracker file if auto-export is enabled
         if self.config.auto_export
             && let Err(e) = self.export_tracker_tsv(&self.config.tracker_path)
         {
             error!("Failed to export tracker file: {}", e);
+        }
+    }
+
+    /// Reload score map from memory
+    ///
+    /// Called when new songs are discovered to ensure score comparisons
+    /// work for all known songs.
+    fn reload_score_map(&mut self, reader: &MemoryReader) {
+        match ScoreMap::load_from_memory(reader, self.offsets.data_map, &self.game_data.song_db) {
+            Ok(map) => {
+                info!("Reloaded score map: {} entries", map.len());
+                self.game_data.score_map = map;
+            }
+            Err(e) => warn!("Failed to reload score map: {}", e),
         }
     }
 

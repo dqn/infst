@@ -137,7 +137,7 @@ impl ScoreMap {
 
         // Follow linked lists from each entry point
         for entry_point in entry_points {
-            Self::follow_linked_list(reader, entry_point, song_db, &mut nodes)?;
+            Self::follow_linked_list(reader, entry_point, null_obj, song_db, &mut nodes);
         }
 
         // Convert nodes to ScoreData
@@ -168,9 +168,10 @@ impl ScoreMap {
     fn follow_linked_list<R: ReadMemory>(
         reader: &R,
         entry_point: u64,
+        null_obj: u64,
         song_db: &HashMap<u32, SongInfo>,
         nodes: &mut HashMap<(u32, i32, i32), ListNode>,
-    ) -> Result<()> {
+    ) {
         let mut visited: HashSet<u64> = HashSet::new();
         let mut current_addr = entry_point;
 
@@ -181,27 +182,27 @@ impl ScoreMap {
             }
             visited.insert(current_addr);
 
-            // Read node
-            let buffer = reader.read_bytes(current_addr, ListNode::SIZE)?;
+            // Read error = end of chain (not a fatal error)
+            let Ok(buffer) = reader.read_bytes(current_addr, ListNode::SIZE) else {
+                break;
+            };
             let node = ListNode::from_bytes(&buffer);
-
-            // Check if song exists in database
             let song_id = node.song as u32;
-            if !song_db.contains_key(&song_id) {
-                break;
-            }
+            let next_addr = node.next;
 
-            let key = node.key();
-            if let std::collections::hash_map::Entry::Vacant(e) = nodes.entry(key) {
-                let next_addr = node.next;
+            // Store node if song is in database (skip unknown songs instead of breaking)
+            if song_db.contains_key(&song_id)
+                && let std::collections::hash_map::Entry::Vacant(e) = nodes.entry(node.key())
+            {
                 e.insert(node);
-                current_addr = next_addr;
-            } else {
+            }
+
+            // Check for end of linked list
+            if next_addr == 0 || next_addr == null_obj {
                 break;
             }
+            current_addr = next_addr;
         }
-
-        Ok(())
     }
 
     pub fn get(&self, song_id: u32) -> Option<&ScoreData> {
