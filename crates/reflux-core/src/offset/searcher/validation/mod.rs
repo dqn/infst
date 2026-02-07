@@ -369,8 +369,7 @@ mod tests {
             .with_size(0x100)
             .write_i32(0, 1500) // song_id
             .write_i32(4, 3) // difficulty
-            .write_i32(8, 2000) // ex_score
-            .write_i32(12, 25) // miss_count
+            .write_i32(24, 5) // lamp (HARD)
             .build();
 
         assert!(validate_play_data_address(&reader, 0x1000));

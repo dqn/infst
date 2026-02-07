@@ -16,7 +16,7 @@
 //! The offset searcher uses these approximate relationships:
 //! - JudgeData - PlaySettings ≈ 0x2ACE00
 //! - JudgeData + SongList ≈ 0x94E000
-//! - PlaySettings + PlayData ≈ 0x2B0
+//! - PlaySettings + PlayData ≈ 0x2A0
 //! - JudgeData + CurrentSong ≈ 0x1E4
 
 /// Memory layout constants for JudgeData structure

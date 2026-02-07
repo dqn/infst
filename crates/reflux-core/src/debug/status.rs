@@ -272,13 +272,14 @@ fn validate_play_data<R: ReadMemory>(reader: &R, addr: u64) -> OffsetValidation 
         };
     }
 
-    let song_id = reader.read_i32(addr).unwrap_or(-1);
-    let difficulty = reader.read_i32(addr + 4).unwrap_or(-1);
-    let ex_score = reader.read_i32(addr + 8).unwrap_or(-1);
-    let miss_count = reader.read_i32(addr + 12).unwrap_or(-1);
+    use crate::process::layout::play;
+
+    let song_id = reader.read_i32(addr + play::SONG_ID).unwrap_or(-1);
+    let difficulty = reader.read_i32(addr + play::DIFFICULTY).unwrap_or(-1);
+    let lamp = reader.read_i32(addr + play::LAMP).unwrap_or(-1);
 
     // Accept initial state (all zeros)
-    if song_id == 0 && difficulty == 0 && ex_score == 0 && miss_count == 0 {
+    if song_id == 0 && difficulty == 0 && lamp == 0 {
         return OffsetValidation {
             name: "playData".to_string(),
             address: addr,
@@ -287,18 +288,15 @@ fn validate_play_data<R: ReadMemory>(reader: &R, addr: u64) -> OffsetValidation 
         };
     }
 
-    if (1000..=50000).contains(&song_id)
-        && (0..=9).contains(&difficulty)
-        && (0..=10000).contains(&ex_score)
-        && (0..=3000).contains(&miss_count)
+    if (1000..=50000).contains(&song_id) && (0..=9).contains(&difficulty) && (0..=7).contains(&lamp)
     {
         OffsetValidation {
             name: "playData".to_string(),
             address: addr,
             valid: true,
             reason: format!(
-                "Valid: song_id={}, diff={}, ex_score={}, miss={}",
-                song_id, difficulty, ex_score, miss_count
+                "Valid: song_id={}, diff={}, lamp={}",
+                song_id, difficulty, lamp
             ),
         }
     } else {
@@ -307,8 +305,8 @@ fn validate_play_data<R: ReadMemory>(reader: &R, addr: u64) -> OffsetValidation 
             address: addr,
             valid: false,
             reason: format!(
-                "Invalid: song_id={}, diff={}, ex_score={}, miss={}",
-                song_id, difficulty, ex_score, miss_count
+                "Invalid: song_id={}, diff={}, lamp={}",
+                song_id, difficulty, lamp
             ),
         }
     }

@@ -81,8 +81,7 @@ fn test_validate_play_data_valid() {
         .with_size(0x100)
         .write_i32(0, 1500) // song_id in range
         .write_i32(4, 3) // difficulty (SPA)
-        .write_i32(8, 2000) // ex_score
-        .write_i32(12, 25) // miss_count
+        .write_i32(24, 5) // lamp (HARD)
         .build();
 
     let result = reader.validate_play_data_address(0x1000);
@@ -96,10 +95,7 @@ fn test_validate_play_data_all_zeros_is_rejected() {
     let reader = MockMemoryBuilder::new()
         .base(0x1000)
         .with_size(0x100)
-        .write_i32(0, 0) // song_id
-        .write_i32(4, 0) // difficulty
-        .write_i32(8, 0) // ex_score
-        .write_i32(12, 0) // miss_count
+        // all zeros (default)
         .build();
 
     let result = reader.validate_play_data_address(0x1000);
@@ -113,8 +109,7 @@ fn test_validate_play_data_invalid_song_id() {
         .with_size(0x100)
         .write_i32(0, 500) // song_id below 1000
         .write_i32(4, 3)
-        .write_i32(8, 2000)
-        .write_i32(12, 25)
+        .write_i32(24, 5)
         .build();
 
     let result = reader.validate_play_data_address(0x1000);

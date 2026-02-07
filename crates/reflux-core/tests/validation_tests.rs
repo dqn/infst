@@ -282,8 +282,7 @@ mod play_data {
             .with_size(0x100)
             .write_i32(0, 1500) // song_id
             .write_i32(4, 3) // difficulty (SPA)
-            .write_i32(8, 2000) // ex_score
-            .write_i32(12, 25) // miss_count
+            .write_i32(24, 5) // lamp (HARD)
             .build();
 
         assert!(reader.validate_play_data_address(0x1000));
@@ -295,9 +294,8 @@ mod play_data {
             .base(0x1000)
             .with_size(0x100)
             .write_i32(0, 1000) // min valid song_id
-            .write_i32(4, 0)
-            .write_i32(8, 100)
-            .write_i32(12, 0)
+            .write_i32(4, 0) // difficulty
+            .write_i32(24, 1) // lamp (FAILED)
             .build();
 
         assert!(reader.validate_play_data_address(0x1000));
@@ -310,8 +308,7 @@ mod play_data {
             .with_size(0x100)
             .write_i32(0, 50000) // max valid song_id
             .write_i32(4, 9) // max difficulty
-            .write_i32(8, 10000) // max ex_score
-            .write_i32(12, 3000) // max miss_count
+            .write_i32(24, 7) // lamp (PFC)
             .build();
 
         assert!(reader.validate_play_data_address(0x1000));
@@ -323,10 +320,7 @@ mod play_data {
         let reader = MockMemoryBuilder::new()
             .base(0x1000)
             .with_size(0x100)
-            .write_i32(0, 0)
-            .write_i32(4, 0)
-            .write_i32(8, 0)
-            .write_i32(12, 0)
+            // all zeros (default)
             .build();
 
         assert!(!reader.validate_play_data_address(0x1000));
@@ -339,8 +333,7 @@ mod play_data {
             .with_size(0x100)
             .write_i32(0, 500) // Invalid: < 1000
             .write_i32(4, 3)
-            .write_i32(8, 2000)
-            .write_i32(12, 25)
+            .write_i32(24, 5)
             .build();
 
         assert!(!reader.validate_play_data_address(0x1000));
@@ -353,8 +346,7 @@ mod play_data {
             .with_size(0x100)
             .write_i32(0, 60000) // Invalid: > 50000
             .write_i32(4, 3)
-            .write_i32(8, 2000)
-            .write_i32(12, 25)
+            .write_i32(24, 5)
             .build();
 
         assert!(!reader.validate_play_data_address(0x1000));
@@ -367,22 +359,20 @@ mod play_data {
             .with_size(0x100)
             .write_i32(0, 1500)
             .write_i32(4, 10) // Invalid: > 9
-            .write_i32(8, 2000)
-            .write_i32(12, 25)
+            .write_i32(24, 5)
             .build();
 
         assert!(!reader.validate_play_data_address(0x1000));
     }
 
     #[test]
-    fn invalid_ex_score_above_10000() {
+    fn invalid_lamp_above_7() {
         let reader = MockMemoryBuilder::new()
             .base(0x1000)
             .with_size(0x100)
             .write_i32(0, 1500)
             .write_i32(4, 3)
-            .write_i32(8, 15000) // Invalid: > 10000
-            .write_i32(12, 25)
+            .write_i32(24, 8) // Invalid: > 7
             .build();
 
         assert!(!reader.validate_play_data_address(0x1000));
