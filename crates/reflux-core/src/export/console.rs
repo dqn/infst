@@ -74,35 +74,35 @@ pub fn format_play_data_console(play_data: &PlayData, personal_best: Option<&Sco
     let _ = writeln!(output, "{}", border_dim);
     let _ = writeln!(output, "{}", title_content);
     let _ = writeln!(output, "{}", border_dim);
-    let _ = writeln!(output, "  Option : {}", option);
-    let _ = writeln!(output, "  Lamp   : {}", lamp_str);
-    let _ = writeln!(output, "  Score  : {} {}", score_str, grade_str);
+    let _ = writeln!(output, "  OPTION : {}", option);
+    let _ = writeln!(output, "  LAMP   : {}", lamp_str);
+    let _ = writeln!(output, "  SCORE  : {} {}", score_str, grade_str);
     if play_data.miss_count_valid() {
         let miss = play_data.miss_count();
         match comparison.miss_count_diff {
             Some(diff) => {
                 let _ = writeln!(
                     output,
-                    "  Miss   : {} ({})",
+                    "  MISS   : {} ({})",
                     miss,
                     format!("{}", diff).green()
                 );
             }
             None => {
-                let _ = writeln!(output, "  Miss   : {}", miss);
+                let _ = writeln!(output, "  MISS   : {}", miss);
             }
         }
     } else {
-        let _ = writeln!(output, "  Miss   : -");
+        let _ = writeln!(output, "  MISS   : -");
     }
     let _ = writeln!(
         output,
-        "  Judge  : {}/{}/{}/{}/{}",
+        "  JUDGE  : {}/{}/{}/{}/{}",
         judge.pgreat.cyan(),
-        judge.great.yellow(),
-        judge.good.truecolor(255, 200, 0),
-        judge.bad.truecolor(255, 165, 0),
-        judge.poor.red(),
+        judge.great.truecolor(255, 200, 0),
+        judge.good.truecolor(255, 165, 0),
+        judge.bad.truecolor(230, 120, 0),
+        judge.poor.truecolor(200, 50, 30),
     );
     let _ = writeln!(
         output,
