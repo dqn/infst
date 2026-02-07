@@ -12,6 +12,8 @@ pub struct PersonalBestComparison {
     pub previous_grade: Option<Grade>,
     /// Previous lamp if improved
     pub previous_lamp: Option<Lamp>,
+    /// Miss count difference (negative = improvement)
+    pub miss_count_diff: Option<i32>,
 }
 
 /// Compare current play data with personal best
@@ -45,6 +47,17 @@ pub fn compare_with_personal_best(
     // Lamp comparison: direct comparison (Lamp implements Ord)
     if best_lamp != Lamp::NoPlay && play_data.lamp > best_lamp {
         comparison.previous_lamp = Some(best_lamp);
+    }
+
+    // Miss count comparison: only show when improved (decreased)
+    if play_data.miss_count_valid() {
+        let best_miss = best.miss_count[diff_index];
+        if let Some(best_miss) = best_miss {
+            let diff = play_data.miss_count() as i32 - best_miss as i32;
+            if diff < 0 {
+                comparison.miss_count_diff = Some(diff);
+            }
+        }
     }
 
     comparison
@@ -181,5 +194,66 @@ mod tests {
         assert!(comparison.score_diff.is_none()); // No previous score
         assert!(comparison.previous_grade.is_none()); // No previous grade
         assert!(comparison.previous_lamp.is_none()); // NoPlay is not shown
+    }
+
+    #[test]
+    fn test_compare_miss_count_improved() {
+        // Current: 5 misses, Best: 10 misses → improvement (-5)
+        let mut play_data = create_test_play_data(1800, Grade::Aaa, Lamp::HardClear);
+        play_data.judge.bad = 2;
+        play_data.judge.poor = 3;
+
+        let mut best = ScoreData::new(1000);
+        best.score[Difficulty::SpA as usize] = 1800;
+        best.lamp[Difficulty::SpA as usize] = Lamp::HardClear;
+        best.miss_count[Difficulty::SpA as usize] = Some(10);
+
+        let comparison = compare_with_personal_best(&play_data, Some(&best));
+        assert_eq!(comparison.miss_count_diff, Some(-5));
+    }
+
+    #[test]
+    fn test_compare_miss_count_not_improved() {
+        // Current: 10 misses, Best: 5 misses → no improvement shown
+        let mut play_data = create_test_play_data(1800, Grade::Aaa, Lamp::HardClear);
+        play_data.judge.bad = 5;
+        play_data.judge.poor = 5;
+
+        let mut best = ScoreData::new(1000);
+        best.score[Difficulty::SpA as usize] = 1800;
+        best.lamp[Difficulty::SpA as usize] = Lamp::HardClear;
+        best.miss_count[Difficulty::SpA as usize] = Some(5);
+
+        let comparison = compare_with_personal_best(&play_data, Some(&best));
+        assert!(comparison.miss_count_diff.is_none());
+    }
+
+    #[test]
+    fn test_compare_miss_count_no_best_data() {
+        // Best miss count is None → no comparison
+        let play_data = create_test_play_data(1800, Grade::Aaa, Lamp::HardClear);
+
+        let mut best = ScoreData::new(1000);
+        best.score[Difficulty::SpA as usize] = 1800;
+        best.lamp[Difficulty::SpA as usize] = Lamp::HardClear;
+        // miss_count defaults to None
+
+        let comparison = compare_with_personal_best(&play_data, Some(&best));
+        assert!(comparison.miss_count_diff.is_none());
+    }
+
+    #[test]
+    fn test_compare_miss_count_invalid_play() {
+        // data_available is false → miss count not valid
+        let mut play_data = create_test_play_data(1800, Grade::Aaa, Lamp::HardClear);
+        play_data.data_available = false;
+
+        let mut best = ScoreData::new(1000);
+        best.score[Difficulty::SpA as usize] = 1800;
+        best.lamp[Difficulty::SpA as usize] = Lamp::HardClear;
+        best.miss_count[Difficulty::SpA as usize] = Some(10);
+
+        let comparison = compare_with_personal_best(&play_data, Some(&best));
+        assert!(comparison.miss_count_diff.is_none());
     }
 }

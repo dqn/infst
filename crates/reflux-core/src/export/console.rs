@@ -69,9 +69,20 @@ pub fn format_play_data_console(play_data: &PlayData, personal_best: Option<&Sco
         None => format_colored_lamp(&play_data.lamp),
     };
 
+    // Build miss count string (only when valid)
+    let miss_str = if play_data.miss_count_valid() {
+        let miss = play_data.miss_count();
+        match comparison.miss_count_diff {
+            Some(diff) => format!("  Miss: {} ({})", miss, format!("{}", diff).green()),
+            None => format!("  Miss: {}", miss),
+        }
+    } else {
+        String::new()
+    };
+
     let line1 = format!(
-        "  Option: {}  Score: {} {}  Lamp: {}",
-        option, score_str, grade_str, lamp_str
+        "  Option: {}  Score: {} {}  Lamp: {}{}",
+        option, score_str, grade_str, lamp_str, miss_str
     );
 
     let judge = &play_data.judge;
