@@ -1,4 +1,4 @@
-# reflux-rs
+# infst
 
 [[日本語](README.ja.md)]
 
@@ -6,8 +6,6 @@
 [![Release](https://img.shields.io/github/v/release/dqn/reflux-rs)](https://github.com/dqn/reflux-rs/releases)
 
 A real-time score tracker for beatmania IIDX INFINITAS.
-
-This is a Rust port of the original [Reflux](https://github.com/olji/Reflux) (C#).
 
 ## Features
 
@@ -21,7 +19,7 @@ This is a Rust port of the original [Reflux](https://github.com/olji/Reflux) (C#
 
 ## Installation
 
-1. Download `reflux.exe` from [GitHub Releases](https://github.com/dqn/reflux-rs/releases)
+1. Download `infst.exe` from [GitHub Releases](https://github.com/dqn/reflux-rs/releases)
 2. Place the executable anywhere you like
 
 ## Usage
@@ -31,7 +29,7 @@ This is a Rust port of the original [Reflux](https://github.com/olji/Reflux) (C#
 Run with INFINITAS open:
 
 ```bash
-reflux
+infst
 ```
 
 Your plays are automatically recorded while the tracker is running.
@@ -42,13 +40,13 @@ Export all your play data (scores, lamps, miss counts, DJ points, etc.):
 
 ```bash
 # Export to TSV (default)
-reflux export -o scores.tsv
+infst export -o scores.tsv
 
 # Export to JSON
-reflux export -o scores.json -f json
+infst export -o scores.json -f json
 
 # Output to stdout
-reflux export
+infst export
 ```
 
 #### Options
@@ -61,7 +59,3 @@ reflux export
 ## License
 
 [MIT License](LICENSE)
-
-## Credits
-
-Based on [Reflux](https://github.com/olji/Reflux) by olji.

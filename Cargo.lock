@@ -275,6 +275,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "infst"
+version = "0.1.19"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "encoding_rs",
+ "memchr",
+ "owo-colors",
+ "serde",
+ "serde_json",
+ "strum",
+ "tempfile",
+ "thiserror",
+ "tracing",
+ "windows",
+]
+
+[[package]]
+name = "infst-cli"
+version = "0.1.19"
+dependencies = [
+ "anyhow",
+ "clap",
+ "crossterm",
+ "encoding_rs",
+ "infst",
+ "serde_json",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "is_terminal_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -458,38 +490,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed2bf2547551a7053d6fdfafda3f938979645c44812fbfcda098faae3f1a362d"
 dependencies = [
  "bitflags",
-]
-
-[[package]]
-name = "reflux-cli"
-version = "0.1.19"
-dependencies = [
- "anyhow",
- "clap",
- "crossterm",
- "encoding_rs",
- "reflux-core",
- "serde_json",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "reflux-core"
-version = "0.1.19"
-dependencies = [
- "anyhow",
- "chrono",
- "encoding_rs",
- "memchr",
- "owo-colors",
- "serde",
- "serde_json",
- "strum",
- "tempfile",
- "thiserror",
- "tracing",
- "windows",
 ]
 
 [[package]]

@@ -1,6 +1,6 @@
-# reflux-rs
+# infst
 
-beatmania IIDX INFINITAS のスコアトラッカー。本家 [Reflux](https://github.com/olji/Reflux) (C#) の Rust 移植版。
+beatmania IIDX INFINITAS のスコアトラッカー。
 
 Rust Edition 2024 を使用。
 
@@ -8,8 +8,8 @@ Rust Edition 2024 を使用。
 
 ```
 crates/
-├── reflux-core/    # コアライブラリ（ゲームロジック、メモリ読み取り）
-└── reflux-cli/     # CLI アプリケーション
+├── infst/        # コアライブラリ（ゲームロジック、メモリ読み取り）
+└── infst-cli/    # CLI アプリケーション
 ```
 
 ## 開発コマンド
@@ -35,48 +35,48 @@ INFINITAS のバージョン変更時にメモリ構造を調査するための�
 
 ```bash
 # オフセット検索（対話的）
-reflux find-offsets
+infst find-offsets
 
 # ゲーム・オフセット状態表示
-reflux status
+infst status
 
 # メモリ構造情報をダンプ
-reflux dump
+infst dump
 ```
 
 ### メモリ分析
 
 ```bash
 # メモリ構造の分析（デバッグモード）
-reflux analyze
+infst analyze
 
 # 特定アドレスのメモリ構造探索
-reflux explore --address 0x1431B08A0
+infst explore --address 0x1431B08A0
 
 # メモリの生バイトダンプ
-reflux hexdump --address 0x1431B08A0 --size 256 --ascii
+infst hexdump --address 0x1431B08A0 --size 256 --ascii
 ```
 
 ### 検索・スキャン
 
 ```bash
 # メモリ検索
-reflux search --string "fun"              # 文字列検索（Shift-JIS）
-reflux search --i32 9003                  # 32bit整数検索
-reflux search --pattern "00 04 07 0A"     # バイトパターン検索（?? でワイルドカード）
+infst search --string "fun"              # 文字列検索（Shift-JIS）
+infst search --i32 9003                  # 32bit整数検索
+infst search --pattern "00 04 07 0A"     # バイトパターン検索（?? でワイルドカード）
 
 # カスタムエントリサイズでスキャン
-reflux scan --entry-size 1200
+infst scan --entry-size 1200
 ```
 
 ### ユーティリティ
 
 ```bash
 # アドレス間のオフセット計算
-reflux offset --from 0x1431B08A0 --to 0x1431B0BD0
+infst offset --from 0x1431B08A0 --to 0x1431B0BD0
 
 # 楽曲エントリ構造の検証
-reflux validate song-entry --address 0x1431B08A0
+infst validate song-entry --address 0x1431B08A0
 ```
 
 ## データエクスポート
@@ -85,16 +85,16 @@ reflux validate song-entry --address 0x1431B08A0
 
 ```bash
 # TSV形式でファイルに出力（デフォルト）
-reflux export -o scores.tsv
+infst export -o scores.tsv
 
 # JSON形式でファイルに出力
-reflux export -o scores.json -f json
+infst export -o scores.json -f json
 
 # 標準出力にTSV出力
-reflux export
+infst export
 
 # 標準出力にJSON出力
-reflux export -f json
+infst export -f json
 ```
 
 ### オプション
@@ -107,7 +107,7 @@ reflux export -f json
 
 ## アーキテクチャ
 
-### reflux-core モジュール構成
+### infst モジュール構成
 
 | モジュール         | 役割                                               |
 | ------------------ | -------------------------------------------------- |
@@ -120,7 +120,7 @@ reflux export -f json
 | `offset/`          | メモリオフセット検索・管理                         |
 | `offset/searcher/` | オフセット検索のサブモジュール群                   |
 | `debug/`           | メモリダンプ、スキャン、ステータス表示（要 feature） |
-| `reflux/`          | メインアプリケーションロジック                     |
+| `infst/`           | メインアプリケーションロジック                     |
 | `prelude.rs`       | よく使う型の再エクスポート                         |
 | `error.rs`         | エラー型定義                                       |
 
@@ -165,7 +165,7 @@ reflux export -f json
 - `OffsetsCollection` - メモリオフセット集
 - `OffsetSearcher`, `OffsetSearcherBuilder` - オフセット検索（Builder パターン対応）
 - `SessionManager` - セッション管理
-- `Reflux`, `RefluxConfig`, `GameData` - メインアプリケーション（設定外部化対応）
+- `Infst`, `InfstConfig`, `GameData` - メインアプリケーション（設定外部化対応）
 - `ExportFormat`, `TsvExporter`, `JsonExporter` - エクスポート形式（trait ベース）
 - `PersonalBestComparison` - 自己ベスト比較結果
 
@@ -182,7 +182,7 @@ reflux export -f json
 
 ## リリース手順
 
-1. Cargo.toml のバージョンを更新（reflux-core, reflux-cli 両方）
+1. Cargo.toml のバージョンを更新（infst, infst-cli 両方）
 2. `git tag vX.Y.Z` でタグをつける
 3. `git push --tags` で push
 

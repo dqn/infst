@@ -1,0 +1,90 @@
+//! Find offsets command implementation.
+//!
+//! Interactive mode for discovering memory offsets in new game versions.
+//! Requires user interaction (playing a song) to detect play-related offsets
+//! through state changes.
+//!
+//! The output file can be used as input for other commands via `--offsets-file`.
+
+use std::time::Duration;
+
+use anyhow::Result;
+use infst::config::find_game_version;
+use infst::{MemoryReader, OffsetSearcher, OffsetsCollection, ProcessHandle, save_offsets};
+use tracing::{debug, info, warn};
+
+use crate::prompter::CliPrompter;
+
+/// Run the find-offsets interactive mode
+pub fn run(output: &str, pid: Option<u32>) -> Result<()> {
+    let current_version = env!("CARGO_PKG_VERSION");
+    info!("infst {} - Offset Search Mode", current_version);
+
+    // Open process (either by PID or auto-detect)
+    let process = if let Some(pid) = pid {
+        println!("Opening process with PID {}...", pid);
+        ProcessHandle::open(pid)?
+    } else {
+        println!("Waiting for INFINITAS...");
+
+        // Wait for process
+        loop {
+            match ProcessHandle::find_and_open() {
+                Ok(p) => break p,
+                Err(_) => {
+                    std::thread::sleep(Duration::from_secs(2));
+                }
+            }
+        }
+    };
+
+    debug!(
+        "Found INFINITAS process (base: {:#x})",
+        process.base_address
+    );
+
+    let reader = MemoryReader::new(&process);
+
+    // Game version detection
+    let game_version = match find_game_version(&reader, process.base_address) {
+        Ok(Some(version)) => {
+            println!("Detected game version: {}", version);
+            version
+        }
+        Ok(None) => {
+            println!("Could not detect game version, using 'unknown'");
+            "unknown".to_string()
+        }
+        Err(e) => {
+            warn!("Failed to check game version: {}", e);
+            "unknown".to_string()
+        }
+    };
+
+    // Run interactive search
+    let prompter = CliPrompter;
+    let mut searcher = OffsetSearcher::new(&reader);
+    let old_offsets = OffsetsCollection::default();
+
+    let result = searcher.interactive_search(&prompter, &old_offsets, &game_version)?;
+
+    // Display results
+    println!();
+    println!("=== Offset Search Results ===");
+    println!("Version:      {}", result.offsets.version);
+    println!("Play Type:    {}", result.play_type.short_name());
+    println!("SongList:     0x{:X}", result.offsets.song_list);
+    println!("JudgeData:    0x{:X}", result.offsets.judge_data);
+    println!("PlaySettings: 0x{:X}", result.offsets.play_settings);
+    println!("PlayData:     0x{:X}", result.offsets.play_data);
+    println!("CurrentSong:  0x{:X}", result.offsets.current_song);
+    println!("DataMap:      0x{:X}", result.offsets.data_map);
+    println!("UnlockData:   0x{:X}", result.offsets.unlock_data);
+
+    // Save to file
+    save_offsets(output, &result.offsets)?;
+    println!();
+    println!("Offsets saved to: {}", output);
+
+    Ok(())
+}

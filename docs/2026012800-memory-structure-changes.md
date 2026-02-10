@@ -109,7 +109,7 @@ beatmania IIDX INFINITAS バージョン `P2D:J:B:A:2026012800` で発見され�
 
 ## コード変更
 
-### `crates/reflux-core/src/game/song.rs`
+### `crates/infst/src/game/song.rs`
 
 ```rust
 impl SongInfo {
@@ -131,21 +131,21 @@ impl SongInfo {
 
 新バイナリ (bm2dx-2.exe) で一部のシグネチャ検索が機能しなかったため、新旧両方のバイナリで動作するパターンに更新しました。
 
-- **変更ファイル**: `crates/reflux-core/src/offset/signature.rs`
+- **変更ファイル**: `crates/infst/src/offset/signature.rs`
 - **変更定数**: `JUDGE_TO_CURRENT_SONG` を `0x160` から `0x1E4` に更新
 
 ### ResultScreen 状態検出の修正
 
 トラッカー開始時に既に ResultScreen にいる場合の検出ができていなかった問題を解決しました。
 
-- **変更ファイル**: `crates/reflux-core/src/game/state.rs`
+- **変更ファイル**: `crates/infst/src/game/state.rs`
 - **変更内容**: `detect_raw()` ロジックを C# 本家実装に合わせて修正
 
 ### PlaySettings 検索の改善
 
 PlaySettings オフセット検索パターンを C# 本家実装と完全に一致させました。
 
-- **変更ファイル**: `crates/reflux-core/src/offset/searcher/mod.rs`
+- **変更ファイル**: `crates/infst/src/offset/searcher/mod.rs`
 - **変更内容**: 20 バイトの固定パターン検索、gauge 値の判定を EXHARD=4/EASY=2 に統一
 
 ## 互換性に関する注意

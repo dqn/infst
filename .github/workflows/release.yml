@@ -17,4 +17,4 @@ jobs:
       - run: cargo build --release
       - uses: softprops/action-gh-release@v2
         with:
-          files: target/release/reflux.exe
+          files: target/release/infst.exe

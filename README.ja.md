@@ -1,11 +1,9 @@
-# reflux-rs
+# infst
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Release](https://img.shields.io/github/v/release/dqn/reflux-rs)](https://github.com/dqn/reflux-rs/releases)
 
 beatmania IIDX INFINITAS のリアルタイムスコアトラッカー。
-
-本家 [Reflux](https://github.com/olji/Reflux)（C#）の Rust 移植版です。
 
 ## 機能
 
@@ -19,7 +17,7 @@ beatmania IIDX INFINITAS のリアルタイムスコアトラッカー。
 
 ## インストール
 
-1. [GitHub Releases](https://github.com/dqn/reflux-rs/releases) から `reflux.exe` をダウンロード
+1. [GitHub Releases](https://github.com/dqn/reflux-rs/releases) から `infst.exe` をダウンロード
 2. 任意の場所に配置
 
 ## 使い方
@@ -29,7 +27,7 @@ beatmania IIDX INFINITAS のリアルタイムスコアトラッカー。
 INFINITAS を起動した状態で実行：
 
 ```bash
-reflux
+infst
 ```
 
 トラッカーの実行中、プレイが自動的に記録されます。
@@ -40,13 +38,13 @@ reflux
 
 ```bash
 # TSV形式でエクスポート（デフォルト）
-reflux export -o scores.tsv
+infst export -o scores.tsv
 
 # JSON形式でエクスポート
-reflux export -o scores.json -f json
+infst export -o scores.json -f json
 
 # 標準出力に出力
-reflux export
+infst export
 ```
 
 #### オプション
@@ -59,7 +57,3 @@ reflux export
 ## ライセンス
 
 [MIT License](LICENSE)
-
-## クレジット
-
-olji による [Reflux](https://github.com/olji/Reflux) をベースにしています。
