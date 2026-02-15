@@ -232,6 +232,7 @@ interface LevenshteinCandidate {
 function findLevenshteinCandidates(
   cleanTitle: string,
   difficulty: Difficulty,
+  expectedRating: number,
   tracker: Map<string, TrackerEntry>,
   maxCandidates: number,
 ): LevenshteinCandidate[] {
@@ -239,6 +240,10 @@ function findLevenshteinCandidates(
   const candidates: LevenshteinCandidate[] = [];
 
   for (const entry of tracker.values()) {
+    // Only include candidates whose rating matches the expected value
+    if (entry.ratings[difficulty] !== expectedRating) {
+      continue;
+    }
     const normalizedEntry = normalizeText(entry.title);
     const dist = distance(normalizedInput, normalizedEntry);
     candidates.push({
@@ -265,6 +270,7 @@ async function resolveInteractively(
   const candidates = findLevenshteinCandidates(
     cleanTitle,
     difficulty,
+    expectedRating,
     tracker,
     10,
   );
@@ -328,41 +334,50 @@ export async function normalize(): Promise<void> {
     "sp11-normal": [],
   };
 
-  try {
-    for (const [key, url] of Object.entries(ENDPOINTS) as [
-      EndpointKey,
-      string,
-    ][]) {
-      const expectedRating = EXPECTED_RATING[key];
-      console.log(`\n--- ${key} (fetching ${url}) ---`);
-      const entries = await fetchEndpoint(url);
-      console.log(`Fetched ${entries.length} entries`);
+  // Phase 1: Fetch all endpoints and attempt automatic matching
+  interface PendingEntry {
+    key: EndpointKey;
+    apiEntry: IidxApiEntry;
+    cleanTitle: string;
+    difficulty: Difficulty;
+    expectedRating: number;
+  }
 
-      for (const apiEntry of entries) {
-        const { cleanTitle, difficulty } = analyzeSuffix(apiEntry.title);
+  const pending: PendingEntry[] = [];
 
-        // 1. Try exact match
-        let match = findExactMatch(cleanTitle, difficulty, tracker);
+  // Counters for summary
+  let autoMatched = 0;
+  let notInInfinitas = 0;
+  let chartNotAvailable = 0;
+  let ratingMismatch = 0;
 
-        // 2. Try normalized match
-        if (match === undefined) {
-          match = findNormalizedMatch(
-            cleanTitle,
-            difficulty,
-            normalizedIndex,
-          );
-        }
+  for (const [key, url] of Object.entries(ENDPOINTS) as [
+    EndpointKey,
+    string,
+  ][]) {
+    const expectedRating = EXPECTED_RATING[key];
+    console.log(`\n--- ${key} (fetching ${url}) ---`);
+    const entries = await fetchEndpoint(url);
+    console.log(`Fetched ${entries.length} entries`);
 
-        // Validate rating for automatic matches
-        if (match !== undefined && match.rating !== expectedRating) {
-          console.log(
-            `\x1b[33m!\x1b[0m Rating mismatch: ${apiEntry.title} -> ${match.trackerTitle} ` +
-              `(expected ${difficulty} \u2606${expectedRating}, got \u2606${match.rating})`,
-          );
-          match = undefined;
-        }
+    for (const apiEntry of entries) {
+      const { cleanTitle, difficulty } = analyzeSuffix(apiEntry.title);
 
-        if (match !== undefined) {
+      // 1. Try exact match
+      let match = findExactMatch(cleanTitle, difficulty, tracker);
+
+      // 2. Try normalized match
+      if (match === undefined) {
+        match = findNormalizedMatch(
+          cleanTitle,
+          difficulty,
+          normalizedIndex,
+        );
+      }
+
+      if (match !== undefined) {
+        if (match.rating === expectedRating) {
+          // Auto-match success
           console.log(
             `\x1b[32m\u2713\x1b[0m ${apiEntry.title} \u2192 ${match.trackerTitle} (${difficulty} \u2606${match.rating})`,
           );
@@ -373,32 +388,82 @@ export async function normalize(): Promise<void> {
             tier: apiEntry.tier,
             attributes: apiEntry.attributes,
           });
-          continue;
-        }
-
-        // 3. Interactive resolution
-        const resolved = await resolveInteractively(
-          apiEntry.title,
-          difficulty,
-          expectedRating,
-          tracker,
-          rl,
-        );
-
-        if (resolved !== undefined) {
+          autoMatched++;
+        } else if (match.rating === 0) {
+          // Chart not available in INFINITAS
           console.log(
-            `\x1b[32m\u2713\x1b[0m Resolved: ${apiEntry.title} \u2192 ${resolved}`,
+            `\x1b[33m-\x1b[0m Chart not available: ${apiEntry.title} (${difficulty} not in tracker)`,
           );
-          result[key].push({
-            title: apiEntry.title,
-            infinitasTitle: resolved,
+          chartNotAvailable++;
+        } else {
+          // Rating mismatch
+          console.log(
+            `\x1b[33m!\x1b[0m Rating mismatch: ${apiEntry.title} -> ${match.trackerTitle} ` +
+              `(expected ${difficulty} \u2606${expectedRating}, got \u2606${match.rating})`,
+          );
+          ratingMismatch++;
+        }
+      } else {
+        // No match found — check if the title exists in tracker at all
+        const existsInTracker =
+          tracker.has(cleanTitle) ||
+          normalizedIndex.has(normalizeText(cleanTitle));
+
+        if (existsInTracker) {
+          // Title exists but no match — needs interactive resolution
+          pending.push({
+            key,
+            apiEntry,
+            cleanTitle,
             difficulty,
-            tier: apiEntry.tier,
-            attributes: apiEntry.attributes,
+            expectedRating,
           });
         } else {
-          console.log(`\x1b[33m-\x1b[0m Skipped: ${apiEntry.title}`);
+          // Not in INFINITAS
+          console.log(
+            `\x1b[90m-\x1b[0m Not in INFINITAS: ${apiEntry.title}`,
+          );
+          notInInfinitas++;
         }
+      }
+    }
+  }
+
+  // Phase 2: Interactive resolution for unmatched entries
+  if (pending.length === 0) {
+    console.log("\nAll entries matched automatically!");
+  } else {
+    console.log(
+      `\n\x1b[33m${pending.length} entries\x1b[0m need interactive resolution:`,
+    );
+    for (const p of pending) {
+      console.log(`  - ${p.apiEntry.title} (${p.difficulty} \u2606${p.expectedRating}) [${p.key}]`);
+    }
+  }
+
+  try {
+    for (const p of pending) {
+      const resolved = await resolveInteractively(
+        p.apiEntry.title,
+        p.difficulty,
+        p.expectedRating,
+        tracker,
+        rl,
+      );
+
+      if (resolved !== undefined) {
+        console.log(
+          `\x1b[32m\u2713\x1b[0m Resolved: ${p.apiEntry.title} \u2192 ${resolved}`,
+        );
+        result[p.key].push({
+          title: p.apiEntry.title,
+          infinitasTitle: resolved,
+          difficulty: p.difficulty,
+          tier: p.apiEntry.tier,
+          attributes: p.apiEntry.attributes,
+        });
+      } else {
+        console.log(`\x1b[33m-\x1b[0m Skipped: ${p.apiEntry.title}`);
       }
     }
   } finally {
@@ -410,6 +475,13 @@ export async function normalize(): Promise<void> {
   console.log(`\nWrote ${OUTPUT_PATH}`);
 
   // Summary
+  console.log("\nSummary:");
+  console.log(`  Auto-matched: ${autoMatched}`);
+  console.log(`  Not in INFINITAS: ${notInInfinitas}`);
+  console.log(`  Chart not available: ${chartNotAvailable}`);
+  console.log(`  Rating mismatch: ${ratingMismatch}`);
+  console.log(`  Need interactive resolution: ${pending.length}`);
+  console.log("\nPer endpoint:");
   for (const [key, entries] of Object.entries(result) as [
     EndpointKey,
     MappedEntry[],
