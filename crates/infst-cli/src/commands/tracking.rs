@@ -7,8 +7,8 @@ use std::time::Duration;
 use anyhow::Result;
 use infst::config::find_game_version;
 use infst::{
-    Infst, MemoryReader, OffsetSearcher, OffsetsCollection, ProcessHandle, ScoreMap, SongInfo,
-    load_offsets, save_offsets_to_cache, try_load_cached_offsets,
+    ApiConfig, Infst, InfstConfig, MemoryReader, OffsetSearcher, OffsetsCollection, ProcessHandle,
+    ScoreMap, SongInfo, load_offsets, save_offsets_to_cache, try_load_cached_offsets,
 };
 use tracing::{debug, error, info, warn};
 
@@ -17,11 +17,16 @@ use crate::retry::{load_song_database_with_retry, search_offsets_with_retry};
 use crate::shutdown::ShutdownSignal;
 
 /// Run the main tracking mode
-pub fn run(offsets_file: Option<&str>) -> Result<()> {
+pub fn run(
+    offsets_file: Option<&str>,
+    api_endpoint: Option<&str>,
+    api_token: Option<&str>,
+) -> Result<()> {
     let shutdown = setup_shutdown_handler();
     let (initial_offsets, offsets_from_file) = load_initial_offsets(offsets_file);
 
-    let mut infst = Infst::new(initial_offsets);
+    let config = build_config(api_endpoint, api_token);
+    let mut infst = Infst::with_config(initial_offsets, config);
 
     println!("Waiting for INFINITAS... (Press Esc or q to quit)");
 
@@ -55,6 +60,43 @@ fn setup_shutdown_handler() -> Arc<ShutdownSignal> {
     println!("infst v{}", current_version);
 
     shutdown
+}
+
+/// Build InfstConfig with optional API configuration
+///
+/// Resolves API credentials from: args > credentials file
+fn build_config(api_endpoint: Option<&str>, api_token: Option<&str>) -> InfstConfig {
+    let api_config = resolve_api_config(api_endpoint, api_token);
+    if api_config.is_some() {
+        info!("API integration enabled");
+    }
+    InfstConfig {
+        api_config,
+        ..InfstConfig::default()
+    }
+}
+
+/// Resolve API config from args or credentials file
+fn resolve_api_config(api_endpoint: Option<&str>, api_token: Option<&str>) -> Option<ApiConfig> {
+    // If both are provided via args, use them directly
+    if let (Some(endpoint), Some(token)) = (api_endpoint, api_token) {
+        return Some(ApiConfig {
+            endpoint: endpoint.to_string(),
+            token: token.to_string(),
+        });
+    }
+
+    // Try loading from credentials file
+    let creds = super::login::load_credentials();
+
+    let endpoint = api_endpoint
+        .map(|s| s.to_string())
+        .or_else(|| creds.as_ref().map(|(e, _)| e.clone()))?;
+    let token = api_token
+        .map(|s| s.to_string())
+        .or_else(|| creds.as_ref().map(|(_, t)| t.clone()))?;
+
+    Some(ApiConfig { endpoint, token })
 }
 
 /// Load offsets from file if specified

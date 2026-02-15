@@ -8,6 +8,7 @@ license.workspace = true
 default = []
 debug-tools = []
 legacy-signatures = []
+api = ["dep:ureq"]
 
 [dependencies]
 anyhow.workspace = true
@@ -20,6 +21,7 @@ chrono.workspace = true
 strum.workspace = true
 owo-colors = "4"
 memchr = "2"
+ureq = { version = "3", optional = true, features = ["json"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows.workspace = true

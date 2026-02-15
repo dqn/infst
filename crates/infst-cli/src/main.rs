@@ -75,6 +75,17 @@ fn main() -> Result<()> {
             format,
             pid,
         }) => commands::export::run(output.as_deref(), format, pid),
-        None => commands::tracking::run(args.offsets_file.as_deref()),
+        Some(Command::Login { endpoint }) => commands::login::run(&endpoint),
+        Some(Command::Upload {
+            tracker,
+            mapping,
+            endpoint,
+            token,
+        }) => commands::upload::run(&tracker, &mapping, endpoint.as_deref(), token.as_deref()),
+        None => commands::tracking::run(
+            args.offsets_file.as_deref(),
+            args.api_endpoint.as_deref(),
+            args.api_token.as_deref(),
+        ),
     }
 }

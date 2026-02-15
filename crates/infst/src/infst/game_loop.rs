@@ -253,7 +253,43 @@ impl Infst {
 
         // Save to session files
         self.save_session_data(play_data);
+
+        // Send to API (non-blocking)
+        self.send_lamp_to_api(play_data);
     }
+
+    /// Send lamp data to the API endpoint in a background thread
+    #[cfg(feature = "api")]
+    fn send_lamp_to_api(&self, play_data: &PlayData) {
+        let Some(ref api_config) = self.config.api_config else {
+            return;
+        };
+
+        let endpoint = api_config.endpoint.clone();
+        let token = api_config.token.clone();
+        let title = play_data.chart.title.to_string();
+        let difficulty = play_data.chart.difficulty.short_name().to_string();
+        let lamp = play_data.lamp.expand_name().to_string();
+        let ex_score = play_data.ex_score;
+        let miss_count = play_data.miss_count();
+
+        thread::spawn(move || {
+            if let Err(e) = send_lamp_request(
+                &endpoint,
+                &token,
+                &title,
+                &difficulty,
+                &lamp,
+                ex_score,
+                miss_count,
+            ) {
+                warn!("Failed to send lamp to API: {}", e);
+            }
+        });
+    }
+
+    #[cfg(not(feature = "api"))]
+    fn send_lamp_to_api(&self, _play_data: &PlayData) {}
 
     /// Save play data to session file (TSV)
     fn save_session_data(&mut self, play_data: &PlayData) {
@@ -600,4 +636,36 @@ impl Infst {
 
         Ok((game_version, matches))
     }
+}
+
+#[cfg(feature = "api")]
+fn send_lamp_request(
+    endpoint: &str,
+    token: &str,
+    title: &str,
+    difficulty: &str,
+    lamp: &str,
+    ex_score: u32,
+    miss_count: u32,
+) -> anyhow::Result<()> {
+    let url = format!("{}/api/lamps", endpoint.trim_end_matches('/'));
+    let body = serde_json::json!({
+        "infinitasTitle": title,
+        "difficulty": difficulty,
+        "lamp": lamp,
+        "exScore": ex_score,
+        "missCount": miss_count,
+    });
+
+    let config = ureq::Agent::config_builder()
+        .timeout_global(Some(std::time::Duration::from_secs(5)))
+        .build();
+    let agent: ureq::Agent = config.into();
+    let response = agent
+        .post(&url)
+        .header("Authorization", &format!("Bearer {}", token))
+        .send_json(&body)?;
+
+    tracing::debug!("API response: {}", response.status());
+    Ok(())
 }

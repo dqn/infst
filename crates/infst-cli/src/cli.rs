@@ -10,6 +10,14 @@ pub struct Args {
     #[arg(long, value_name = "FILE")]
     pub offsets_file: Option<String>,
 
+    /// API endpoint URL
+    #[arg(long, env = "INFST_API_ENDPOINT")]
+    pub api_endpoint: Option<String>,
+
+    /// API token
+    #[arg(long, env = "INFST_API_TOKEN")]
+    pub api_token: Option<String>,
+
     #[command(subcommand)]
     pub command: Option<Command>,
 }
@@ -149,6 +157,27 @@ pub enum Command {
         /// Process ID (skip automatic detection)
         #[arg(long)]
         pid: Option<u32>,
+    },
+    /// Login to the infst web service
+    Login {
+        /// API endpoint URL
+        #[arg(long, env = "INFST_API_ENDPOINT")]
+        endpoint: String,
+    },
+    /// Upload tracker data to the web service
+    Upload {
+        /// Tracker TSV file path
+        #[arg(long, short = 't', default_value = "tracker.tsv")]
+        tracker: String,
+        /// Title mapping JSON file path
+        #[arg(long, short = 'm', default_value = "title-mapping.json")]
+        mapping: String,
+        /// API endpoint URL
+        #[arg(long, env = "INFST_API_ENDPOINT")]
+        endpoint: Option<String>,
+        /// API token
+        #[arg(long, env = "INFST_API_TOKEN")]
+        token: Option<String>,
     },
 }
 

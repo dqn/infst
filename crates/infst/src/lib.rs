@@ -61,7 +61,7 @@ pub use play::{
 };
 
 // Re-export from infst module
-pub use infst::{GameData, Infst, InfstConfig, InfstConfigBuilder};
+pub use infst::{ApiConfig, GameData, Infst, InfstConfig, InfstConfigBuilder};
 
 // Re-export from retry module
 pub use retry::{ExponentialBackoff, FixedDelay, NoRetry, RetryStrategy};

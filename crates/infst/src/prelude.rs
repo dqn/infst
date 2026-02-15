@@ -17,7 +17,7 @@
 //! - Error handling: `Error`, `Result`
 
 // Core application types
-pub use crate::infst::{GameData, Infst, InfstConfig, InfstConfigBuilder};
+pub use crate::infst::{ApiConfig, GameData, Infst, InfstConfig, InfstConfigBuilder};
 
 // Error handling
 pub use crate::error::{Error, Result};

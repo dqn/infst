@@ -44,6 +44,13 @@ use crate::play::GameStateDetector;
 use crate::score::ScoreMap;
 use crate::session::SessionManager;
 
+/// API configuration for sending play data to the web service
+#[derive(Debug, Clone)]
+pub struct ApiConfig {
+    pub endpoint: String,
+    pub token: String,
+}
+
 /// Configuration for the Infst application
 #[derive(Debug, Clone)]
 pub struct InfstConfig {
@@ -53,6 +60,8 @@ pub struct InfstConfig {
     pub auto_export: bool,
     /// Path for auto-exported tracker file
     pub tracker_path: PathBuf,
+    /// API configuration for sending play data
+    pub api_config: Option<ApiConfig>,
 }
 
 impl Default for InfstConfig {
@@ -61,6 +70,7 @@ impl Default for InfstConfig {
             session_dir: PathBuf::from("sessions"),
             auto_export: true,
             tracker_path: PathBuf::from("tracker.tsv"),
+            api_config: None,
         }
     }
 }
@@ -78,6 +88,7 @@ pub struct InfstConfigBuilder {
     session_dir: Option<PathBuf>,
     auto_export: Option<bool>,
     tracker_path: Option<PathBuf>,
+    api_config: Option<ApiConfig>,
 }
 
 impl InfstConfigBuilder {
@@ -99,6 +110,12 @@ impl InfstConfigBuilder {
         self
     }
 
+    /// Set API configuration
+    pub fn api_config(mut self, config: ApiConfig) -> Self {
+        self.api_config = Some(config);
+        self
+    }
+
     /// Build the configuration
     pub fn build(self) -> InfstConfig {
         let default = InfstConfig::default();
@@ -106,6 +123,7 @@ impl InfstConfigBuilder {
             session_dir: self.session_dir.unwrap_or(default.session_dir),
             auto_export: self.auto_export.unwrap_or(default.auto_export),
             tracker_path: self.tracker_path.unwrap_or(default.tracker_path),
+            api_config: self.api_config,
         }
     }
 }
