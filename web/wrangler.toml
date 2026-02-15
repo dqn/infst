@@ -8,5 +8,4 @@ JWT_SECRET = "change-me-in-production"
 [[d1_databases]]
 binding = "DB"
 database_name = "infst-db"
-database_id = "placeholder-change-me"
 migrations_dir = "drizzle"
