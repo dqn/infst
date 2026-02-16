@@ -1,10 +1,25 @@
 import type { Context } from "hono";
+import { HTTPException } from "hono/http-exception";
 import type { AppEnv } from "../lib/types";
 
 export function setupErrorHandler(app: {
   onError: (handler: (err: Error, c: Context<AppEnv>) => Response | Promise<Response>) => void;
 }): void {
   app.onError((err, c) => {
+    if (err instanceof HTTPException) {
+      if (err.status >= 500) {
+        console.error(
+          JSON.stringify({
+            error: err.message,
+            stack: err.stack,
+            path: c.req.path,
+            method: c.req.method,
+          }),
+        );
+      }
+      return err.getResponse();
+    }
+
     console.error(
       JSON.stringify({
         error: err.message,

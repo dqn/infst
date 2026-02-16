@@ -29,8 +29,10 @@ setupErrorHandler(app);
 // DB middleware for all routes
 app.use("*", dbMiddleware);
 
-// CSRF protection for form-based auth routes
-app.use("/auth/*", csrf());
+// CSRF protection for browser form submissions
+app.use("/auth/login", csrf());
+app.use("/auth/register", csrf());
+app.use("/auth/device/confirm", csrf());
 
 // Rate limiting
 app.use(
