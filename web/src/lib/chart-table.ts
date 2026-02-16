@@ -64,6 +64,37 @@ const TIER_ORDER: string[] = [
   "未定",
 ];
 
+const LAMP_TYPE_ORDER = ["normal", "hard"] as const;
+
+export function formatTableKey(tableKey: string): string {
+  const match = tableKey.match(/^(sp|dp)(\d+)-(normal|hard)$/);
+  if (!match) {
+    return tableKey;
+  }
+  const [, playStyle = "", level = "", lampType = ""] = match;
+  return `${playStyle.toUpperCase()}☆${level} ${lampType.toUpperCase()}`;
+}
+
+export function sortTableKeys<T extends { tableKey: string }>(
+  keys: T[],
+): T[] {
+  return [...keys].sort((a, b) => {
+    const ma = a.tableKey.match(/^(sp|dp)(\d+)-(normal|hard)$/);
+    const mb = b.tableKey.match(/^(sp|dp)(\d+)-(normal|hard)$/);
+    if (!ma || !mb) {
+      return 0;
+    }
+    const levelDiff = Number(ma[2]) - Number(mb[2]);
+    if (levelDiff !== 0) {
+      return levelDiff;
+    }
+    return (
+      LAMP_TYPE_ORDER.indexOf(ma[3] as (typeof LAMP_TYPE_ORDER)[number]) -
+      LAMP_TYPE_ORDER.indexOf(mb[3] as (typeof LAMP_TYPE_ORDER)[number])
+    );
+  });
+}
+
 export function groupChartsByTier(
   chartRows: ChartRow[],
   lampMap: Map<string, LampData>,

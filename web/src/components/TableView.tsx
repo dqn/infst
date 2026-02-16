@@ -2,6 +2,7 @@ import type { FC } from "hono/jsx";
 import { LampCell } from "./LampCell";
 import type { LampValue } from "../lib/lamp";
 import { LAMP_VALUES, getLampStyle } from "../lib/lamp";
+import { formatTableKey } from "../lib/chart-table";
 
 interface TableEntry {
   id: number;
@@ -39,7 +40,7 @@ export const TableView: FC<TableViewProps> = ({
 
   return (
     <div>
-      <h2 style="margin-bottom: 16px;">{tableKey}</h2>
+      <h2 style="margin-bottom: 16px;">{formatTableKey(tableKey)}</h2>
 
       {/* Statistics bar */}
       <div class="card" style="margin-bottom: 24px;">

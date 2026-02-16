@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import type { AppEnv, SessionUser } from "../lib/types";
 import { optionalSession, sessionAuth } from "../middleware/session";
 import { users, charts, lamps } from "../db/schema";
-import { buildLampMap, groupChartsByTier } from "../lib/chart-table";
+import { buildLampMap, groupChartsByTier, formatTableKey, sortTableKeys } from "../lib/chart-table";
 import { Layout } from "../components/Layout";
 import { LoginPage } from "../components/LoginPage";
 import { RegisterPage } from "../components/RegisterPage";
@@ -115,10 +115,12 @@ pageRoutes.get("/:username", optionalSession, async (c) => {
   }
 
   // Get distinct table keys for this user's lamps
-  const userCharts = await db
-    .select({ tableKey: charts.tableKey })
-    .from(charts)
-    .groupBy(charts.tableKey);
+  const userCharts = sortTableKeys(
+    await db
+      .select({ tableKey: charts.tableKey })
+      .from(charts)
+      .groupBy(charts.tableKey),
+  );
 
   return c.html(
     <Layout user={sessionUser}>
@@ -137,7 +139,7 @@ pageRoutes.get("/:username", optionalSession, async (c) => {
                   onmouseover="this.style.borderColor='#444'"
                   onmouseout="this.style.borderColor='#2a2a2a'"
                 >
-                  {chart.tableKey}
+                  {formatTableKey(chart.tableKey)}
                 </a>
               </li>
             ))}
@@ -222,12 +224,12 @@ pageRoutes.get("/:username/:tableKey", optionalSession, async (c) => {
   const tiers = groupChartsByTier(chartRows, lampMap);
 
   return c.html(
-    <Layout title={`${username} - ${tableKey}`} user={sessionUser}>
+    <Layout title={`${username} - ${formatTableKey(tableKey)}`} user={sessionUser}>
       <div style="margin-top:16px;">
         <p style="margin-bottom:8px;font-size:0.9rem;color:#999;">
           <a href={`/${username}`} style="color:#999;">{username}</a>{" "}
           <span style="color:#666;">/</span>{" "}
-          {tableKey}
+          {formatTableKey(tableKey)}
         </p>
         <TableView tableKey={tableKey} tiers={tiers} username={username} />
       </div>
