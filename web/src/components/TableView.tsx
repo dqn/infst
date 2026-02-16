@@ -1,4 +1,5 @@
 import type { FC } from "hono/jsx";
+import { raw } from "hono/html";
 import { LampCell } from "./LampCell";
 import type { LampValue } from "../lib/lamp";
 import { LAMP_VALUES, getLampStyle } from "../lib/lamp";
@@ -83,7 +84,7 @@ export const TableView: FC<TableViewProps> = ({
       ))}
 
       {/* Polling script */}
-      <script>{`
+      <script>{raw(`
         (function() {
           var username = ${JSON.stringify(username)};
           var lastPoll = new Date().toISOString();
@@ -127,7 +128,7 @@ export const TableView: FC<TableViewProps> = ({
 
           setInterval(poll, 5000);
         })();
-      `}</script>
+      `)}</script>
     </div>
   );
 };
