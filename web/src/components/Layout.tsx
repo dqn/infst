@@ -29,6 +29,10 @@ export const Layout: FC<LayoutProps> = ({ title, user, children }) => {
             background: #1a1a1a;
             border-bottom: 1px solid #2a2a2a;
             padding: 14px 24px;
+          }
+          nav .nav-inner {
+            max-width: 960px;
+            margin: 0 auto;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -88,24 +92,26 @@ export const Layout: FC<LayoutProps> = ({ title, user, children }) => {
       </head>
       <body>
         <nav>
-          <a class="brand" href="/">infst</a>
-          <div class="links">
-            <a href="/guide">Guide</a>
-            {user ? (
-              <>
-                {user.username ? (
-                  <a href={`/${user.username}`}>{user.username}</a>
-                ) : null}
-                <a href="/settings">Settings</a>
-                <form method="post" action="/auth/logout" style="display:inline">
-                  <button type="submit" class="secondary" style="padding:6px 12px;font-size:0.85rem">
-                    Logout
-                  </button>
-                </form>
-              </>
-            ) : (
-              <a href="/login">Login</a>
-            )}
+          <div class="nav-inner">
+            <a class="brand" href="/">infst</a>
+            <div class="links">
+              <a href="/guide">Guide</a>
+              {user ? (
+                <>
+                  {user.username ? (
+                    <a href={`/${user.username}`}>{user.username}</a>
+                  ) : null}
+                  <a href="/settings">Settings</a>
+                  <form method="post" action="/auth/logout" style="display:inline">
+                    <button type="submit" class="secondary" style="padding:6px 12px;font-size:0.85rem">
+                      Logout
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <a href="/login">Login</a>
+              )}
+            </div>
           </div>
         </nav>
         <div class="container">
