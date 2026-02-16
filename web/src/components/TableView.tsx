@@ -1,25 +1,9 @@
 import type { FC } from "hono/jsx";
 import { raw } from "hono/html";
 import { LampCell } from "./LampCell";
-import type { LampValue } from "../lib/lamp";
 import { LAMP_VALUES, getLampStyle } from "../lib/lamp";
 import { formatTableKey } from "../lib/chart-table";
-
-interface TableEntry {
-  id: number;
-  title: string;
-  infinitasTitle: string | null;
-  difficulty: string;
-  attributes: string | null;
-  lamp: string;
-  exScore: number | null;
-  missCount: number | null;
-}
-
-interface TierGroup {
-  tier: string;
-  entries: TableEntry[];
-}
+import type { TableEntry, TierGroup } from "../lib/chart-table";
 
 interface TableViewProps {
   tableKey: string;
@@ -123,7 +107,7 @@ export const TableView: FC<TableViewProps> = ({
                   lastPoll = new Date().toISOString();
                 }
               })
-              .catch(function() {});
+              .catch(function(err) { console.error('Polling error:', err); });
           }
 
           setInterval(poll, 5000);

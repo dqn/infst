@@ -72,7 +72,8 @@ export const SettingsPage: FC<SettingsPageProps> = ({ user }) => {
                 if (data.apiToken) {
                   document.getElementById('api-token').value = data.apiToken;
                 }
-              });
+              })
+              .catch(function(err) { console.error('Failed to regenerate token:', err); });
           });
 
           // Toggle visibility
@@ -81,7 +82,8 @@ export const SettingsPage: FC<SettingsPageProps> = ({ user }) => {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ isPublic: this.checked })
-            });
+            })
+            .catch(function(err) { console.error('Failed to update visibility:', err); });
           });
         `)}</script>
       </div>
