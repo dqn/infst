@@ -34,7 +34,7 @@ export const GuidePage: FC<GuidePageProps> = ({ user }) => {
               <a href="#real-time-tracking">5. Real-time Tracking</a>
             </li>
             <li>
-              <a href="#manual-upload">6. Manual Upload</a>
+              <a href="#sync">6. Sync Data</a>
             </li>
             <li>
               <a href="#data-export">7. Data Export</a>
@@ -113,15 +113,18 @@ export const GuidePage: FC<GuidePageProps> = ({ user }) => {
           </p>
         </div>
 
-        {/* Manual Upload */}
-        <div id="manual-upload" class="card" style="margin-bottom:16px;">
-          <h3 style="font-size:1rem;margin-bottom:12px;">6. Manual Upload</h3>
+        {/* Sync Data */}
+        <div id="sync" class="card" style="margin-bottom:16px;">
+          <h3 style="font-size:1rem;margin-bottom:12px;">6. Sync Data</h3>
           <p style="color:#ccc;line-height:1.6;margin-bottom:12px;">
-            You can also upload previously exported data manually:
+            Sync all your play data directly from game memory to the server:
           </p>
-          <code style={codeStyle}>
-            infst upload --tracker tracker.tsv --mapping title-mapping.json
-          </code>
+          <code style={codeStyle}>infst sync</code>
+          <p style="color:#ccc;line-height:1.6;margin-top:12px;">
+            This reads all scores, lamps, and miss counts from the running game
+            and uploads them in one step. Safe to run multiple times — the API
+            is idempotent.
+          </p>
         </div>
 
         {/* Data Export */}
