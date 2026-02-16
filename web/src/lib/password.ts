@@ -1,4 +1,5 @@
-const ITERATIONS = 600_000;
+// Cloudflare Workers WebCrypto currently supports up to 100000 PBKDF2 iterations.
+export const PBKDF2_ITERATIONS = 100_000;
 const HASH_LENGTH = 32;
 const SALT_LENGTH = 16;
 
@@ -15,7 +16,7 @@ export async function hashPassword(password: string): Promise<string> {
   );
 
   const hash = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: ITERATIONS, hash: "SHA-256" },
+    { name: "PBKDF2", salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
     key,
     HASH_LENGTH * 8,
   );
@@ -23,7 +24,7 @@ export async function hashPassword(password: string): Promise<string> {
   const saltBase64 = btoa(String.fromCharCode(...salt));
   const hashBase64 = btoa(String.fromCharCode(...new Uint8Array(hash)));
 
-  return `pbkdf2:${ITERATIONS}:${saltBase64}:${hashBase64}`;
+  return `pbkdf2:${PBKDF2_ITERATIONS}:${saltBase64}:${hashBase64}`;
 }
 
 export async function verifyPassword(
@@ -48,13 +49,18 @@ export async function verifyPassword(
     ["deriveBits"],
   );
 
-  const actualHash = new Uint8Array(
-    await crypto.subtle.deriveBits(
-      { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
-      key,
-      expectedHash.length * 8,
-    ),
-  );
+  let actualHash: Uint8Array;
+  try {
+    actualHash = new Uint8Array(
+      await crypto.subtle.deriveBits(
+        { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+        key,
+        expectedHash.length * 8,
+      ),
+    );
+  } catch {
+    return false;
+  }
 
   if (actualHash.length !== expectedHash.length) {
     return false;

@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 
-import { hashPassword, verifyPassword } from "../../lib/password";
+import {
+  hashPassword,
+  verifyPassword,
+  PBKDF2_ITERATIONS,
+} from "../../lib/password";
 
 describe("hashPassword", () => {
   it("returns a pbkdf2-prefixed hash", async () => {
@@ -14,10 +18,10 @@ describe("hashPassword", () => {
     expect(hash1).not.toBe(hash2);
   });
 
-  it("uses 600000 iterations", async () => {
+  it("uses configured PBKDF2 iterations", async () => {
     const hash = await hashPassword("test");
     const iterations = hash.split(":")[1];
-    expect(iterations).toBe("600000");
+    expect(iterations).toBe(String(PBKDF2_ITERATIONS));
   });
 });
 
