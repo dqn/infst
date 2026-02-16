@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { raw } from "hono/html";
 import { eq } from "drizzle-orm";
 
 import type { AppEnv, SessionUser } from "../lib/types";
@@ -39,13 +38,7 @@ pageRoutes.get("/", optionalSession, (c) => {
             />
             <button type="submit">View</button>
           </form>
-          <script>{raw(`
-            document.getElementById('search-form').addEventListener('submit', function(e) {
-              e.preventDefault();
-              var username = this.querySelector('input').value.trim().toLowerCase();
-              if (username) window.location.href = '/' + encodeURIComponent(username);
-            });
-          `)}</script>
+          <script src="/search-form.js"></script>
         </div>
       </div>
     </Layout>,

@@ -1,5 +1,4 @@
 import type { FC } from "hono/jsx";
-import { raw } from "hono/html";
 import { LampCell } from "./LampCell";
 import { LAMP_VALUES, getLampStyle } from "../lib/lamp";
 import { formatTableKey } from "../lib/chart-table";
@@ -68,51 +67,17 @@ export const TableView: FC<TableViewProps> = ({
       ))}
 
       {/* Polling script */}
-      <script>{raw(`
-        (function() {
-          var username = ${JSON.stringify(username)};
-          var lastPoll = new Date().toISOString();
-
-          var LAMP_STYLES = ${JSON.stringify(
-            Object.fromEntries(
-              LAMP_VALUES.map((l) => [l, getLampStyle(l)])
-            )
-          )};
-
-          function updateCell(key, lamp) {
-            var cells = document.querySelectorAll('.lamp-cell[data-key="' + key + '"]');
-            cells.forEach(function(cell) {
-              var style = LAMP_STYLES[lamp] || LAMP_STYLES["NO PLAY"];
-              cell.dataset.lamp = lamp;
-              cell.style.color = style.color;
-              if (style.background.indexOf("linear-gradient") === 0) {
-                cell.style.backgroundImage = style.background;
-                cell.style.backgroundColor = "";
-              } else {
-                cell.style.backgroundColor = style.background;
-                cell.style.backgroundImage = "";
-              }
-              cell.style.border = style.border || "";
-            });
-          }
-
-          function poll() {
-            fetch("/api/lamps/updated-since?since=" + encodeURIComponent(lastPoll) + "&user=" + encodeURIComponent(username))
-              .then(function(res) { return res.json(); })
-              .then(function(data) {
-                if (data.lamps && data.lamps.length > 0) {
-                  data.lamps.forEach(function(l) {
-                    updateCell(l.infinitasTitle + ":" + l.difficulty, l.lamp);
-                  });
-                  lastPoll = new Date().toISOString();
-                }
-              })
-              .catch(function(err) { console.error('Polling error:', err); });
-          }
-
-          setInterval(poll, 5000);
-        })();
-      `)}</script>
+      <div
+        id="table-data"
+        data-username={username}
+        data-lamp-styles={JSON.stringify(
+          Object.fromEntries(
+            LAMP_VALUES.map((l) => [l, getLampStyle(l)])
+          )
+        )}
+        hidden
+      />
+      <script src="/table-polling.js"></script>
     </div>
   );
 };
