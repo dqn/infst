@@ -1,3 +1,4 @@
+import type { FC } from "hono/jsx";
 import { Layout } from "./Layout";
 
 interface SettingsPageProps {
@@ -8,14 +9,14 @@ interface SettingsPageProps {
   };
 }
 
-export function SettingsPage({ user }: SettingsPageProps): ReturnType<typeof SettingsPage> {
+export const SettingsPage: FC<SettingsPageProps> = ({ user }) => {
   return (
     <Layout title="Settings" user={user}>
       <div style="max-width:500px;margin:24px auto;">
         <h2 style="margin-bottom:24px;">Settings</h2>
 
         {/* API Token */}
-        <section style="margin-bottom:32px;">
+        <div class="card" style="margin-bottom:16px;">
           <h3 style="margin-bottom:12px;font-size:1rem;">API Token</h3>
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
             <input
@@ -32,10 +33,10 @@ export function SettingsPage({ user }: SettingsPageProps): ReturnType<typeof Set
           <button type="button" id="regen-token" class="danger" style="font-size:0.85rem;">
             Regenerate
           </button>
-        </section>
+        </div>
 
         {/* Visibility */}
-        <section style="margin-bottom:32px;">
+        <div class="card" style="margin-bottom:16px;">
           <h3 style="margin-bottom:12px;font-size:1rem;">Profile Visibility</h3>
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
             <input
@@ -45,10 +46,10 @@ export function SettingsPage({ user }: SettingsPageProps): ReturnType<typeof Set
             />
             <span>Public profile</span>
           </label>
-          <p style="font-size:0.8rem;color:#888;margin-top:4px;">
+          <p style="font-size:0.8rem;color:#666;margin-top:4px;">
             When disabled, your lamp data will not be visible to others.
           </p>
-        </section>
+        </div>
 
         <script>{`
           // Copy token
@@ -85,4 +86,4 @@ export function SettingsPage({ user }: SettingsPageProps): ReturnType<typeof Set
       </div>
     </Layout>
   );
-}
+};

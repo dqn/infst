@@ -1,3 +1,4 @@
+import type { FC } from "hono/jsx";
 import { getLampStyle } from "../lib/lamp";
 
 interface LampCellProps {
@@ -8,13 +9,13 @@ interface LampCellProps {
   attributes: string | null;
 }
 
-export function LampCell({
+export const LampCell: FC<LampCellProps> = ({
   title,
   infinitasTitle,
   difficulty,
   lamp,
   attributes,
-}: LampCellProps): ReturnType<typeof LampCell> {
+}) => {
   const style = getLampStyle(lamp);
   const lookupKey = `${infinitasTitle ?? title}:${difficulty}`;
 
@@ -55,4 +56,4 @@ export function LampCell({
       {title}
     </span>
   );
-}
+};

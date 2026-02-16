@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { drizzle } from "drizzle-orm/d1";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import type { Env } from "../lib/types";
 import { optionalSession, sessionAuth } from "../middleware/session";
@@ -31,13 +31,13 @@ pageRoutes.get("/", optionalSession, (c) => {
   return c.html(
     <Layout user={user}>
       <div style="margin-top:24px;">
-        <h2 style="margin-bottom:16px;">infst - IIDX INFINITAS Score Tracker</h2>
-        <p style="color:#aaa;margin-bottom:24px;">
+        <h2 style="margin-bottom:16px;font-weight:300;">infst - IIDX INFINITAS Score Tracker</h2>
+        <p style="color:#999;margin-bottom:24px;">
           Track your clear lamps on difficulty tables.
         </p>
 
         {/* User search */}
-        <section style="margin-bottom:32px;">
+        <div class="card">
           <h3 style="font-size:1rem;margin-bottom:8px;">Find a player</h3>
           <form id="search-form" style="display:flex;gap:8px;">
             <input
@@ -55,21 +55,7 @@ pageRoutes.get("/", optionalSession, (c) => {
               if (username) window.location.href = '/' + encodeURIComponent(username);
             });
           `}</script>
-        </section>
-
-        {/* Table selection */}
-        <section>
-          <h3 style="font-size:1rem;margin-bottom:8px;">Difficulty Tables</h3>
-          <div id="table-list" style="color:#888;">
-            Loading tables...
-          </div>
-          <script>{`
-            // Fetch available tables from the charts table
-            // For now, show a simple list of known tables
-            var tableList = document.getElementById('table-list');
-            tableList.innerHTML = '<p style="color:#888;">Enter a username above to view their lamp data on a difficulty table.</p>';
-          `}</script>
-        </section>
+        </div>
       </div>
     </Layout>,
   );
@@ -109,7 +95,7 @@ pageRoutes.get("/:username", optionalSession, async (c) => {
       <Layout user={sessionUser}>
         <div style="margin-top:48px;text-align:center;">
           <h2>User not found</h2>
-          <p style="color:#aaa;margin-top:8px;">
+          <p style="color:#666;margin-top:8px;">
             The user "{username}" does not exist.
           </p>
         </div>
@@ -123,7 +109,7 @@ pageRoutes.get("/:username", optionalSession, async (c) => {
       <Layout user={sessionUser}>
         <div style="margin-top:48px;text-align:center;">
           <h2>Private Profile</h2>
-          <p style="color:#aaa;margin-top:8px;">
+          <p style="color:#666;margin-top:8px;">
             This user's profile is private.
           </p>
         </div>
@@ -142,16 +128,18 @@ pageRoutes.get("/:username", optionalSession, async (c) => {
     <Layout user={sessionUser}>
       <div style="margin-top:24px;">
         <h2 style="margin-bottom:16px;">{username}</h2>
-        <h3 style="font-size:1rem;margin-bottom:12px;color:#aaa;">Difficulty Tables</h3>
+        <h3 style="font-size:1rem;margin-bottom:12px;color:#999;">Difficulty Tables</h3>
         {userCharts.length === 0 ? (
-          <p style="color:#888;">No tables available.</p>
+          <p style="color:#666;">No tables available.</p>
         ) : (
           <ul style="list-style:none;display:flex;flex-direction:column;gap:8px;">
             {userCharts.map((chart) => (
               <li>
                 <a
                   href={`/${username}/${chart.tableKey}`}
-                  style="display:block;padding:12px 16px;background:#12122a;border:1px solid #2a2a4a;border-radius:4px;"
+                  style="display:block;padding:12px 16px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;text-decoration:none;transition:border-color 0.15s;"
+                  onmouseover="this.style.borderColor='#444'"
+                  onmouseout="this.style.borderColor='#2a2a2a'"
                 >
                   {chart.tableKey}
                 </a>
@@ -185,6 +173,9 @@ pageRoutes.get("/:username/:tableKey", optionalSession, async (c) => {
       <Layout user={sessionUser}>
         <div style="margin-top:48px;text-align:center;">
           <h2>User not found</h2>
+          <p style="color:#666;margin-top:8px;">
+            The user "{username}" does not exist.
+          </p>
         </div>
       </Layout>,
       404,
@@ -196,6 +187,9 @@ pageRoutes.get("/:username/:tableKey", optionalSession, async (c) => {
       <Layout user={sessionUser}>
         <div style="margin-top:48px;text-align:center;">
           <h2>Private Profile</h2>
+          <p style="color:#666;margin-top:8px;">
+            This user's profile is private.
+          </p>
         </div>
       </Layout>,
       403,
@@ -213,6 +207,9 @@ pageRoutes.get("/:username/:tableKey", optionalSession, async (c) => {
       <Layout user={sessionUser}>
         <div style="margin-top:48px;text-align:center;">
           <h2>Table not found</h2>
+          <p style="color:#666;margin-top:8px;">
+            The table "{tableKey}" does not exist.
+          </p>
         </div>
       </Layout>,
       404,
@@ -283,8 +280,10 @@ pageRoutes.get("/:username/:tableKey", optionalSession, async (c) => {
   return c.html(
     <Layout title={`${username} - ${tableKey}`} user={sessionUser}>
       <div style="margin-top:16px;">
-        <p style="margin-bottom:8px;">
-          <a href={`/${username}`}>{username}</a> / {tableKey}
+        <p style="margin-bottom:8px;font-size:0.9rem;color:#999;">
+          <a href={`/${username}`} style="color:#999;">{username}</a>{" "}
+          <span style="color:#666;">/</span>{" "}
+          {tableKey}
         </p>
         <TableView tableKey={tableKey} tiers={tiers} username={username} />
       </div>

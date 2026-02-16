@@ -1,3 +1,4 @@
+import type { FC } from "hono/jsx";
 import { LampCell } from "./LampCell";
 import type { LampValue } from "../lib/lamp";
 import { LAMP_VALUES, getLampStyle } from "../lib/lamp";
@@ -24,11 +25,11 @@ interface TableViewProps {
   username: string;
 }
 
-export function TableView({
+export const TableView: FC<TableViewProps> = ({
   tableKey,
   tiers,
   username,
-}: TableViewProps): ReturnType<typeof TableView> {
+}) => {
   // Calculate statistics
   const allEntries = tiers.flatMap((t) => t.entries);
   const lampCounts = new Map<string, number>();
@@ -41,7 +42,7 @@ export function TableView({
       <h2 style="margin-bottom: 16px;">{tableKey}</h2>
 
       {/* Statistics bar */}
-      <div style="margin-bottom: 24px;">
+      <div class="card" style="margin-bottom: 24px;">
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
           {LAMP_VALUES.filter((l) => (lampCounts.get(l) ?? 0) > 0).map((lamp) => {
             const style = getLampStyle(lamp);
@@ -55,7 +56,7 @@ export function TableView({
             );
           })}
         </div>
-        <div style="font-size:0.85rem;color:#888;">
+        <div style="font-size:0.85rem;color:#666;">
           Total: {allEntries.length}
         </div>
       </div>
@@ -63,10 +64,10 @@ export function TableView({
       {/* Tier groups */}
       {tiers.map((tier) => (
         <div style="margin-bottom: 20px;">
-          <h3 style="font-size:1rem;color:#aaa;border-bottom:1px solid #2a2a4a;padding-bottom:4px;margin-bottom:8px;">
+          <h3 style="font-size:0.85rem;color:#999;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #2a2a2a;padding-bottom:4px;margin-bottom:8px;">
             {tier.tier}
           </h3>
-          <div style="display:flex;flex-wrap:wrap;gap:4px;">
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
             {tier.entries.map((entry) => (
               <LampCell
                 title={entry.title}
@@ -128,4 +129,4 @@ export function TableView({
       `}</script>
     </div>
   );
-}
+};

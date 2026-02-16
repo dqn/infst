@@ -32,16 +32,16 @@ export interface LampStyle {
 }
 
 const LAMP_STYLES: Record<LampValue, LampStyle> = {
-  "NO PLAY": { background: "#666", color: "#fff" },
-  FAILED: { background: "#e53e3e", color: "#fff" },
-  ASSIST: { background: "#9f7aea", color: "#fff" },
-  EASY: { background: "#80ff00", color: "#000" },
-  CLEAR: { background: "#00e5ff", color: "#000" },
-  HARD: { background: "#ffffff", color: "#000", border: "1px solid #666" },
-  "EX HARD": { background: "#ffd700", color: "#000" },
-  FC: { background: "#00e5ff", color: "#000" },
+  "NO PLAY": { background: "#333", color: "#888" },
+  FAILED: { background: "#c0392b", color: "#fff" },
+  ASSIST: { background: "#8e6cbf", color: "#fff" },
+  EASY: { background: "#6abf40", color: "#000" },
+  CLEAR: { background: "#3db8c9", color: "#000" },
+  HARD: { background: "#e0e0e0", color: "#111", border: "1px solid #555" },
+  "EX HARD": { background: "#d4aa00", color: "#000" },
+  FC: { background: "#3db8c9", color: "#000" },
   PFC: {
-    background: "linear-gradient(135deg, #ffd700, #ffec80, #ffd700)",
+    background: "linear-gradient(135deg, #d4aa00, #e8cc55, #d4aa00)",
     color: "#000",
   },
 };

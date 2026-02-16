@@ -19,10 +19,10 @@ function base64urlEncode(data: Uint8Array): string {
 }
 
 // Decode base64url to bytes
-function base64urlDecode(str: string): Uint8Array {
+function base64urlDecode(str: string): Uint8Array<ArrayBuffer> {
   const padded = str.replace(/-/g, "+").replace(/_/g, "/");
   const binString = atob(padded);
-  return Uint8Array.from(binString, (c) => c.charCodeAt(0));
+  return Uint8Array.from(binString, (c) => c.charCodeAt(0)) as Uint8Array<ArrayBuffer>;
 }
 
 // Encode string to base64url

@@ -1,4 +1,4 @@
-import type { Child } from "hono/jsx";
+import type { Child, FC } from "hono/jsx";
 
 interface LayoutProps {
   title?: string;
@@ -6,7 +6,7 @@ interface LayoutProps {
   children: Child;
 }
 
-export function Layout({ title, user, children }: LayoutProps): ReturnType<typeof Layout> {
+export const Layout: FC<LayoutProps> = ({ title, user, children }) => {
   const pageTitle = title ? `${title} - infst` : "infst";
 
   return (
@@ -18,55 +18,72 @@ export function Layout({ title, user, children }: LayoutProps): ReturnType<typeo
         <style>{`
           *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
           body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background: #0a0a1a;
+            font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+            background: #111;
             color: #e0e0e0;
             min-height: 100vh;
           }
-          a { color: #00e5ff; text-decoration: none; }
-          a:hover { text-decoration: underline; }
+          a { color: #ccc; text-decoration: underline; }
+          a:hover { color: #e0e0e0; }
           nav {
-            background: #12122a;
-            border-bottom: 1px solid #2a2a4a;
-            padding: 12px 24px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #2a2a2a;
+            padding: 14px 24px;
             display: flex;
             align-items: center;
             justify-content: space-between;
           }
-          nav .brand { font-weight: bold; font-size: 1.2rem; color: #00e5ff; }
+          nav .brand {
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: #e0e0e0;
+            text-decoration: none;
+          }
+          nav .brand:hover { color: #fff; }
           nav .links { display: flex; gap: 16px; align-items: center; }
+          nav .links a {
+            color: #999;
+            text-decoration: none;
+          }
+          nav .links a:hover { color: #e0e0e0; }
           .container { max-width: 960px; margin: 0 auto; padding: 24px; }
+          .card {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 24px;
+          }
           input, button, select {
             font-family: inherit;
             font-size: 0.9rem;
           }
-          input[type="text"], input[type="email"] {
-            background: #1a1a3a;
-            border: 1px solid #3a3a5a;
+          input[type="text"], input[type="email"], input[type="password"] {
+            background: #222;
+            border: 1px solid #333;
             color: #e0e0e0;
-            padding: 8px 12px;
-            border-radius: 4px;
+            padding: 10px 12px;
+            border-radius: 6px;
           }
-          input:focus { outline: none; border-color: #00e5ff; }
+          input:focus { outline: none; border-color: #888; }
           button {
             cursor: pointer;
-            background: #00e5ff;
-            color: #000;
+            background: #e0e0e0;
+            color: #111;
             border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
+            padding: 10px 16px;
+            border-radius: 6px;
             font-weight: bold;
           }
-          button:hover { background: #00c8e0; }
+          button:hover { background: #ccc; }
           button.secondary {
-            background: #3a3a5a;
+            background: #333;
             color: #e0e0e0;
           }
-          button.secondary:hover { background: #4a4a6a; }
-          button.danger { background: #e53e3e; color: #fff; }
-          button.danger:hover { background: #c53030; }
-          .error { color: #e53e3e; margin-bottom: 12px; }
-          .success { color: #48bb78; margin-bottom: 12px; }
+          button.secondary:hover { background: #444; }
+          button.danger { background: #c53030; color: #fff; }
+          button.danger:hover { background: #a02020; }
+          .error { color: #e06060; margin-bottom: 12px; }
+          .success { color: #6bc98a; margin-bottom: 12px; }
         `}</style>
       </head>
       <body>
@@ -80,7 +97,7 @@ export function Layout({ title, user, children }: LayoutProps): ReturnType<typeo
                 ) : null}
                 <a href="/settings">Settings</a>
                 <form method="post" action="/auth/logout" style="display:inline">
-                  <button type="submit" class="secondary" style="padding:4px 12px;font-size:0.85rem">
+                  <button type="submit" class="secondary" style="padding:6px 12px;font-size:0.85rem">
                     Logout
                   </button>
                 </form>
@@ -96,4 +113,4 @@ export function Layout({ title, user, children }: LayoutProps): ReturnType<typeo
       </body>
     </html>
   );
-}
+};
