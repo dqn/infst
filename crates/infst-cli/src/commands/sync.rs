@@ -2,7 +2,8 @@
 
 use anyhow::{Context, Result};
 use infst::{
-    MemoryReader, ScoreMap, chart::Difficulty, fetch_song_database, get_unlock_states, score::Lamp,
+    MemoryReader, OffsetSearcher, ScoreMap, chart::Difficulty, fetch_song_database,
+    get_unlock_states, score::Lamp,
 };
 use serde::Serialize;
 use std::time::Duration;
@@ -50,7 +51,9 @@ pub fn run(endpoint: Option<&str>, token: Option<&str>, pid: Option<u32>) -> Res
     );
 
     let reader = MemoryReader::new(&process);
-    let offsets = cli_utils::search_offsets(&reader)?;
+    // Search only required offsets (song list/data map/unlock data)
+    let mut searcher = OffsetSearcher::new(&reader);
+    let offsets = searcher.search_data_offsets()?;
     eprintln!("Offsets detected");
 
     // Load song database

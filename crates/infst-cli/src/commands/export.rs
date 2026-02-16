@@ -2,8 +2,8 @@
 
 use anyhow::Result;
 use infst::{
-    MemoryReader, ScoreMap, fetch_song_database, generate_tracker_json, generate_tracker_tsv,
-    get_unlock_states,
+    MemoryReader, OffsetSearcher, ScoreMap, fetch_song_database,
+    generate_tracker_json, generate_tracker_tsv, get_unlock_states,
 };
 
 use crate::cli::ExportFormat;
@@ -22,7 +22,9 @@ pub fn run(output: Option<&str>, format: ExportFormat, pid: Option<u32>) -> Resu
     );
 
     let reader = MemoryReader::new(&process);
-    let offsets = cli_utils::search_offsets(&reader)?;
+    // Search only required offsets (song list/data map/unlock data)
+    let mut searcher = OffsetSearcher::new(&reader);
+    let offsets = searcher.search_data_offsets()?;
 
     eprintln!("Offsets detected");
 

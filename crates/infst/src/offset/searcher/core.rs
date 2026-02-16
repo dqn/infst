@@ -151,6 +151,49 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         Ok(offsets)
     }
 
+    /// Search offsets required for score export/sync operations.
+    ///
+    /// Unlike `search_all_with_signatures`, this method does not require
+    /// gameplay-state offsets such as PlayData/CurrentSong. This allows
+    /// export/sync to work even when those regions are not initialized.
+    pub fn search_data_offsets(&mut self) -> Result<OffsetsCollection> {
+        debug!("Starting data-offset detection for export/sync...");
+
+        let mut offsets = OffsetsCollection {
+            version: "unknown".to_string(),
+            ..Default::default()
+        };
+
+        let base = self.reader.base_address();
+        let song_list_hint = self
+            .song_list_hint
+            .unwrap_or(base + EXPECTED_SONG_LIST_OFFSET);
+
+        offsets.song_list = self.search_song_list_offset(song_list_hint)?;
+        debug!("  SongList: 0x{:X}", offsets.song_list);
+
+        offsets.data_map = self.search_data_map_offset(base).or_else(|e| {
+            debug!(
+                "  DataMap search from base failed: {}, trying from SongList",
+                e
+            );
+            self.search_data_map_offset(offsets.song_list)
+        })?;
+        debug!("  DataMap: 0x{:X}", offsets.data_map);
+
+        offsets.unlock_data = self.search_unlock_data_offset(offsets.song_list)?;
+        debug!("  UnlockData: 0x{:X}", offsets.unlock_data);
+
+        if offsets.song_list == 0 || offsets.data_map == 0 || offsets.unlock_data == 0 {
+            return Err(Error::offset_search_failed(
+                "Validation failed: required data offsets are zero".to_string(),
+            ));
+        }
+
+        debug!("Data-offset detection completed successfully");
+        Ok(offsets)
+    }
+
     /// Validate all offsets in a collection (delegates to validation module)
     #[inline]
     pub fn validate_signature_offsets(&self, offsets: &OffsetsCollection) -> bool {
