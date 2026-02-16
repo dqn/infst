@@ -31,12 +31,13 @@ export const bearerAuth = createMiddleware<AppEnv>(async (c, next) => {
   }
 
   // Check API token expiry (90 days)
-  if (user.apiTokenCreatedAt) {
-    const createdAt = new Date(user.apiTokenCreatedAt).getTime();
-    const expiryMs = API_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
-    if (Date.now() - createdAt > expiryMs) {
-      return c.json({ error: "token_expired" }, 401);
-    }
+  if (!user.apiTokenCreatedAt) {
+    return c.json({ error: "token_expired" }, 401);
+  }
+  const createdAt = new Date(user.apiTokenCreatedAt).getTime();
+  const expiryMs = API_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+  if (Date.now() - createdAt > expiryMs) {
+    return c.json({ error: "token_expired" }, 401);
   }
 
   c.set("user", user);

@@ -34,6 +34,10 @@ app.use("/auth/login", csrf());
 app.use("/auth/register", csrf());
 app.use("/auth/device/confirm", csrf());
 
+// CSRF protection for session-authenticated API endpoints
+app.use("/api/users/me", csrf());
+app.use("/api/users/me/*", csrf());
+
 // Rate limiting
 app.use(
   "/auth/login",

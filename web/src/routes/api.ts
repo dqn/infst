@@ -86,6 +86,9 @@ apiRoutes.post("/lamps", bearerAuth, async (c) => {
   }
 
   const user = c.get("user");
+  if (!user) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
   const db = c.get("db");
 
   // Check existing lamp
@@ -94,7 +97,7 @@ apiRoutes.post("/lamps", bearerAuth, async (c) => {
     .from(lamps)
     .where(
       and(
-        eq(lamps.userId, user!.id),
+        eq(lamps.userId, user.id),
         eq(lamps.infinitasTitle, body.infinitasTitle),
         eq(lamps.difficulty, body.difficulty),
       ),
@@ -141,7 +144,7 @@ apiRoutes.post("/lamps", bearerAuth, async (c) => {
 
   // Insert new lamp
   await db.insert(lamps).values({
-    userId: user!.id,
+    userId: user.id,
     infinitasTitle: body.infinitasTitle,
     difficulty: body.difficulty,
     lamp: body.lamp,
@@ -168,6 +171,9 @@ apiRoutes.post("/lamps/bulk", bearerAuth, async (c) => {
   }
 
   const user = c.get("user");
+  if (!user) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
   const db = c.get("db");
   const now = new Date().toISOString();
   let updatedCount = 0;
@@ -178,7 +184,7 @@ apiRoutes.post("/lamps/bulk", bearerAuth, async (c) => {
   const existingLamps = await db
     .select()
     .from(lamps)
-    .where(eq(lamps.userId, user!.id));
+    .where(eq(lamps.userId, user.id));
 
   const existingMap = new Map<string, typeof existingLamps[number]>();
   for (const l of existingLamps) {
@@ -233,7 +239,7 @@ apiRoutes.post("/lamps/bulk", bearerAuth, async (c) => {
       }
     } else {
       inserts.push({
-        userId: user!.id,
+        userId: user.id,
         infinitasTitle: entry.infinitasTitle,
         difficulty: entry.difficulty,
         lamp: entry.lamp,
@@ -403,6 +409,9 @@ apiRoutes.post("/charts/sync", async (c) => {
 apiRoutes.patch("/users/me", sessionAuth, async (c) => {
   const body = await c.req.json<{ isPublic?: boolean }>();
   const user = c.get("user");
+  if (!user) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
   const db = c.get("db");
 
   const updates: Record<string, unknown> = {};
@@ -411,7 +420,7 @@ apiRoutes.patch("/users/me", sessionAuth, async (c) => {
   }
 
   if (Object.keys(updates).length > 0) {
-    await db.update(users).set(updates).where(eq(users.id, user!.id));
+    await db.update(users).set(updates).where(eq(users.id, user.id));
   }
 
   return c.json({ ok: true });
@@ -420,12 +429,18 @@ apiRoutes.patch("/users/me", sessionAuth, async (c) => {
 // GET /api/users/me/token - Get API token (session auth)
 apiRoutes.get("/users/me/token", sessionAuth, async (c) => {
   const user = c.get("user");
-  return c.json({ apiToken: user!.apiToken });
+  if (!user) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+  return c.json({ apiToken: user.apiToken });
 });
 
 // POST /api/users/me/token/regenerate - Regenerate API token (session auth)
 apiRoutes.post("/users/me/token/regenerate", sessionAuth, async (c) => {
   const user = c.get("user");
+  if (!user) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
   const newToken = generateToken();
   const now = new Date().toISOString();
   const db = c.get("db");
@@ -433,7 +448,7 @@ apiRoutes.post("/users/me/token/regenerate", sessionAuth, async (c) => {
   await db
     .update(users)
     .set({ apiToken: newToken, apiTokenCreatedAt: now })
-    .where(eq(users.id, user!.id));
+    .where(eq(users.id, user.id));
 
   return c.json({ apiToken: newToken });
 });
