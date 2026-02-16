@@ -26,8 +26,7 @@ export const LampCell: FC<LampCellProps> = ({
     "white-space": "nowrap",
     overflow: "hidden",
     "text-overflow": "ellipsis",
-    "max-width": "200px",
-    display: "inline-block",
+    "min-width": "0",
     color: style.color,
   };
 

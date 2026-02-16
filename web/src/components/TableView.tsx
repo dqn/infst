@@ -67,7 +67,7 @@ export const TableView: FC<TableViewProps> = ({
           <h3 style="font-size:0.85rem;color:#999;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #2a2a2a;padding-bottom:4px;margin-bottom:8px;">
             {tier.tier}
           </h3>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));gap:6px;">
             {tier.entries.map((entry) => (
               <LampCell
                 title={entry.title}
