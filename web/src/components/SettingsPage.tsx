@@ -1,3 +1,4 @@
+import { raw } from "hono/html";
 import type { FC } from "hono/jsx";
 import { Layout } from "./Layout";
 
@@ -51,7 +52,7 @@ export const SettingsPage: FC<SettingsPageProps> = ({ user }) => {
           </p>
         </div>
 
-        <script>{`
+        <script>{raw(`
           // Copy token
           document.getElementById('copy-token').addEventListener('click', function() {
             var input = document.getElementById('api-token');
@@ -82,7 +83,7 @@ export const SettingsPage: FC<SettingsPageProps> = ({ user }) => {
               body: JSON.stringify({ isPublic: this.checked })
             });
           });
-        `}</script>
+        `)}</script>
       </div>
     </Layout>
   );

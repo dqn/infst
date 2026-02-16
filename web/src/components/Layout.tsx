@@ -1,3 +1,4 @@
+import { raw } from "hono/html";
 import type { Child, FC } from "hono/jsx";
 
 interface LayoutProps {
@@ -15,7 +16,7 @@ export const Layout: FC<LayoutProps> = ({ title, user, children }) => {
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{pageTitle}</title>
-        <style>{`
+        <style>{raw(`
           *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
           body {
             font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -88,7 +89,7 @@ export const Layout: FC<LayoutProps> = ({ title, user, children }) => {
           button.danger:hover { background: #a02020; }
           .error { color: #e06060; margin-bottom: 12px; }
           .success { color: #6bc98a; margin-bottom: 12px; }
-        `}</style>
+        `)}</style>
       </head>
       <body>
         <nav>

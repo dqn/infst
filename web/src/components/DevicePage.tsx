@@ -38,7 +38,7 @@ export const DevicePage: FC<DevicePageProps> = ({
                     value={userCode}
                     placeholder="XXXX-XXXX"
                     required
-                    style="width:100%;font-size:1.5rem;text-align:center;letter-spacing:4px;"
+                    style="width:100%;font-size:1.5rem;text-align:center;letter-spacing:4px;padding:14px 20px;"
                   />
                 </div>
                 <button type="submit" style="width:100%;">Authorize</button>
