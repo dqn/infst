@@ -3,6 +3,7 @@ import {
   text,
   integer,
   uniqueIndex,
+  index,
 } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
@@ -12,6 +13,7 @@ export const users = sqliteTable("users", {
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   apiToken: text("api_token").unique(),
+  apiTokenCreatedAt: text("api_token_created_at"),
   isPublic: integer("is_public", { mode: "boolean" }).notNull().default(true),
   createdAt: text("created_at")
     .notNull()
@@ -65,5 +67,12 @@ export const lamps = sqliteTable(
       table.infinitasTitle,
       table.difficulty,
     ),
+    index("lamps_user_updated_at_idx").on(table.userId, table.updatedAt),
   ],
 );
+
+export const rateLimits = sqliteTable("rate_limits", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  key: text("key").notNull(),
+  createdAt: text("created_at").notNull(),
+});

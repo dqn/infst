@@ -1,27 +1,12 @@
 import { createMiddleware } from "hono/factory";
-import { drizzle } from "drizzle-orm/d1";
 import { eq } from "drizzle-orm";
 
-import type { Env } from "../lib/types";
+import type { AppEnv } from "../lib/types";
 import { users } from "../db/schema";
-
-interface AuthUser {
-  id: number;
-  email: string;
-  username: string | null;
-  apiToken: string | null;
-  isPublic: boolean;
-}
-
-interface AuthEnv {
-  Bindings: Env;
-  Variables: {
-    user: AuthUser;
-  };
-}
+import { API_TOKEN_EXPIRY_DAYS } from "../lib/constants";
 
 // Bearer token authentication middleware for API routes
-export const bearerAuth = createMiddleware<AuthEnv>(async (c, next) => {
+export const bearerAuth = createMiddleware<AppEnv>(async (c, next) => {
   const authorization = c.req.header("Authorization");
   if (!authorization) {
     return c.json({ error: "Missing Authorization header" }, 401);
@@ -33,7 +18,7 @@ export const bearerAuth = createMiddleware<AuthEnv>(async (c, next) => {
   }
 
   const token = match[1];
-  const db = drizzle(c.env.DB);
+  const db = c.get("db");
   const result = await db
     .select()
     .from(users)
@@ -43,6 +28,15 @@ export const bearerAuth = createMiddleware<AuthEnv>(async (c, next) => {
   const user = result[0];
   if (!user) {
     return c.json({ error: "Invalid API token" }, 401);
+  }
+
+  // Check API token expiry (90 days)
+  if (user.apiTokenCreatedAt) {
+    const createdAt = new Date(user.apiTokenCreatedAt).getTime();
+    const expiryMs = API_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+    if (Date.now() - createdAt > expiryMs) {
+      return c.json({ error: "token_expired" }, 401);
+    }
   }
 
   c.set("user", user);

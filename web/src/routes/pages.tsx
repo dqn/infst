@@ -1,10 +1,10 @@
 import { Hono } from "hono";
-import { drizzle } from "drizzle-orm/d1";
 import { eq } from "drizzle-orm";
 
-import type { Env } from "../lib/types";
+import type { AppEnv, SessionUser } from "../lib/types";
 import { optionalSession, sessionAuth } from "../middleware/session";
 import { users, charts, lamps } from "../db/schema";
+import { buildLampMap, groupChartsByTier } from "../lib/chart-table";
 import { Layout } from "../components/Layout";
 import { LoginPage } from "../components/LoginPage";
 import { RegisterPage } from "../components/RegisterPage";
@@ -12,22 +12,11 @@ import { SettingsPage } from "../components/SettingsPage";
 import { GuidePage } from "../components/GuidePage";
 import { TableView } from "../components/TableView";
 
-interface SessionUser {
-  id: number;
-  email: string;
-  username: string;
-  apiToken: string | null;
-  isPublic: boolean;
-}
-
-export const pageRoutes = new Hono<{
-  Bindings: Env;
-  Variables: { user: SessionUser | null };
-}>();
+export const pageRoutes = new Hono<AppEnv>();
 
 // GET / - Top page
 pageRoutes.get("/", optionalSession, (c) => {
-  const user = c.get("user");
+  const user = c.get("user") as SessionUser | null;
 
   return c.html(
     <Layout user={user}>
@@ -73,23 +62,23 @@ pageRoutes.get("/register", (c) => {
 });
 
 // GET /settings - Settings page (session required)
-pageRoutes.get("/settings", sessionAuth as any, async (c) => {
+pageRoutes.get("/settings", sessionAuth, async (c) => {
   const user = c.get("user") as SessionUser;
   return c.html(<SettingsPage user={user} />);
 });
 
 // GET /guide - Guide page
 pageRoutes.get("/guide", optionalSession, (c) => {
-  const user = c.get("user");
+  const user = c.get("user") as SessionUser | null;
   return c.html(<GuidePage user={user} />);
 });
 
 // GET /:username - User's table list
 pageRoutes.get("/:username", optionalSession, async (c) => {
   const username = c.req.param("username");
-  const sessionUser = c.get("user");
+  const sessionUser = c.get("user") as SessionUser | null;
 
-  const db = drizzle(c.env.DB);
+  const db = c.get("db");
   const userResult = await db
     .select()
     .from(users)
@@ -163,9 +152,9 @@ pageRoutes.get("/:username", optionalSession, async (c) => {
 pageRoutes.get("/:username/:tableKey", optionalSession, async (c) => {
   const username = c.req.param("username");
   const tableKey = c.req.param("tableKey");
-  const sessionUser = c.get("user");
+  const sessionUser = c.get("user") as SessionUser | null;
 
-  const db = drizzle(c.env.DB);
+  const db = c.get("db");
 
   // Find user
   const userResult = await db
@@ -229,60 +218,8 @@ pageRoutes.get("/:username/:tableKey", optionalSession, async (c) => {
     .from(lamps)
     .where(eq(lamps.userId, targetUser.id));
 
-  const lampMap = new Map<
-    string,
-    { lamp: string; exScore: number | null; missCount: number | null }
-  >();
-  for (const l of userLamps) {
-    lampMap.set(`${l.infinitasTitle}:${l.difficulty}`, {
-      lamp: l.lamp,
-      exScore: l.exScore,
-      missCount: l.missCount,
-    });
-  }
-
-  // Group by tier
-  const tierMap = new Map<
-    string,
-    Array<{
-      id: number;
-      title: string;
-      infinitasTitle: string | null;
-      difficulty: string;
-      attributes: string | null;
-      lamp: string;
-      exScore: number | null;
-      missCount: number | null;
-    }>
-  >();
-
-  for (const chart of chartRows) {
-    const key = `${chart.infinitasTitle ?? chart.title}:${chart.difficulty}`;
-    const lampData = lampMap.get(key);
-
-    const entry = {
-      id: chart.id,
-      title: chart.title,
-      infinitasTitle: chart.infinitasTitle,
-      difficulty: chart.difficulty,
-      attributes: chart.attributes,
-      lamp: lampData?.lamp ?? "NO PLAY",
-      exScore: lampData?.exScore ?? null,
-      missCount: lampData?.missCount ?? null,
-    };
-
-    const tierEntries = tierMap.get(chart.tier);
-    if (tierEntries) {
-      tierEntries.push(entry);
-    } else {
-      tierMap.set(chart.tier, [entry]);
-    }
-  }
-
-  const tiers = Array.from(tierMap.entries()).map(([tier, entries]) => ({
-    tier,
-    entries,
-  }));
+  const lampMap = buildLampMap(userLamps);
+  const tiers = groupChartsByTier(chartRows, lampMap);
 
   return c.html(
     <Layout title={`${username} - ${tableKey}`} user={sessionUser}>

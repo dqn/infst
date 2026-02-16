@@ -1,13 +1,15 @@
 import { Hono } from "hono";
-import { drizzle } from "drizzle-orm/d1";
-import { eq, and, gt, sql } from "drizzle-orm";
+import { eq, and, gt } from "drizzle-orm";
 
-import type { Env } from "../lib/types";
-import { isHigherLamp, isValidLamp } from "../lib/lamp";
+import type { AppEnv } from "../lib/types";
+import { isHigherLamp } from "../lib/lamp";
 import { generateToken } from "../lib/token";
 import { bearerAuth } from "../middleware/auth";
 import { sessionAuth } from "../middleware/session";
+import { cacheControl } from "../middleware/cache";
 import { users, charts, lamps } from "../db/schema";
+import { buildLampMap, groupChartsByTier } from "../lib/chart-table";
+import { validateLampInput } from "../lib/validators";
 
 interface LampInput {
   infinitasTitle: string;
@@ -17,124 +19,74 @@ interface LampInput {
   missCount?: number;
 }
 
-export const apiRoutes = new Hono<{
-  Bindings: Env;
-  Variables: {
-    user: {
-      id: number;
-      email: string;
-      username: string | null;
-      apiToken: string | null;
-      isPublic: boolean;
-    };
-  };
-}>();
+interface BulkError {
+  index: number;
+  reason: string;
+}
+
+export const apiRoutes = new Hono<AppEnv>();
 
 // GET /api/tables/:tableKey - Get chart entries + user lamps
-apiRoutes.get("/tables/:tableKey", async (c) => {
-  const tableKey = c.req.param("tableKey");
-  const username = c.req.query("user");
+apiRoutes.get(
+  "/tables/:tableKey",
+  cacheControl("public, max-age=60"),
+  async (c) => {
+    const tableKey = c.req.param("tableKey");
+    const username = c.req.query("user");
 
-  const db = drizzle(c.env.DB);
+    const db = c.get("db");
 
-  // Get charts for this table
-  const chartRows = await db
-    .select()
-    .from(charts)
-    .where(eq(charts.tableKey, tableKey));
-
-  if (chartRows.length === 0) {
-    return c.json({ error: "Table not found" }, 404);
-  }
-
-  // If user is specified, get their lamps
-  let lampMap = new Map<string, { lamp: string; exScore: number | null; missCount: number | null }>();
-
-  if (username) {
-    const userResult = await db
+    // Get charts for this table
+    const chartRows = await db
       .select()
-      .from(users)
-      .where(eq(users.username, username))
-      .limit(1);
+      .from(charts)
+      .where(eq(charts.tableKey, tableKey));
 
-    const targetUser = userResult[0];
-    if (targetUser) {
-      if (!targetUser.isPublic) {
-        return c.json({ error: "User profile is private" }, 403);
-      }
+    if (chartRows.length === 0) {
+      return c.json({ error: "Table not found" }, 404);
+    }
 
-      const userLamps = await db
+    // If user is specified, get their lamps
+    let lampMap = new Map<string, { lamp: string; exScore: number | null; missCount: number | null }>();
+
+    if (username) {
+      const userResult = await db
         .select()
-        .from(lamps)
-        .where(eq(lamps.userId, targetUser.id));
+        .from(users)
+        .where(eq(users.username, username))
+        .limit(1);
 
-      for (const l of userLamps) {
-        lampMap.set(`${l.infinitasTitle}:${l.difficulty}`, {
-          lamp: l.lamp,
-          exScore: l.exScore,
-          missCount: l.missCount,
-        });
+      const targetUser = userResult[0];
+      if (targetUser) {
+        if (!targetUser.isPublic) {
+          return c.json({ error: "User profile is private" }, 403);
+        }
+
+        const userLamps = await db
+          .select()
+          .from(lamps)
+          .where(eq(lamps.userId, targetUser.id));
+
+        lampMap = buildLampMap(userLamps);
       }
     }
-  }
 
-  // Group by tier
-  const tiers = new Map<string, Array<{
-    id: number;
-    title: string;
-    infinitasTitle: string | null;
-    difficulty: string;
-    attributes: string | null;
-    lamp: string;
-    exScore: number | null;
-    missCount: number | null;
-  }>>();
-
-  for (const chart of chartRows) {
-    const key = `${chart.infinitasTitle ?? chart.title}:${chart.difficulty}`;
-    const lampData = lampMap.get(key);
-
-    const entry = {
-      id: chart.id,
-      title: chart.title,
-      infinitasTitle: chart.infinitasTitle,
-      difficulty: chart.difficulty,
-      attributes: chart.attributes,
-      lamp: lampData?.lamp ?? "NO PLAY",
-      exScore: lampData?.exScore ?? null,
-      missCount: lampData?.missCount ?? null,
-    };
-
-    const tierEntries = tiers.get(chart.tier);
-    if (tierEntries) {
-      tierEntries.push(entry);
-    } else {
-      tiers.set(chart.tier, [entry]);
-    }
-  }
-
-  // Convert to array preserving tier order
-  const result = Array.from(tiers.entries()).map(([tier, entries]) => ({
-    tier,
-    entries,
-  }));
-
-  return c.json({ tableKey, tiers: result });
-});
+    const tiers = groupChartsByTier(chartRows, lampMap);
+    return c.json({ tableKey, tiers });
+  },
+);
 
 // POST /api/lamps - Update single lamp (Bearer auth)
 apiRoutes.post("/lamps", bearerAuth, async (c) => {
   const body = await c.req.json<LampInput>();
-  if (!body.infinitasTitle || !body.difficulty || !body.lamp) {
-    return c.json({ error: "infinitasTitle, difficulty, and lamp are required" }, 400);
-  }
 
-  if (!isValidLamp(body.lamp)) {
-    return c.json({ error: "Invalid lamp value" }, 400);
+  const validation = validateLampInput(body);
+  if (!validation.valid) {
+    return c.json({ error: validation.error }, 400);
   }
 
   const user = c.get("user");
-  const db = drizzle(c.env.DB);
+  const db = c.get("db");
 
   // Check existing lamp
   const existing = await db
@@ -142,7 +94,7 @@ apiRoutes.post("/lamps", bearerAuth, async (c) => {
     .from(lamps)
     .where(
       and(
-        eq(lamps.userId, user.id),
+        eq(lamps.userId, user!.id),
         eq(lamps.infinitasTitle, body.infinitasTitle),
         eq(lamps.difficulty, body.difficulty),
       ),
@@ -189,7 +141,7 @@ apiRoutes.post("/lamps", bearerAuth, async (c) => {
 
   // Insert new lamp
   await db.insert(lamps).values({
-    userId: user.id,
+    userId: user!.id,
     infinitasTitle: body.infinitasTitle,
     difficulty: body.difficulty,
     lamp: body.lamp,
@@ -203,56 +155,85 @@ apiRoutes.post("/lamps", bearerAuth, async (c) => {
 
 // POST /api/lamps/bulk - Bulk update lamps (Bearer auth)
 apiRoutes.post("/lamps/bulk", bearerAuth, async (c) => {
-  const body = await c.req.json<LampInput[]>();
-  if (!Array.isArray(body)) {
-    return c.json({ error: "Expected an array of lamp entries" }, 400);
+  const rawBody = await c.req.json();
+
+  // Bug-2 fix: Accept both { entries: [...] } and [...] formats
+  let entries: LampInput[];
+  if (Array.isArray(rawBody)) {
+    entries = rawBody;
+  } else if (rawBody && Array.isArray(rawBody.entries)) {
+    entries = rawBody.entries;
+  } else {
+    return c.json({ error: "Expected an array of lamp entries or { entries: [...] }" }, 400);
   }
 
   const user = c.get("user");
-  const db = drizzle(c.env.DB);
+  const db = c.get("db");
   const now = new Date().toISOString();
   let updatedCount = 0;
+  let skippedCount = 0;
+  const errors: BulkError[] = [];
 
-  for (const entry of body) {
-    if (!entry.infinitasTitle || !entry.difficulty || !entry.lamp) {
+  // Phase 3-2: Batch fetch existing lamps to avoid N+1
+  const existingLamps = await db
+    .select()
+    .from(lamps)
+    .where(eq(lamps.userId, user!.id));
+
+  const existingMap = new Map<string, typeof existingLamps[number]>();
+  for (const l of existingLamps) {
+    existingMap.set(`${l.infinitasTitle}:${l.difficulty}`, l);
+  }
+
+  // Process entries and collect batch operations
+  const inserts: Array<{
+    userId: number;
+    infinitasTitle: string;
+    difficulty: string;
+    lamp: string;
+    exScore: number | null;
+    missCount: number | null;
+    updatedAt: string;
+  }> = [];
+
+  const updates: Array<{
+    id: number;
+    values: Record<string, unknown>;
+  }> = [];
+
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i]!;
+
+    const validation = validateLampInput(entry);
+    if (!validation.valid) {
+      errors.push({ index: i, reason: validation.error! });
+      skippedCount++;
       continue;
     }
-    if (!isValidLamp(entry.lamp)) {
-      continue;
-    }
 
-    const existing = await db
-      .select()
-      .from(lamps)
-      .where(
-        and(
-          eq(lamps.userId, user.id),
-          eq(lamps.infinitasTitle, entry.infinitasTitle),
-          eq(lamps.difficulty, entry.difficulty),
-        ),
-      )
-      .limit(1);
-
-    const existingLamp = existing[0];
+    const key = `${entry.infinitasTitle}:${entry.difficulty}`;
+    const existingLamp = existingMap.get(key);
 
     if (existingLamp) {
       if (isHigherLamp(entry.lamp, existingLamp.lamp)) {
-        const updates: Record<string, unknown> = {
+        const updateValues: Record<string, unknown> = {
           lamp: entry.lamp,
           updatedAt: now,
         };
         if (entry.exScore !== undefined) {
-          updates.exScore = entry.exScore;
+          updateValues.exScore = entry.exScore;
         }
         if (entry.missCount !== undefined) {
-          updates.missCount = entry.missCount;
+          updateValues.missCount = entry.missCount;
         }
-        await db.update(lamps).set(updates).where(eq(lamps.id, existingLamp.id));
+        updates.push({ id: existingLamp.id, values: updateValues });
         updatedCount++;
+      } else {
+        skippedCount++;
       }
     } else {
-      await db.insert(lamps).values({
-        userId: user.id,
+      inserts.push({
+        userId: user!.id,
         infinitasTitle: entry.infinitasTitle,
         difficulty: entry.difficulty,
         lamp: entry.lamp,
@@ -264,51 +245,100 @@ apiRoutes.post("/lamps/bulk", bearerAuth, async (c) => {
     }
   }
 
-  return c.json({ updated: updatedCount, total: body.length });
+  // Execute batch operations using D1 batch API
+  const statements: D1PreparedStatement[] = [];
+
+  for (const ins of inserts) {
+    statements.push(
+      c.env.DB.prepare(
+        "INSERT INTO lamps (user_id, infinitas_title, difficulty, lamp, ex_score, miss_count, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      ).bind(
+        ins.userId,
+        ins.infinitasTitle,
+        ins.difficulty,
+        ins.lamp,
+        ins.exScore,
+        ins.missCount,
+        ins.updatedAt,
+      ),
+    );
+  }
+
+  for (const upd of updates) {
+    const setClauses: string[] = [];
+    const bindValues: unknown[] = [];
+    for (const [k, v] of Object.entries(upd.values)) {
+      // Convert camelCase to snake_case for SQL
+      const col = k.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+      setClauses.push(`${col} = ?`);
+      bindValues.push(v);
+    }
+    bindValues.push(upd.id);
+    statements.push(
+      c.env.DB.prepare(
+        `UPDATE lamps SET ${setClauses.join(", ")} WHERE id = ?`,
+      ).bind(...bindValues),
+    );
+  }
+
+  if (statements.length > 0) {
+    await c.env.DB.batch(statements);
+  }
+
+  return c.json({
+    updated: updatedCount,
+    skipped: skippedCount,
+    total: entries.length,
+    errors: errors.length > 0 ? errors : undefined,
+  });
 });
 
 // GET /api/lamps/updated-since - Polling endpoint
-apiRoutes.get("/lamps/updated-since", async (c) => {
-  const since = c.req.query("since");
-  const username = c.req.query("user");
+apiRoutes.get(
+  "/lamps/updated-since",
+  cacheControl("no-cache"),
+  async (c) => {
+    const since = c.req.query("since");
+    const username = c.req.query("user");
 
-  if (!since || !username) {
-    return c.json({ error: "since and user query params are required" }, 400);
-  }
+    if (!since || !username) {
+      return c.json({ error: "since and user query params are required" }, 400);
+    }
 
-  const db = drizzle(c.env.DB);
-  const userResult = await db
-    .select()
-    .from(users)
-    .where(eq(users.username, username))
-    .limit(1);
+    const db = c.get("db");
+    const userResult = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, username))
+      .limit(1);
 
-  const targetUser = userResult[0];
-  if (!targetUser) {
-    return c.json({ lamps: [] });
-  }
+    const targetUser = userResult[0];
+    if (!targetUser) {
+      return c.json({ lamps: [] });
+    }
 
-  const updatedLamps = await db
-    .select()
-    .from(lamps)
-    .where(
-      and(
-        eq(lamps.userId, targetUser.id),
-        gt(lamps.updatedAt, since),
-      ),
-    );
+    const updatedLamps = await db
+      .select()
+      .from(lamps)
+      .where(
+        and(
+          eq(lamps.userId, targetUser.id),
+          gt(lamps.updatedAt, since),
+        ),
+      );
 
-  return c.json({
-    lamps: updatedLamps.map((l) => ({
-      infinitasTitle: l.infinitasTitle,
-      difficulty: l.difficulty,
-      lamp: l.lamp,
-      exScore: l.exScore,
-      missCount: l.missCount,
-      updatedAt: l.updatedAt,
-    })),
-  });
-});
+    return c.json({
+      lamps: updatedLamps.map((l) => ({
+        infinitasTitle: l.infinitasTitle,
+        difficulty: l.difficulty,
+        lamp: l.lamp,
+        exScore: l.exScore,
+        missCount: l.missCount,
+        updatedAt: l.updatedAt,
+      })),
+    });
+  },
+);
 
 // POST /api/charts/sync - Sync title-mapping.json to charts table (Admin auth)
 apiRoutes.post("/charts/sync", async (c) => {
@@ -330,11 +360,11 @@ apiRoutes.post("/charts/sync", async (c) => {
     >
   >();
 
-  const db = drizzle(c.env.DB);
+  const db = c.get("db");
   let upsertCount = 0;
 
-  for (const [tableKey, entries] of Object.entries(body)) {
-    for (const entry of entries) {
+  for (const [tableKey, tableEntries] of Object.entries(body)) {
+    for (const entry of tableEntries) {
       // Try to update existing, insert if not found
       const existing = await db
         .select()
@@ -373,7 +403,7 @@ apiRoutes.post("/charts/sync", async (c) => {
 apiRoutes.patch("/users/me", sessionAuth, async (c) => {
   const body = await c.req.json<{ isPublic?: boolean }>();
   const user = c.get("user");
-  const db = drizzle(c.env.DB);
+  const db = c.get("db");
 
   const updates: Record<string, unknown> = {};
   if (body.isPublic !== undefined) {
@@ -381,7 +411,7 @@ apiRoutes.patch("/users/me", sessionAuth, async (c) => {
   }
 
   if (Object.keys(updates).length > 0) {
-    await db.update(users).set(updates).where(eq(users.id, user.id));
+    await db.update(users).set(updates).where(eq(users.id, user!.id));
   }
 
   return c.json({ ok: true });
@@ -390,19 +420,20 @@ apiRoutes.patch("/users/me", sessionAuth, async (c) => {
 // GET /api/users/me/token - Get API token (session auth)
 apiRoutes.get("/users/me/token", sessionAuth, async (c) => {
   const user = c.get("user");
-  return c.json({ apiToken: user.apiToken });
+  return c.json({ apiToken: user!.apiToken });
 });
 
 // POST /api/users/me/token/regenerate - Regenerate API token (session auth)
 apiRoutes.post("/users/me/token/regenerate", sessionAuth, async (c) => {
   const user = c.get("user");
   const newToken = generateToken();
-  const db = drizzle(c.env.DB);
+  const now = new Date().toISOString();
+  const db = c.get("db");
 
   await db
     .update(users)
-    .set({ apiToken: newToken })
-    .where(eq(users.id, user.id));
+    .set({ apiToken: newToken, apiTokenCreatedAt: now })
+    .where(eq(users.id, user!.id));
 
   return c.json({ apiToken: newToken });
 });

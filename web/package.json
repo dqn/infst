@@ -8,7 +8,8 @@
     "deploy": "wrangler deploy",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply infst-db --local",
-    "db:migrate:remote": "wrangler d1 migrations apply infst-db --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply infst-db --remote",
+    "test": "vitest run"
   },
   "dependencies": {
     "hono": "^4.7.0",
@@ -18,6 +19,7 @@
     "@cloudflare/workers-types": "^4.20250109.0",
     "drizzle-kit": "^0.30.0",
     "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
     "wrangler": "^4.65.0"
   }
 }

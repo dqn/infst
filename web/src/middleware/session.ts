@@ -1,29 +1,14 @@
 import { createMiddleware } from "hono/factory";
-import { getCookie, setCookie } from "hono/cookie";
-import { drizzle } from "drizzle-orm/d1";
+import { getCookie } from "hono/cookie";
 import { eq } from "drizzle-orm";
 
-import type { Env } from "../lib/types";
+import type { AppEnv } from "../lib/types";
 import { verifyJwt, signJwt } from "../lib/token";
 import { users } from "../db/schema";
-
-interface SessionUser {
-  id: number;
-  email: string;
-  username: string;
-  apiToken: string | null;
-  isPublic: boolean;
-}
-
-interface SessionEnv {
-  Bindings: Env;
-  Variables: {
-    user: SessionUser;
-  };
-}
+import { SESSION_MAX_AGE_SECONDS } from "../lib/constants";
 
 // Session authentication middleware using JWT cookies
-export const sessionAuth = createMiddleware<SessionEnv>(async (c, next) => {
+export const sessionAuth = createMiddleware<AppEnv>(async (c, next) => {
   const token = getCookie(c, "session");
   if (!token) {
     return c.redirect("/login");
@@ -34,7 +19,7 @@ export const sessionAuth = createMiddleware<SessionEnv>(async (c, next) => {
     return c.redirect("/login");
   }
 
-  const db = drizzle(c.env.DB);
+  const db = c.get("db");
   const result = await db
     .select()
     .from(users)
@@ -51,12 +36,7 @@ export const sessionAuth = createMiddleware<SessionEnv>(async (c, next) => {
 });
 
 // Optional session middleware that does not redirect on failure
-export const optionalSession = createMiddleware<{
-  Bindings: Env;
-  Variables: {
-    user: SessionUser | null;
-  };
-}>(async (c, next) => {
+export const optionalSession = createMiddleware<AppEnv>(async (c, next) => {
   const token = getCookie(c, "session");
   if (!token) {
     c.set("user", null);
@@ -71,7 +51,7 @@ export const optionalSession = createMiddleware<{
     return;
   }
 
-  const db = drizzle(c.env.DB);
+  const db = c.get("db");
   const result = await db
     .select()
     .from(users)
@@ -95,6 +75,6 @@ export function setSessionCookie(
   c: { header: (name: string, value: string) => void },
   token: string,
 ): void {
-  const cookie = `session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`;
+  const cookie = `session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${SESSION_MAX_AGE_SECONDS}`;
   c.header("Set-Cookie", cookie);
 }
