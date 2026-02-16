@@ -105,6 +105,38 @@ infst export -f json
 | `-f, --format`      | 出力形式: `tsv`（デフォルト）/ `json`  |
 | `--pid`             | プロセスID（省略時は自動検出）         |
 
+## データ同期
+
+メモリから直接読み取ったプレイデータを Web サービスに一括アップロードする。
+
+```bash
+# ログイン済みの場合（credentials を使用）
+infst sync
+
+# エンドポイントとトークンを明示指定
+infst sync --endpoint https://infst.oidehosp.me --token <TOKEN>
+
+# 環境変数で指定
+INFST_API_ENDPOINT=https://infst.oidehosp.me INFST_API_TOKEN=<TOKEN> infst sync
+```
+
+### オプション
+
+| オプション     | 説明                                           |
+| -------------- | ---------------------------------------------- |
+| `--endpoint`   | API エンドポイント URL（環境変数対応）         |
+| `--token`      | API トークン（環境変数対応）                   |
+| `--pid`        | プロセスID（省略時は自動検出）                 |
+
+### 動作
+
+1. ゲームプロセスのメモリからスコアデータを読み取り
+2. 全曲 × 全難易度（SP+DP）のランプ・EXスコア・ミスカウントを収集
+3. `NO PLAY` と譜面なし（total_notes == 0）をフィルタ
+4. `/api/lamps/bulk` に一括 POST
+
+API はべき等のため、何度実行しても安全。
+
 ## アーキテクチャ
 
 ### infst モジュール構成

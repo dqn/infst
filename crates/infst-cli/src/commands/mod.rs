@@ -14,6 +14,7 @@ pub mod offset;
 pub mod scan;
 pub mod search;
 pub mod status;
+pub mod sync;
 pub mod tracking;
 pub mod upload;
 pub mod validate;

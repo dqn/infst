@@ -137,7 +137,10 @@ pub fn run(
     Ok(())
 }
 
-fn resolve_credentials(endpoint: Option<&str>, token: Option<&str>) -> Result<(String, String)> {
+pub fn resolve_credentials(
+    endpoint: Option<&str>,
+    token: Option<&str>,
+) -> Result<(String, String)> {
     let creds = load_credentials();
 
     let resolved_endpoint = match endpoint {

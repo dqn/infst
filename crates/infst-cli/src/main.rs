@@ -76,6 +76,11 @@ fn main() -> Result<()> {
             pid,
         }) => commands::export::run(output.as_deref(), format, pid),
         Some(Command::Login { endpoint }) => commands::login::run(&endpoint),
+        Some(Command::Sync {
+            endpoint,
+            token,
+            pid,
+        }) => commands::sync::run(endpoint.as_deref(), token.as_deref(), pid),
         Some(Command::Upload {
             tracker,
             mapping,

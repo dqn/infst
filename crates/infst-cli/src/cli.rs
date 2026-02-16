@@ -161,8 +161,24 @@ pub enum Command {
     /// Login to the infst web service
     Login {
         /// API endpoint URL
-        #[arg(long, env = "INFST_API_ENDPOINT", default_value = "https://infst.oidehosp.me")]
+        #[arg(
+            long,
+            env = "INFST_API_ENDPOINT",
+            default_value = "https://infst.oidehosp.me"
+        )]
         endpoint: String,
+    },
+    /// Sync all play data to the web service
+    Sync {
+        /// API endpoint URL
+        #[arg(long, env = "INFST_API_ENDPOINT")]
+        endpoint: Option<String>,
+        /// API token
+        #[arg(long, env = "INFST_API_TOKEN")]
+        token: Option<String>,
+        /// Process ID (skip automatic detection)
+        #[arg(long)]
+        pid: Option<u32>,
     },
     /// Upload tracker data to the web service
     Upload {
