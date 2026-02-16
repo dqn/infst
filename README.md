@@ -11,6 +11,7 @@ A real-time score tracker for beatmania IIDX INFINITAS.
 
 - Automatically tracks play data in real-time
 - Exports scores in TSV/JSON format
+- Syncs play data directly to the web service
 
 ## Requirements
 
@@ -55,6 +56,26 @@ infst export
 |--------|-------------|
 | `-o, --output` | Output file path (stdout if omitted) |
 | `-f, --format` | Output format: `tsv` (default) / `json` |
+
+### Sync Data
+
+Sync all play data directly from game memory to the web service:
+
+```bash
+# Login first (one-time setup)
+infst login
+
+# Sync all play data
+infst sync
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `--endpoint` | API endpoint URL (env: `INFST_API_ENDPOINT`) |
+| `--token` | API token (env: `INFST_API_TOKEN`) |
+| `--pid` | Process ID (auto-detected if omitted) |
 
 ## License
 
