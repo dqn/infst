@@ -35,6 +35,9 @@
             updateCell(l.songId + ":" + l.difficulty, l.lamp);
           });
           lastPoll = new Date().toISOString();
+          if (typeof window.__tableFilterApply === 'function') {
+            window.__tableFilterApply();
+          }
         }
       })
       .catch(function(err) { console.error('Polling error:', err); });
