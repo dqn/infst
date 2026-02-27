@@ -42,6 +42,7 @@ pub use config::{check_version_match, extract_date_code, find_game_version};
 pub use error::{Error, Result};
 
 // Re-export from process module
+pub use process::launcher;
 pub use process::{
     ByteBuffer, MemoryReader, ProcessHandle, ProcessInfo, ProcessProvider, ReadMemory,
     decode_shift_jis, decode_shift_jis_to_string,

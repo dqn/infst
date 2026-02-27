@@ -1,6 +1,7 @@
 mod bytes;
 pub mod chunked_reader;
 mod handle;
+pub mod launcher;
 pub mod layout;
 pub mod pattern;
 pub mod provider;

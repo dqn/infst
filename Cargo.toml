@@ -27,6 +27,7 @@ windows = { version = "0.58", features = [
     "Win32_System_ProcessStatus",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Registry",
 ] }
 tempfile = "3"
 strum = { version = "0.26", features = ["derive"] }

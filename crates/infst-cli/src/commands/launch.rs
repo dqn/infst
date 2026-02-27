@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 use anyhow::{Result, bail};
 use infst::ProcessHandle;
 use infst::input::window;
+use infst::launcher;
 
 const LOGIN_PAGE_URL: &str = "https://p.eagate.573.jp/game/2dx/infinitas/top/index.html";
 const WINDOW_POLL_INTERVAL: Duration = Duration::from_millis(500);
@@ -45,8 +46,11 @@ fn find_or_launch_process(
     // Not running — launch or instruct
     match url {
         Some(uri) => {
-            eprintln!("Launching game via URI...");
-            open::that(uri)?;
+            eprintln!("Extracting token from URI...");
+            let token = launcher::extract_token_from_uri(uri)?;
+            eprintln!("Launching game in windowed mode...");
+            let pid = launcher::launch_game(&token)?;
+            eprintln!("Game launched (PID: {})", pid);
         }
         None => {
             eprintln!("Game is not running. Opening login page...");

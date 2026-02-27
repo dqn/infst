@@ -82,27 +82,30 @@ pub fn is_foreground(hwnd: HWND) -> bool {
     fg == hwnd
 }
 
-/// Apply borderless window mode: remove decorations and resize to fill the monitor.
+/// Apply borderless window mode: strip all decorations and resize to fill the monitor.
 ///
-/// Removes `WS_CAPTION` and `WS_THICKFRAME` styles, adds `WS_POPUP`, then
-/// repositions the window to cover the entire monitor work area.
+/// Sets the window style to `WS_VISIBLE` only (removing all decoration flags),
+/// then repositions the window to cover the entire monitor.
+/// Uses `SWP_NOSENDCHANGING` to bypass the game's `WM_WINDOWPOSCHANGING` handler
+/// which restricts window resizing.
 /// Skips modification if the window is already borderless.
 #[cfg(target_os = "windows")]
 pub fn apply_borderless(hwnd: HWND) -> anyhow::Result<()> {
     use windows::Win32::UI::WindowsAndMessaging::{
-        GWL_STYLE, GetWindowLongPtrW, SWP_FRAMECHANGED, SWP_NOZORDER, SetWindowLongPtrW,
-        SetWindowPos, WINDOW_STYLE, WS_CAPTION, WS_POPUP, WS_THICKFRAME,
+        GWL_STYLE, GetWindowLongPtrW, SWP_FRAMECHANGED, SWP_NOSENDCHANGING, SWP_NOZORDER,
+        SetWindowLongPtrW, SetWindowPos, WINDOW_STYLE, WS_VISIBLE,
     };
 
     // SAFETY: GetWindowLongPtrW with GWL_STYLE reads the window style bits.
     let style = WINDOW_STYLE(unsafe { GetWindowLongPtrW(hwnd, GWL_STYLE) } as u32);
 
-    // Skip if already borderless (no caption and no thick frame)
-    if !style.contains(WS_CAPTION) && !style.contains(WS_THICKFRAME) {
+    // Skip if already borderless (only WS_VISIBLE remains)
+    if style == WS_VISIBLE {
         return Ok(());
     }
 
-    let new_style = (style & !WS_CAPTION & !WS_THICKFRAME) | WS_POPUP;
+    // Strip all decorations, keep only WS_VISIBLE (matches infzoom approach)
+    let new_style = WS_VISIBLE;
 
     // SAFETY: SetWindowLongPtrW with GWL_STYLE updates window style bits.
     unsafe {
@@ -120,7 +123,7 @@ pub fn apply_borderless(hwnd: HWND) -> anyhow::Result<()> {
             rect.top,
             rect.right - rect.left,
             rect.bottom - rect.top,
-            SWP_NOZORDER | SWP_FRAMECHANGED,
+            SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOSENDCHANGING,
         )?;
     }
 
