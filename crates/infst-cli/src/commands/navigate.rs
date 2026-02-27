@@ -20,6 +20,7 @@ pub fn run(
     difficulty: Option<&str>,
     max_steps: u32,
     key_delay_ms: u64,
+    settle_delay_ms: u64,
     pid: Option<u32>,
 ) -> Result<()> {
     let current_version = env!("CARGO_PKG_VERSION");
@@ -85,7 +86,8 @@ pub fn run(
     // Navigate
     let shutdown = AtomicBool::new(false);
     let nav = SongNavigator::new(&reader, offsets.current_song)
-        .with_key_delay(Duration::from_millis(key_delay_ms));
+        .with_key_delay(Duration::from_millis(key_delay_ms))
+        .with_settle_delay(Duration::from_millis(settle_delay_ms));
 
     eprintln!("Navigating (max {} steps)...", max_steps);
     let result = nav.navigate_to_song(song_id, max_steps, &shutdown)?;

@@ -193,6 +193,9 @@ pub enum Command {
         /// Key press delay in ms
         #[arg(long, default_value = "80")]
         key_delay: u64,
+        /// Settle delay after key press in ms
+        #[arg(long, default_value = "150")]
+        settle_delay: u64,
         /// Process ID (skip automatic detection)
         #[arg(long)]
         pid: Option<u32>,

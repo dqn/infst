@@ -40,7 +40,7 @@ impl<'a, R: ReadMemory> SongNavigator<'a, R> {
             reader,
             current_song_addr,
             key_delay: Duration::from_millis(80),
-            settle_delay: Duration::from_millis(50),
+            settle_delay: Duration::from_millis(150),
         }
     }
 
@@ -49,7 +49,6 @@ impl<'a, R: ReadMemory> SongNavigator<'a, R> {
         self
     }
 
-    #[allow(dead_code)]
     pub fn with_settle_delay(mut self, delay: Duration) -> Self {
         self.settle_delay = delay;
         self
@@ -88,7 +87,9 @@ impl<'a, R: ReadMemory> SongNavigator<'a, R> {
         }
 
         let mut steps: u32 = 0;
-        let mut seen_start_again = false;
+        let mut has_left_start = false;
+        let mut stale_count: u32 = 0;
+        let mut prev_song_id = start_song_id;
 
         loop {
             if shutdown.load(Ordering::Relaxed) {
@@ -110,14 +111,30 @@ impl<'a, R: ReadMemory> SongNavigator<'a, R> {
                 return Ok(NavigationResult::Success { steps });
             }
 
-            // If we see the start song again, we've cycled the whole list
-            if current == start_song_id {
-                if seen_start_again {
-                    // Second time seeing start → definitely not in the list
-                    return Ok(NavigationResult::NotFound { steps });
+            if current != prev_song_id {
+                stale_count = 0;
+                if current != start_song_id {
+                    has_left_start = true;
                 }
-                seen_start_again = true;
+            } else {
+                stale_count += 1;
             }
+
+            // Cycle detection: only when we've left start and returned to it
+            if has_left_start && current == start_song_id {
+                return Ok(NavigationResult::NotFound { steps });
+            }
+
+            // Stale detection: cursor not moving for too many consecutive steps
+            if stale_count >= 10 {
+                anyhow::bail!(
+                    "Cursor not responding — song_id stuck at {} for {} steps",
+                    current,
+                    stale_count
+                );
+            }
+
+            prev_song_id = current;
         }
     }
 

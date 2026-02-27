@@ -90,8 +90,16 @@ fn main() -> Result<()> {
             difficulty,
             max_steps,
             key_delay,
+            settle_delay,
             pid,
-        }) => commands::navigate::run(&target, difficulty.as_deref(), max_steps, key_delay, pid),
+        }) => commands::navigate::run(
+            &target,
+            difficulty.as_deref(),
+            max_steps,
+            key_delay,
+            settle_delay,
+            pid,
+        ),
         Some(Command::Upload {
             tracker,
             mapping,
