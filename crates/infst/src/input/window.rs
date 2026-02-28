@@ -154,21 +154,6 @@ fn get_monitor_rect(hwnd: HWND) -> anyhow::Result<windows::Win32::Foundation::RE
     Ok(info.rcMonitor)
 }
 
-/// Restore the display settings to the registry defaults.
-///
-/// Call this after the game process exits to undo any display-mode
-/// changes it made (e.g. resolution switch).  Passing `NULL` DEVMODE
-/// with flags `0` is the standard way to revert a dynamic mode change.
-#[cfg(target_os = "windows")]
-pub fn restore_display_settings() {
-    use windows::Win32::Graphics::Gdi::{CDS_TYPE, ChangeDisplaySettingsW};
-
-    // SAFETY: ChangeDisplaySettingsW(NULL, 0) restores registry defaults.
-    unsafe {
-        let _ = ChangeDisplaySettingsW(None, CDS_TYPE(0));
-    }
-}
-
 // --- Non-Windows stubs ---
 
 #[cfg(not(target_os = "windows"))]
@@ -190,6 +175,3 @@ pub fn is_foreground(_hwnd: ()) -> bool {
 pub fn apply_borderless(_hwnd: ()) -> anyhow::Result<()> {
     anyhow::bail!("Window management is only supported on Windows")
 }
-
-#[cfg(not(target_os = "windows"))]
-pub fn restore_display_settings() {}

@@ -58,8 +58,6 @@ pub fn run(
             {
                 error!("Tracking session error: {}", e);
             }
-            // Restore display settings after the game disconnects
-            window::restore_display_settings();
             println!("Waiting for INFINITAS...");
         }
 
@@ -371,25 +369,7 @@ fn try_apply_borderless(process: &ProcessHandle) -> anyhow::Result<()> {
         std::thread::sleep(WINDOW_POLL_INTERVAL);
     };
 
-    // Apply immediately — must happen before the game's DirectX init
-    // switches to exclusive fullscreen mode.
-    window::apply_borderless(hwnd)?;
-
-    // Spawn a background thread to re-apply if the game overrides our
-    // style change during initialisation.
-    let pid = process.pid;
-    std::thread::spawn(move || {
-        for _ in 0..10 {
-            std::thread::sleep(Duration::from_secs(1));
-            if let Ok(h) = window::find_window_by_pid(pid) {
-                let _ = window::apply_borderless(h);
-            } else {
-                break;
-            }
-        }
-    });
-
-    Ok(())
+    window::apply_borderless(hwnd)
 }
 
 #[cfg(not(target_os = "windows"))]
