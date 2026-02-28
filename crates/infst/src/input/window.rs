@@ -96,38 +96,42 @@ pub fn is_minimized(_hwnd: ()) -> bool {
     false
 }
 
-/// Apply borderless window mode: strip all decorations and resize to fill the monitor.
+/// Apply borderless window mode: strip decorations and resize to fill the monitor.
 ///
-/// Clears both normal (GWL_STYLE) and extended (GWL_EXSTYLE) window styles,
-/// then repositions the window to cover the entire monitor.
-/// Uses `SWP_NOSENDCHANGING` to bypass the game's `WM_WINDOWPOSCHANGING` handler
-/// which restricts window resizing.
+/// Sets the window style to `WS_VISIBLE` only (matching infzoom's approach),
+/// then repositions the window to cover the entire monitor using `HWND_TOPMOST`
+/// so it stays in front of other windows.
+///
+/// Flags match infzoom's `ResizeWindow()`:
+/// - `SWP_NOSENDCHANGING` — bypass the game's `WM_WINDOWPOSCHANGING` handler
+/// - `SWP_ASYNCWINDOWPOS` — don't block on the move
+/// - `SWP_NOCOPYBITS` / `SWP_NOREDRAW` — let the game handle its own rendering
 #[cfg(target_os = "windows")]
 pub fn apply_borderless(hwnd: HWND) -> anyhow::Result<()> {
     use windows::Win32::UI::WindowsAndMessaging::{
-        GWL_EXSTYLE, GWL_STYLE, SWP_FRAMECHANGED, SWP_NOSENDCHANGING, SWP_NOZORDER,
-        SetWindowLongPtrW, SetWindowPos, WS_VISIBLE,
+        GWL_STYLE, HWND_TOPMOST, SWP_ASYNCWINDOWPOS, SWP_NOCOPYBITS, SWP_NOREDRAW,
+        SWP_NOSENDCHANGING, SetWindowLongPtrW, SetWindowPos, WS_VISIBLE,
     };
 
-    // Strip all decorations from both normal and extended styles
-    // SAFETY: SetWindowLongPtrW with GWL_STYLE/GWL_EXSTYLE updates window style bits.
+    // Strip all decorations, keep only WS_VISIBLE (matches infzoom)
+    // SAFETY: SetWindowLongPtrW with GWL_STYLE updates window style bits.
     unsafe {
         SetWindowLongPtrW(hwnd, GWL_STYLE, WS_VISIBLE.0 as isize);
-        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, 0);
     }
 
     let rect = get_monitor_rect(hwnd)?;
 
     // SAFETY: SetWindowPos repositions and resizes the window to fill the monitor.
+    // HWND_TOPMOST keeps the window above all non-topmost windows.
     unsafe {
         SetWindowPos(
             hwnd,
-            None,
+            HWND_TOPMOST,
             rect.left,
             rect.top,
             rect.right - rect.left,
             rect.bottom - rect.top,
-            SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOSENDCHANGING,
+            SWP_ASYNCWINDOWPOS | SWP_NOCOPYBITS | SWP_NOREDRAW | SWP_NOSENDCHANGING,
         )?;
     }
 

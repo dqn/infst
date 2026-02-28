@@ -217,11 +217,7 @@ fn test_missing_required_arg_fails() {
 fn test_parse_launch() {
     let args = Args::try_parse_from(["infst", "launch"]).unwrap();
     match args.command {
-        Some(Command::Launch {
-            url,
-            pid,
-            timeout,
-        }) => {
+        Some(Command::Launch { url, pid, timeout }) => {
             assert!(url.is_none());
             assert!(pid.is_none());
             assert_eq!(timeout, 120);
