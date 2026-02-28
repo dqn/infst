@@ -2,10 +2,11 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use infst::config::find_game_version;
+use infst::input::window;
 use infst::{
     ApiConfig, Infst, InfstConfig, MemoryReader, OffsetSearcher, OffsetsCollection, ProcessHandle,
     ScoreMap, SongInfo, load_offsets, save_offsets_to_cache, try_load_cached_offsets,
@@ -32,6 +33,7 @@ pub fn run(
 
     while !shutdown.is_shutdown() {
         if let Some(process) = wait_for_process(&shutdown) {
+            apply_borderless_if_possible(&process);
             if let Err(e) = run_tracking_session(&mut infst, &process, &shutdown, offsets_from_file)
             {
                 error!("Tracking session error: {}", e);
@@ -314,6 +316,46 @@ fn detect_game_version(reader: &MemoryReader, base_address: u64) -> Option<Strin
             None
         }
     }
+}
+
+const WINDOW_POLL_INTERVAL: Duration = Duration::from_millis(500);
+const WINDOW_POLL_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// Apply borderless window mode (best-effort, failures are logged and ignored).
+fn apply_borderless_if_possible(process: &ProcessHandle) {
+    match try_apply_borderless(process) {
+        Ok(()) => println!("Borderless window mode applied"),
+        Err(e) => warn!("Could not apply borderless mode: {}", e),
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn try_apply_borderless(process: &ProcessHandle) -> anyhow::Result<()> {
+    let start = Instant::now();
+
+    let hwnd = loop {
+        if start.elapsed() > WINDOW_POLL_TIMEOUT {
+            anyhow::bail!("Timed out waiting for game window");
+        }
+
+        if !process.is_alive() {
+            anyhow::bail!("Game process exited before a window appeared");
+        }
+
+        if let Ok(hwnd) = window::find_window_by_pid(process.pid) {
+            break hwnd;
+        }
+
+        std::thread::sleep(WINDOW_POLL_INTERVAL);
+    };
+
+    window::apply_borderless(hwnd)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn try_apply_borderless(_process: &ProcessHandle) -> anyhow::Result<()> {
+    debug!("Borderless window mode is only supported on Windows");
+    Ok(())
 }
 
 /// Load score map from game memory
