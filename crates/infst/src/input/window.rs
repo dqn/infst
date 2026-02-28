@@ -112,6 +112,11 @@ pub fn apply_borderless(hwnd: HWND) -> anyhow::Result<()> {
         SetWindowLongPtrW(hwnd, GWL_STYLE, new_style.0 as isize);
     }
 
+    // Restore display settings before querying monitor rect so we get the
+    // correct (pre-game) resolution.  bm2dx.exe may change the display mode
+    // even in windowed mode.
+    restore_display_settings();
+
     let rect = get_monitor_rect(hwnd)?;
 
     // SAFETY: SetWindowPos repositions and resizes the window to fill the monitor.
@@ -152,6 +157,20 @@ fn get_monitor_rect(hwnd: HWND) -> anyhow::Result<windows::Win32::Foundation::RE
     }
 
     Ok(info.rcMonitor)
+}
+
+/// Restore the display settings to the registry defaults.
+///
+/// Passing `NULL` DEVMODE with flags `0` is the standard way to undo a
+/// dynamic display-mode change (e.g. one caused by a game launch).
+#[cfg(target_os = "windows")]
+fn restore_display_settings() {
+    use windows::Win32::Graphics::Gdi::{CDS_TYPE, ChangeDisplaySettingsW};
+
+    // SAFETY: ChangeDisplaySettingsW(NULL, 0) restores registry defaults.
+    unsafe {
+        let _ = ChangeDisplaySettingsW(None, CDS_TYPE(0));
+    }
 }
 
 // --- Non-Windows stubs ---
