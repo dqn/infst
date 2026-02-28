@@ -131,7 +131,7 @@ pub fn register_uri_scheme() -> anyhow::Result<()> {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
     use windows::Win32::System::Registry::{
-        HKEY, HKEY_CURRENT_USER, KEY_WRITE, REG_SZ, RegCreateKeyExW, RegSetValueExW,
+        HKEY, HKEY_CURRENT_USER, REG_SZ, RegCreateKeyW, RegSetValueExW,
     };
     use windows::core::HSTRING;
 
@@ -144,21 +144,11 @@ pub fn register_uri_scheme() -> anyhow::Result<()> {
     fn create_key(parent: HKEY, subkey: &str) -> anyhow::Result<HKEY> {
         let hkey_subkey = HSTRING::from(subkey);
         let mut key = HKEY::default();
-        // SAFETY: RegCreateKeyExW creates or opens a registry key.
+        // SAFETY: RegCreateKeyW creates or opens a registry key.
         unsafe {
-            RegCreateKeyExW(
-                parent,
-                &hkey_subkey,
-                0,
-                None,
-                windows::Win32::System::Registry::REG_OPTION_NON_VOLATILE,
-                KEY_WRITE,
-                None,
-                &mut key,
-                None,
-            )
-            .ok()
-            .map_err(|e| anyhow::anyhow!("Failed to create registry key '{subkey}': {e}"))?;
+            RegCreateKeyW(parent, &hkey_subkey, &mut key)
+                .ok()
+                .map_err(|e| anyhow::anyhow!("Failed to create registry key '{subkey}': {e}"))?;
         }
         Ok(key)
     }
