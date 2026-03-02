@@ -28,7 +28,8 @@ pub fn run(url: Option<&str>, pid: Option<u32>, timeout_secs: u64, windowed: boo
     eprintln!("Game process found (PID: {})", process.pid);
 
     if windowed {
-        wait_and_apply_borderless(&process)?;
+        // Apply windowed mode optimizations
+        apply_windowed_optimizations(&process)?;
     }
 
     eprintln!("Done!");
@@ -98,6 +99,33 @@ fn find_or_launch_process(
     }
 }
 
+/// Apply all windowed mode optimizations: borderless styling, DWM tuning, process priority.
+#[cfg(target_os = "windows")]
+fn apply_windowed_optimizations(process: &ProcessHandle) -> Result<()> {
+    // System-level optimizations
+    match launcher::ensure_swap_effect_upgrade() {
+        Ok(true) => eprintln!("Enabled SwapEffectUpgrade (flip-model presentation)"),
+        Ok(false) => {}
+        Err(e) => eprintln!("Warning: SwapEffectUpgrade: {e}"),
+    }
+
+    match launcher::optimize_game_process(process.pid) {
+        Ok(()) => eprintln!("Set game process to HIGH priority"),
+        Err(e) => eprintln!("Warning: Process priority: {e}"),
+    }
+
+    launcher::set_timer_resolution();
+
+    // Window-level optimizations
+    wait_and_apply_borderless(process)?;
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn apply_windowed_optimizations(_process: &ProcessHandle) -> Result<()> {
+    bail!("Windowed optimizations are only supported on Windows");
+}
+
 /// Poll until a visible window appears for the process, then apply borderless mode.
 ///
 /// Retries up to 3 times if the game re-applies window styles after modification
@@ -133,7 +161,7 @@ fn wait_and_apply_borderless(process: &ProcessHandle) -> Result<()> {
         let modified = window::apply_borderless(hwnd)?;
         if !modified {
             eprintln!("Window is already borderless");
-            return Ok(());
+            break;
         }
 
         // Wait and verify the style stuck
@@ -141,15 +169,24 @@ fn wait_and_apply_borderless(process: &ProcessHandle) -> Result<()> {
 
         if window::is_borderless(hwnd) {
             eprintln!("Borderless mode applied successfully");
-            return Ok(());
+            break;
         }
 
-        eprintln!("  Game reverted window styles, retrying...");
+        if attempt == BORDERLESS_MAX_RETRIES {
+            // Final attempt — apply without verification
+            eprintln!("  Game reverted window styles, applying final attempt...");
+            window::apply_borderless(hwnd)?;
+        } else {
+            eprintln!("  Game reverted window styles, retrying...");
+        }
     }
 
-    // Final attempt — apply without verification
-    eprintln!("Applying borderless (final)...");
-    window::apply_borderless(hwnd)?;
+    // Apply DWM optimizations after borderless styling
+    match window::apply_dwm_optimizations(hwnd) {
+        Ok(()) => eprintln!("Applied DWM optimizations"),
+        Err(e) => eprintln!("Warning: DWM optimizations: {e}"),
+    }
+
     Ok(())
 }
 

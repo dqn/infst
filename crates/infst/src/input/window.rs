@@ -171,6 +171,52 @@ pub fn apply_borderless(hwnd: HWND) -> anyhow::Result<bool> {
     Ok(true)
 }
 
+/// Apply DWM optimizations to reduce composition overhead for a windowed game.
+///
+/// - Disables DWM transition animations
+/// - Disables non-client area rendering (already stripped for borderless)
+/// - Disables peek preview to avoid extra frame capture
+#[cfg(target_os = "windows")]
+pub fn apply_dwm_optimizations(hwnd: HWND) -> anyhow::Result<()> {
+    use windows::Win32::Foundation::BOOL;
+    use windows::Win32::Graphics::Dwm::{
+        DWMWA_DISALLOW_PEEK, DWMWA_EXCLUDED_FROM_PEEK, DWMWA_NCRENDERING_POLICY,
+        DWMWA_TRANSITIONS_FORCEDISABLED, DwmSetWindowAttribute,
+    };
+
+    let true_val = BOOL(1);
+    let nc_disabled: u32 = 1; // DWMNCRP_DISABLED
+
+    unsafe {
+        DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_TRANSITIONS_FORCEDISABLED,
+            &true_val as *const BOOL as *const _,
+            size_of::<BOOL>() as u32,
+        )?;
+        DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_NCRENDERING_POLICY,
+            &nc_disabled as *const u32 as *const _,
+            size_of::<u32>() as u32,
+        )?;
+        DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_DISALLOW_PEEK,
+            &true_val as *const BOOL as *const _,
+            size_of::<BOOL>() as u32,
+        )?;
+        DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_EXCLUDED_FROM_PEEK,
+            &true_val as *const BOOL as *const _,
+            size_of::<BOOL>() as u32,
+        )?;
+    }
+
+    Ok(())
+}
+
 /// Get the monitor rectangle for the monitor containing the given window.
 #[cfg(target_os = "windows")]
 fn get_monitor_rect(hwnd: HWND) -> anyhow::Result<windows::Win32::Foundation::RECT> {
@@ -219,5 +265,10 @@ pub fn is_borderless(_hwnd: ()) -> bool {
 
 #[cfg(not(target_os = "windows"))]
 pub fn apply_borderless(_hwnd: ()) -> anyhow::Result<bool> {
+    anyhow::bail!("Window management is only supported on Windows")
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn apply_dwm_optimizations(_hwnd: ()) -> anyhow::Result<()> {
     anyhow::bail!("Window management is only supported on Windows")
 }

@@ -250,6 +250,118 @@ pub fn ensure_fso_enabled() -> anyhow::Result<bool> {
     anyhow::bail!("FSO management is only supported on Windows")
 }
 
+/// Ensure "Optimizations for windowed games" (SwapEffectUpgrade) is enabled.
+///
+/// This upgrades DX10/DX11 games from legacy blt-model to flip-model presentation,
+/// significantly reducing frame latency in windowed mode.
+#[cfg(target_os = "windows")]
+pub fn ensure_swap_effect_upgrade() -> anyhow::Result<bool> {
+    use windows::Win32::System::Registry::{
+        HKEY_CURRENT_USER, KEY_READ, KEY_WRITE, REG_DWORD, RRF_RT_REG_DWORD, RegCreateKeyExW,
+        RegGetValueW, RegSetValueExW,
+    };
+    use windows::core::HSTRING;
+
+    let subkey = HSTRING::from(r"Software\Microsoft\DirectX\GraphicsSettings");
+    let value_name = HSTRING::from("SwapEffectUpgradeEnable");
+
+    // Create key if it doesn't exist
+    let mut hkey = windows::Win32::System::Registry::HKEY::default();
+    unsafe {
+        RegCreateKeyExW(
+            HKEY_CURRENT_USER,
+            &subkey,
+            0,
+            None,
+            Default::default(),
+            KEY_READ | KEY_WRITE,
+            None,
+            &mut hkey,
+            None,
+        )
+        .ok()
+        .map_err(|e| anyhow::anyhow!("Failed to open/create registry key: {e}"))?;
+    }
+
+    // Check current value
+    let mut current: u32 = 0;
+    let mut size = size_of::<u32>() as u32;
+    let query_result = unsafe {
+        RegGetValueW(
+            hkey,
+            None,
+            &value_name,
+            RRF_RT_REG_DWORD,
+            None,
+            Some(&mut current as *mut u32 as *mut _),
+            Some(&mut size),
+        )
+    };
+
+    if query_result.is_ok() && current == 1 {
+        return Ok(false); // Already enabled
+    }
+
+    // Enable SwapEffectUpgrade
+    let enabled: u32 = 1;
+    unsafe {
+        RegSetValueExW(
+            hkey,
+            &value_name,
+            0,
+            REG_DWORD,
+            Some(std::slice::from_raw_parts(
+                &enabled as *const u32 as *const u8,
+                size_of::<u32>(),
+            )),
+        )
+        .ok()
+        .map_err(|e| anyhow::anyhow!("Failed to set SwapEffectUpgrade: {e}"))?;
+    }
+
+    Ok(true)
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn ensure_swap_effect_upgrade() -> anyhow::Result<bool> {
+    anyhow::bail!("SwapEffectUpgrade is only supported on Windows")
+}
+
+/// Set the game process to high priority and disable timer resolution throttling.
+#[cfg(target_os = "windows")]
+pub fn optimize_game_process(pid: u32) -> anyhow::Result<()> {
+    use windows::Win32::System::Threading::{
+        HIGH_PRIORITY_CLASS, OpenProcess, PROCESS_SET_INFORMATION, SetPriorityClass,
+    };
+
+    let handle = unsafe { OpenProcess(PROCESS_SET_INFORMATION, false, pid)? };
+
+    unsafe {
+        SetPriorityClass(handle, HIGH_PRIORITY_CLASS)?;
+    }
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn optimize_game_process(_pid: u32) -> anyhow::Result<()> {
+    anyhow::bail!("Process optimization is only supported on Windows")
+}
+
+/// Set system timer resolution to 1ms for tighter scheduling.
+#[cfg(target_os = "windows")]
+pub fn set_timer_resolution() {
+    use windows::Win32::Media::timeBeginPeriod;
+
+    // SAFETY: timeBeginPeriod is safe to call; affects global timer resolution.
+    unsafe {
+        let _ = timeBeginPeriod(1);
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn set_timer_resolution() {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
