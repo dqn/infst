@@ -81,20 +81,6 @@ pub fn is_foreground(hwnd: HWND) -> bool {
     fg == hwnd
 }
 
-/// Check whether the given window is minimised (iconic).
-#[cfg(target_os = "windows")]
-pub fn is_minimized(hwnd: HWND) -> bool {
-    use windows::Win32::UI::WindowsAndMessaging::IsIconic;
-
-    // SAFETY: IsIconic is safe to call with any HWND.
-    unsafe { IsIconic(hwnd).as_bool() }
-}
-
-#[cfg(not(target_os = "windows"))]
-pub fn is_minimized(_hwnd: ()) -> bool {
-    false
-}
-
 // --- Non-Windows stubs ---
 
 #[cfg(not(target_os = "windows"))]

@@ -13,14 +13,6 @@ use cli::{Args, Command};
 use tracing_subscriber::EnvFilter;
 
 fn main() -> Result<()> {
-    // URI handler: Windows passes the URI as the first argument
-    if let Some(uri) = std::env::args().nth(1)
-        && uri.starts_with("bm2dxinf://")
-    {
-        init_logging();
-        return commands::tracking::run_with_uri(&uri, None, None);
-    }
-
     let args = Args::parse();
     init_logging();
 
@@ -86,7 +78,6 @@ fn main() -> Result<()> {
             token,
             pid,
         }) => commands::sync::run(endpoint.as_deref(), token.as_deref(), pid),
-        Some(Command::Register) => commands::register::run(),
         Some(Command::Upload {
             tracker,
             mapping,

@@ -21,7 +21,6 @@ pub mod error;
 pub mod export;
 pub mod infst;
 pub mod input;
-pub mod launcher;
 pub mod offset;
 pub mod play;
 pub mod prelude;
