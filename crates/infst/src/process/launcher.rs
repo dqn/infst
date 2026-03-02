@@ -78,8 +78,8 @@ pub fn find_game_executable() -> anyhow::Result<std::path::PathBuf> {
         .map_err(|e| anyhow::anyhow!("Failed to read registry value: {e}"))?;
     }
 
-    // Trim null terminator
-    if buffer.last() == Some(&0) {
+    // Trim all trailing null terminators (buffer may be larger than actual data)
+    while buffer.last() == Some(&0) {
         buffer.pop();
     }
 
