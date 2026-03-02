@@ -12,6 +12,8 @@ const LOGIN_PAGE_URL: &str = "https://p.eagate.573.jp/game/2dx/infinitas/top/ind
 const WINDOW_POLL_INTERVAL: Duration = Duration::from_millis(500);
 const WINDOW_POLL_TIMEOUT: Duration = Duration::from_secs(60);
 const PROCESS_POLL_INTERVAL: Duration = Duration::from_secs(2);
+const BORDERLESS_RETRY_DELAY: Duration = Duration::from_secs(1);
+const BORDERLESS_MAX_RETRIES: u32 = 3;
 
 pub fn run(url: Option<&str>, pid: Option<u32>, timeout_secs: u64) -> Result<()> {
     let current_version = env!("CARGO_PKG_VERSION");
@@ -78,6 +80,9 @@ fn find_or_launch_process(
 }
 
 /// Poll until a visible window appears for the process, then apply borderless mode.
+///
+/// Retries up to 3 times if the game re-applies window styles after modification
+/// (Borderless-Gaming approach for games that fight back).
 #[cfg(target_os = "windows")]
 fn wait_and_apply_borderless(process: &ProcessHandle) -> Result<()> {
     eprintln!("Waiting for game window...");
@@ -100,8 +105,33 @@ fn wait_and_apply_borderless(process: &ProcessHandle) -> Result<()> {
     };
 
     eprintln!("Game window found");
-    eprintln!("Applying borderless window mode...");
-    window::apply_borderless(hwnd)
+
+    for attempt in 1..=BORDERLESS_MAX_RETRIES {
+        eprintln!(
+            "Applying borderless window mode (attempt {attempt}/{BORDERLESS_MAX_RETRIES})..."
+        );
+
+        let modified = window::apply_borderless(hwnd)?;
+        if !modified {
+            eprintln!("Window is already borderless");
+            return Ok(());
+        }
+
+        // Wait and verify the style stuck
+        thread::sleep(BORDERLESS_RETRY_DELAY);
+
+        if window::is_borderless(hwnd) {
+            eprintln!("Borderless mode applied successfully");
+            return Ok(());
+        }
+
+        eprintln!("  Game reverted window styles, retrying...");
+    }
+
+    // Final attempt — apply without verification
+    eprintln!("Applying borderless (final)...");
+    window::apply_borderless(hwnd)?;
+    Ok(())
 }
 
 #[cfg(not(target_os = "windows"))]

@@ -82,39 +82,69 @@ pub fn is_foreground(hwnd: HWND) -> bool {
     fg == hwnd
 }
 
+/// Check whether the window is already in borderless mode.
+#[cfg(target_os = "windows")]
+pub fn is_borderless(hwnd: HWND) -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{GWL_STYLE, GetWindowLongPtrW, WS_VISIBLE};
+
+    let style = unsafe { GetWindowLongPtrW(hwnd, GWL_STYLE) } as u32;
+    style == WS_VISIBLE.0
+}
+
 /// Apply borderless window mode: strip all decorations and resize to fill the monitor.
 ///
-/// Sets the window style to `WS_VISIBLE` only (removing all decoration flags),
+/// Removes both standard and extended window styles (Borderless-Gaming approach),
 /// then repositions the window to cover the entire monitor.
 /// Uses `SWP_NOSENDCHANGING` to bypass the game's `WM_WINDOWPOSCHANGING` handler
 /// which restricts window resizing.
-/// Skips modification if the window is already borderless.
+///
+/// Returns `true` if styles were modified, `false` if already borderless.
 #[cfg(target_os = "windows")]
-pub fn apply_borderless(hwnd: HWND) -> anyhow::Result<()> {
+pub fn apply_borderless(hwnd: HWND) -> anyhow::Result<bool> {
     use windows::Win32::UI::WindowsAndMessaging::{
-        GWL_STYLE, GetWindowLongPtrW, SWP_FRAMECHANGED, SWP_NOSENDCHANGING, SWP_NOZORDER,
-        SetWindowLongPtrW, SetWindowPos, WINDOW_STYLE, WS_VISIBLE,
+        GWL_EXSTYLE, GWL_STYLE, GetWindowLongPtrW, SWP_FRAMECHANGED, SWP_NOOWNERZORDER,
+        SWP_NOSENDCHANGING, SWP_SHOWWINDOW, SetWindowLongPtrW, SetWindowPos, WINDOW_EX_STYLE,
+        WINDOW_STYLE, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_EX_STATICEDGE, WS_EX_WINDOWEDGE,
+        WS_VISIBLE,
     };
 
-    // SAFETY: GetWindowLongPtrW with GWL_STYLE reads the window style bits.
+    // SAFETY: GetWindowLongPtrW reads window style bits.
     let style = WINDOW_STYLE(unsafe { GetWindowLongPtrW(hwnd, GWL_STYLE) } as u32);
+    let ex_style = WINDOW_EX_STYLE(unsafe { GetWindowLongPtrW(hwnd, GWL_EXSTYLE) } as u32);
 
-    // Skip if already borderless (only WS_VISIBLE remains)
-    if style == WS_VISIBLE {
-        return Ok(());
+    eprintln!("  style: 0x{:08X}, ex_style: 0x{:08X}", style.0, ex_style.0);
+
+    // Skip if already borderless (only WS_VISIBLE remains, no extended border styles)
+    let border_ex_flags =
+        WS_EX_DLGMODALFRAME | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE;
+    if style == WS_VISIBLE && (ex_style & border_ex_flags).0 == 0 {
+        eprintln!("  Already borderless, skipping");
+        return Ok(false);
     }
 
-    // Strip all decorations, keep only WS_VISIBLE (matches infzoom approach)
+    // Strip all standard decorations, keep only WS_VISIBLE
     let new_style = WS_VISIBLE;
 
-    // SAFETY: SetWindowLongPtrW with GWL_STYLE updates window style bits.
+    // Strip border-related extended styles (Borderless-Gaming approach)
+    let new_ex_style =
+        ex_style & !WS_EX_DLGMODALFRAME & !WS_EX_WINDOWEDGE & !WS_EX_CLIENTEDGE & !WS_EX_STATICEDGE;
+
+    eprintln!(
+        "  -> style: 0x{:08X}, ex_style: 0x{:08X}",
+        new_style.0, new_ex_style.0
+    );
+
+    // SAFETY: SetWindowLongPtrW updates window style bits.
     unsafe {
         SetWindowLongPtrW(hwnd, GWL_STYLE, new_style.0 as isize);
+        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_ex_style.0 as isize);
     }
 
     let rect = get_monitor_rect(hwnd)?;
 
     // SAFETY: SetWindowPos repositions and resizes the window to fill the monitor.
+    // SWP_SHOWWINDOW forces display, SWP_NOOWNERZORDER prevents owned window Z-order changes,
+    // SWP_NOSENDCHANGING bypasses game's WM_WINDOWPOSCHANGING handler.
     unsafe {
         SetWindowPos(
             hwnd,
@@ -123,11 +153,11 @@ pub fn apply_borderless(hwnd: HWND) -> anyhow::Result<()> {
             rect.top,
             rect.right - rect.left,
             rect.bottom - rect.top,
-            SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOSENDCHANGING,
+            SWP_SHOWWINDOW | SWP_NOOWNERZORDER | SWP_FRAMECHANGED | SWP_NOSENDCHANGING,
         )?;
     }
 
-    Ok(())
+    Ok(true)
 }
 
 /// Get the monitor rectangle for the monitor containing the given window.
@@ -172,6 +202,11 @@ pub fn is_foreground(_hwnd: ()) -> bool {
 }
 
 #[cfg(not(target_os = "windows"))]
-pub fn apply_borderless(_hwnd: ()) -> anyhow::Result<()> {
+pub fn is_borderless(_hwnd: ()) -> bool {
+    false
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn apply_borderless(_hwnd: ()) -> anyhow::Result<bool> {
     anyhow::bail!("Window management is only supported on Windows")
 }
