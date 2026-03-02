@@ -82,13 +82,25 @@ pub fn is_foreground(hwnd: HWND) -> bool {
     fg == hwnd
 }
 
+/// Decoration flags that borderless mode strips.
+#[cfg(target_os = "windows")]
+const DECORATION_STYLE_FLAGS: u32 = {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        WS_CAPTION, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_SYSMENU, WS_THICKFRAME,
+    };
+    WS_CAPTION.0 | WS_THICKFRAME.0 | WS_SYSMENU.0 | WS_MAXIMIZEBOX.0 | WS_MINIMIZEBOX.0
+};
+
 /// Check whether the window is already in borderless mode.
+///
+/// Returns `true` if no decoration flags are set. Non-decoration flags like
+/// `WS_CLIPSIBLINGS` are ignored since the game may re-apply them.
 #[cfg(target_os = "windows")]
 pub fn is_borderless(hwnd: HWND) -> bool {
-    use windows::Win32::UI::WindowsAndMessaging::{GWL_STYLE, GetWindowLongPtrW, WS_VISIBLE};
+    use windows::Win32::UI::WindowsAndMessaging::{GWL_STYLE, GetWindowLongPtrW};
 
     let style = unsafe { GetWindowLongPtrW(hwnd, GWL_STYLE) } as u32;
-    style == WS_VISIBLE.0
+    (style & DECORATION_STYLE_FLAGS) == 0
 }
 
 /// Apply borderless window mode: strip all decorations and resize to fill the monitor.
@@ -105,7 +117,6 @@ pub fn apply_borderless(hwnd: HWND) -> anyhow::Result<bool> {
         GWL_EXSTYLE, GWL_STYLE, GetWindowLongPtrW, SWP_FRAMECHANGED, SWP_NOOWNERZORDER,
         SWP_NOSENDCHANGING, SWP_SHOWWINDOW, SetWindowLongPtrW, SetWindowPos, WINDOW_EX_STYLE,
         WINDOW_STYLE, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_EX_STATICEDGE, WS_EX_WINDOWEDGE,
-        WS_VISIBLE,
     };
 
     // SAFETY: GetWindowLongPtrW reads window style bits.
@@ -114,16 +125,16 @@ pub fn apply_borderless(hwnd: HWND) -> anyhow::Result<bool> {
 
     eprintln!("  style: 0x{:08X}, ex_style: 0x{:08X}", style.0, ex_style.0);
 
-    // Skip if already borderless (only WS_VISIBLE remains, no extended border styles)
+    // Skip if already borderless (no decoration flags remain)
     let border_ex_flags =
         WS_EX_DLGMODALFRAME | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE;
-    if style == WS_VISIBLE && (ex_style & border_ex_flags).0 == 0 {
+    if (style.0 & DECORATION_STYLE_FLAGS) == 0 && (ex_style & border_ex_flags).0 == 0 {
         eprintln!("  Already borderless, skipping");
         return Ok(false);
     }
 
-    // Strip all standard decorations, keep only WS_VISIBLE
-    let new_style = WS_VISIBLE;
+    // Subtract decoration flags, preserve non-decoration flags like WS_CLIPSIBLINGS
+    let new_style = WINDOW_STYLE(style.0 & !DECORATION_STYLE_FLAGS);
 
     // Strip border-related extended styles (Borderless-Gaming approach)
     let new_ex_style =
