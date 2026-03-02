@@ -191,6 +191,10 @@ pub enum Command {
         /// Timeout in seconds for process detection
         #[arg(long, default_value = "120")]
         timeout: u64,
+        /// Force windowed mode (-w flag) with manual borderless styling
+        /// instead of using Windows Fullscreen Optimization
+        #[arg(long)]
+        windowed: bool,
     },
     /// Upload tracker data to the web service
     Upload {

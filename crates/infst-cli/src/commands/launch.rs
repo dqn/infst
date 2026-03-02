@@ -1,4 +1,4 @@
-//! Launch command — start INFINITAS and apply borderless window mode.
+//! Launch command — start INFINITAS in borderless window mode.
 
 use std::thread;
 use std::time::{Duration, Instant};
@@ -15,14 +15,21 @@ const PROCESS_POLL_INTERVAL: Duration = Duration::from_secs(2);
 const BORDERLESS_RETRY_DELAY: Duration = Duration::from_secs(1);
 const BORDERLESS_MAX_RETRIES: u32 = 3;
 
-pub fn run(url: Option<&str>, pid: Option<u32>, timeout_secs: u64) -> Result<()> {
+pub fn run(url: Option<&str>, pid: Option<u32>, timeout_secs: u64, windowed: bool) -> Result<()> {
     let current_version = env!("CARGO_PKG_VERSION");
-    eprintln!("infst {} - Launch (Borderless)", current_version);
 
-    let process = find_or_launch_process(url, pid, timeout_secs)?;
+    if windowed {
+        eprintln!("infst {} - Launch (Windowed Borderless)", current_version);
+    } else {
+        eprintln!("infst {} - Launch (FSO Borderless)", current_version);
+    }
+
+    let process = find_or_launch_process(url, pid, timeout_secs, windowed)?;
     eprintln!("Game process found (PID: {})", process.pid);
 
-    wait_and_apply_borderless(&process)?;
+    if windowed {
+        wait_and_apply_borderless(&process)?;
+    }
 
     eprintln!("Done!");
     Ok(())
@@ -33,6 +40,7 @@ fn find_or_launch_process(
     url: Option<&str>,
     pid: Option<u32>,
     timeout_secs: u64,
+    windowed: bool,
 ) -> Result<ProcessHandle> {
     // Explicit PID — just open it
     if let Some(pid) = pid {
@@ -48,10 +56,21 @@ fn find_or_launch_process(
     // Not running — launch or instruct
     match url {
         Some(uri) => {
-            eprintln!("Extracting token from URI...");
             let token = launcher::extract_token_from_uri(uri)?;
-            eprintln!("Launching game in windowed mode...");
-            let pid = launcher::launch_game(&token)?;
+
+            if windowed {
+                eprintln!("Launching game in windowed mode...");
+            } else {
+                // Ensure FSO is enabled before launching in fullscreen
+                match launcher::ensure_fso_enabled() {
+                    Ok(true) => eprintln!("Enabled Fullscreen Optimization for bm2dx.exe"),
+                    Ok(false) => eprintln!("Fullscreen Optimization is already enabled"),
+                    Err(e) => eprintln!("Warning: Could not check FSO status: {e}"),
+                }
+                eprintln!("Launching game in fullscreen mode (FSO borderless)...");
+            }
+
+            let pid = launcher::launch_game(&token, windowed)?;
             eprintln!("Game launched (PID: {})", pid);
         }
         None => {
