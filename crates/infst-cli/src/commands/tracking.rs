@@ -16,6 +16,21 @@ use crate::input;
 use crate::retry::{load_song_database_with_retry, search_offsets_with_retry};
 use crate::shutdown::ShutdownSignal;
 
+/// Run the main tracking mode, launched via URI scheme handler.
+///
+/// Extracts the token from the URI, launches the game, then enters
+/// the normal tracking loop which will pick up the newly started process.
+pub fn run_with_uri(uri: &str, api_endpoint: Option<&str>, api_token: Option<&str>) -> Result<()> {
+    println!("infst v{}", env!("CARGO_PKG_VERSION"));
+    println!("Launching game from URI...");
+
+    let token = infst::launcher::extract_token_from_uri(uri)?;
+    let pid = infst::launcher::launch_game(&token)?;
+    println!("Game launched (PID: {})", pid);
+
+    run(None, api_endpoint, api_token)
+}
+
 /// Run the main tracking mode
 pub fn run(
     offsets_file: Option<&str>,
@@ -29,6 +44,11 @@ pub fn run(
     let mut infst = Infst::with_config(initial_offsets, config);
 
     println!("Waiting for INFINITAS... (Press Esc or q to quit)");
+
+    // Open the game login page if the game is not already running
+    if ProcessHandle::find_and_open().is_err() {
+        open_login_page();
+    }
 
     while !shutdown.is_shutdown() {
         if let Some(process) = wait_for_process(&shutdown) {
@@ -332,5 +352,15 @@ fn load_score_map(
             warn!("Failed to load score map: {}", e);
             ScoreMap::new()
         }
+    }
+}
+
+const LOGIN_URL: &str = "https://p.eagate.573.jp/game/infinitas/2/api/login/login.html";
+
+/// Open the INFINITAS login page in the default browser (best-effort).
+fn open_login_page() {
+    match open::that(LOGIN_URL) {
+        Ok(()) => println!("Opened login page in browser"),
+        Err(e) => warn!("Could not open browser: {}", e),
     }
 }

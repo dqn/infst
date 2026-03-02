@@ -56,14 +56,7 @@ enum Command {
         #[arg(long)]
         pid: Option<u32>,
     },
-    Launch {
-        #[arg(long)]
-        url: Option<String>,
-        #[arg(long)]
-        pid: Option<u32>,
-        #[arg(long, default_value = "120")]
-        timeout: u64,
-    },
+    Register,
 }
 
 #[derive(Clone, clap::ValueEnum)]
@@ -210,4 +203,10 @@ fn test_missing_required_arg_fails() {
     // hexdump requires --address
     let result = Args::try_parse_from(["infst", "hexdump"]);
     assert!(result.is_err());
+}
+
+#[test]
+fn test_parse_register() {
+    let args = Args::try_parse_from(["infst", "register"]).unwrap();
+    assert!(matches!(args.command, Some(Command::Register)));
 }
