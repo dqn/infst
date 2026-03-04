@@ -8,15 +8,12 @@ use std::process::Command;
 use anyhow::{Context, Result, bail};
 use tracing::{debug, warn};
 
-/// Check if the given path is inside a git repository.
+/// Check if the given path is the root of its own git repository.
+///
+/// Uses `.git` existence check instead of `git rev-parse --is-inside-work-tree`
+/// to avoid false positives when the path is a subdirectory of a parent repo.
 pub fn is_repo(repo_path: &Path) -> Result<bool> {
-    let output = Command::new("git")
-        .args(["rev-parse", "--is-inside-work-tree"])
-        .current_dir(repo_path)
-        .output()
-        .context("Failed to run git. Is git installed?")?;
-
-    Ok(output.status.success())
+    Ok(repo_path.join(".git").exists())
 }
 
 /// Initialize a new git repository at the given path.

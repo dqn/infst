@@ -23,7 +23,7 @@ pub struct Args {
     pub git: bool,
 
     /// Git repository directory for score tracking (default: current directory)
-    #[arg(long, value_name = "PATH", default_value = ".")]
+    #[arg(short = 'r', long, value_name = "PATH", default_value = ".")]
     pub git_repo: String,
 
     #[command(subcommand)]
