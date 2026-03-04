@@ -291,20 +291,21 @@ impl Infst {
             return;
         }
 
-        // Build commit message
-        let message = format!(
-            "Update scores: {} ({}) - {} EX:{}",
+        // Build commit label and message
+        let label = format!(
+            "{} ({}) - {} EX:{}",
             play_data.chart.title,
             play_data.chart.difficulty.short_name(),
             play_data.lamp.short_name(),
             play_data.ex_score,
         );
+        let message = format!("Update scores: {}", label);
 
         let repo_path = git_config.repo_path.clone();
         let file_name = git_config.file_name.clone();
 
         thread::spawn(move || {
-            if let Err(e) = crate::git::add_commit_push(&repo_path, &file_name, &message) {
+            if let Err(e) = crate::git::add_commit_push(&repo_path, &file_name, &message, &label) {
                 error!("Git commit/push failed: {}", e);
             }
         });

@@ -29,7 +29,10 @@ pub fn init_repo(repo_path: &Path) -> Result<()> {
         bail!("git init failed: {}", stderr.trim());
     }
 
-    debug!("Initialized git repository at {}", repo_path.display());
+    println!(
+        "\u{1F4C2} Initialized git repository: {}",
+        repo_path.display()
+    );
     Ok(())
 }
 
@@ -57,7 +60,7 @@ fn has_remote(repo_path: &Path) -> Result<bool> {
 ///
 /// Push failures are logged as warnings but do not cause an error return,
 /// since the commit itself succeeded and push will retry on the next play.
-pub fn add_commit_push(repo_path: &Path, file: &str, message: &str) -> Result<()> {
+pub fn add_commit_push(repo_path: &Path, file: &str, message: &str, label: &str) -> Result<()> {
     // git add
     let output = Command::new("git")
         .args(["add", file])
@@ -94,7 +97,7 @@ pub fn add_commit_push(repo_path: &Path, file: &str, message: &str) -> Result<()
         bail!("git commit failed: {}", stderr.trim());
     }
 
-    debug!("Committed: {}", message);
+    println!("\u{1F4DD} Committed: {}", label);
 
     // Skip push if no remote is configured
     if !has_remote(repo_path)? {
@@ -111,12 +114,13 @@ pub fn add_commit_push(repo_path: &Path, file: &str, message: &str) -> Result<()
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
+        println!("\u{26A0}\u{FE0F} Push failed (will retry)");
         warn!(
             "git push failed (will retry on next play): {}",
             stderr.trim()
         );
     } else {
-        debug!("Pushed successfully");
+        println!("\u{1F680} Pushed");
     }
 
     Ok(())

@@ -117,7 +117,11 @@ fn resolve_git_config(enabled: bool, repo_path: &str) -> Result<Option<GitConfig
         .canonicalize()
         .with_context(|| format!("Git repo path not found: {}", repo_path.display()))?;
 
+    let was_repo = infst::git::is_repo(&repo_path)?;
     infst::git::ensure_repo(&repo_path)?;
+    if was_repo {
+        println!("\u{1F4C2} Git repository: {}", repo_path.display());
+    }
 
     Ok(Some(GitConfig {
         repo_path,
