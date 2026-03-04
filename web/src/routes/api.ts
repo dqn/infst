@@ -176,8 +176,8 @@ apiRoutes.post("/lamps/bulk", bearerAuth, async (c) => {
   let entries: LampInput[];
   if (Array.isArray(rawBody)) {
     entries = rawBody;
-  } else if (rawBody && Array.isArray(rawBody.entries)) {
-    entries = rawBody.entries;
+  } else if (rawBody && typeof rawBody === "object" && Array.isArray((rawBody as Record<string, unknown>).entries)) {
+    entries = (rawBody as Record<string, unknown>).entries as LampInput[];
   } else {
     return c.json({ error: "Expected an array of lamp entries or { entries: [...] }" }, 400);
   }
