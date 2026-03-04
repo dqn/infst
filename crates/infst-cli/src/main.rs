@@ -88,6 +88,8 @@ fn main() -> Result<()> {
             args.offsets_file.as_deref(),
             args.api_endpoint.as_deref(),
             args.api_token.as_deref(),
+            args.git,
+            &args.git_repo,
         ),
     }
 }

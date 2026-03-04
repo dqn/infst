@@ -267,6 +267,47 @@ impl Infst {
 
         // Send to API (non-blocking)
         self.send_lamp_to_api(play_data);
+
+        // Export scores and git commit/push (non-blocking)
+        self.export_and_git_push(play_data);
+    }
+
+    /// Export full score data to JSON and git commit/push in a background thread
+    fn export_and_git_push(&self, play_data: &PlayData) {
+        let Some(ref git_config) = self.config.git_config else {
+            return;
+        };
+
+        let file_path = git_config.repo_path.join(&git_config.file_name);
+
+        // Export JSON to the git repo
+        if let Err(e) = crate::export::export_tracker_json(
+            &file_path,
+            &self.game_data.song_db,
+            &self.game_data.unlock_state,
+            &self.game_data.score_map,
+        ) {
+            error!("Failed to export scores for git: {}", e);
+            return;
+        }
+
+        // Build commit message
+        let message = format!(
+            "Update scores: {} ({}) - {} EX:{}",
+            play_data.chart.title,
+            play_data.chart.difficulty.short_name(),
+            play_data.lamp.short_name(),
+            play_data.ex_score,
+        );
+
+        let repo_path = git_config.repo_path.clone();
+        let file_name = git_config.file_name.clone();
+
+        thread::spawn(move || {
+            if let Err(e) = crate::git::add_commit_push(&repo_path, &file_name, &message) {
+                error!("Git commit/push failed: {}", e);
+            }
+        });
     }
 
     /// Send lamp data to the API endpoint in a background thread

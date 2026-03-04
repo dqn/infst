@@ -51,6 +51,15 @@ pub struct ApiConfig {
     pub token: String,
 }
 
+/// Git integration configuration for automatic score tracking
+#[derive(Debug, Clone)]
+pub struct GitConfig {
+    /// Path to the git repository directory
+    pub repo_path: PathBuf,
+    /// Name of the score file to commit (e.g., "scores.json")
+    pub file_name: String,
+}
+
 /// Configuration for the Infst application
 #[derive(Debug, Clone)]
 pub struct InfstConfig {
@@ -62,6 +71,8 @@ pub struct InfstConfig {
     pub tracker_path: PathBuf,
     /// API configuration for sending play data
     pub api_config: Option<ApiConfig>,
+    /// Git integration configuration
+    pub git_config: Option<GitConfig>,
 }
 
 impl Default for InfstConfig {
@@ -71,6 +82,7 @@ impl Default for InfstConfig {
             auto_export: true,
             tracker_path: PathBuf::from("tracker.tsv"),
             api_config: None,
+            git_config: None,
         }
     }
 }
@@ -89,6 +101,7 @@ pub struct InfstConfigBuilder {
     auto_export: Option<bool>,
     tracker_path: Option<PathBuf>,
     api_config: Option<ApiConfig>,
+    git_config: Option<GitConfig>,
 }
 
 impl InfstConfigBuilder {
@@ -116,6 +129,12 @@ impl InfstConfigBuilder {
         self
     }
 
+    /// Set git integration configuration
+    pub fn git_config(mut self, config: GitConfig) -> Self {
+        self.git_config = Some(config);
+        self
+    }
+
     /// Build the configuration
     pub fn build(self) -> InfstConfig {
         let default = InfstConfig::default();
@@ -124,6 +143,7 @@ impl InfstConfigBuilder {
             auto_export: self.auto_export.unwrap_or(default.auto_export),
             tracker_path: self.tracker_path.unwrap_or(default.tracker_path),
             api_config: self.api_config,
+            git_config: self.git_config,
         }
     }
 }

@@ -4,11 +4,12 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use infst::config::find_game_version;
 use infst::{
-    ApiConfig, Infst, InfstConfig, MemoryReader, OffsetSearcher, OffsetsCollection, ProcessHandle,
-    ScoreMap, SongInfo, load_offsets, save_offsets_to_cache, try_load_cached_offsets,
+    ApiConfig, GitConfig, Infst, InfstConfig, MemoryReader, OffsetSearcher, OffsetsCollection,
+    ProcessHandle, ScoreMap, SongInfo, load_offsets, save_offsets_to_cache,
+    try_load_cached_offsets,
 };
 use tracing::{debug, error, info, warn};
 
@@ -21,11 +22,14 @@ pub fn run(
     offsets_file: Option<&str>,
     api_endpoint: Option<&str>,
     api_token: Option<&str>,
+    git_enabled: bool,
+    git_repo: &str,
 ) -> Result<()> {
     let shutdown = setup_shutdown_handler();
     let (initial_offsets, offsets_from_file) = load_initial_offsets(offsets_file);
 
-    let config = build_config(api_endpoint, api_token);
+    let git_config = resolve_git_config(git_enabled, git_repo)?;
+    let config = build_config(api_endpoint, api_token, git_config);
     let mut infst = Infst::with_config(initial_offsets, config);
 
     println!("Waiting for INFINITAS... (Press Esc or q to quit)");
@@ -67,18 +71,58 @@ fn setup_shutdown_handler() -> Arc<ShutdownSignal> {
     shutdown
 }
 
-/// Build InfstConfig with optional API configuration
+/// Build InfstConfig with optional API and git configuration
 ///
 /// Resolves API credentials from: args > credentials file
-fn build_config(api_endpoint: Option<&str>, api_token: Option<&str>) -> InfstConfig {
+fn build_config(
+    api_endpoint: Option<&str>,
+    api_token: Option<&str>,
+    git_config: Option<GitConfig>,
+) -> InfstConfig {
     let api_config = resolve_api_config(api_endpoint, api_token);
     if api_config.is_some() {
         info!("API integration enabled");
     }
+    if git_config.is_some() {
+        info!("Git integration enabled");
+    }
     InfstConfig {
         api_config,
+        git_config,
         ..InfstConfig::default()
     }
+}
+
+/// Resolve git configuration if enabled.
+///
+/// Validates the repo path at startup to fail fast.
+fn resolve_git_config(enabled: bool, repo_path: &str) -> Result<Option<GitConfig>> {
+    if !enabled {
+        return Ok(None);
+    }
+
+    let repo_path = std::path::PathBuf::from(repo_path);
+
+    // Create directory if it doesn't exist
+    if !repo_path.exists() {
+        std::fs::create_dir_all(&repo_path).with_context(|| {
+            format!(
+                "Failed to create git repo directory: {}",
+                repo_path.display()
+            )
+        })?;
+    }
+
+    let repo_path = repo_path
+        .canonicalize()
+        .with_context(|| format!("Git repo path not found: {}", repo_path.display()))?;
+
+    infst::git::ensure_repo(&repo_path)?;
+
+    Ok(Some(GitConfig {
+        repo_path,
+        file_name: "scores.json".to_string(),
+    }))
 }
 
 /// Resolve API config from args or credentials file

@@ -19,6 +19,7 @@ pub mod config;
 pub mod debug;
 pub mod error;
 pub mod export;
+pub mod git;
 pub mod infst;
 pub mod input;
 pub mod offset;
@@ -62,7 +63,7 @@ pub use play::{
 };
 
 // Re-export from infst module
-pub use infst::{ApiConfig, GameData, Infst, InfstConfig, InfstConfigBuilder};
+pub use infst::{ApiConfig, GameData, GitConfig, Infst, InfstConfig, InfstConfigBuilder};
 
 // Re-export from retry module
 pub use retry::{ExponentialBackoff, FixedDelay, NoRetry, RetryStrategy};

@@ -18,6 +18,14 @@ pub struct Args {
     #[arg(long, env = "INFST_API_TOKEN")]
     pub api_token: Option<String>,
 
+    /// Enable git integration (auto commit & push scores on each play)
+    #[arg(short, long)]
+    pub git: bool,
+
+    /// Git repository directory for score tracking (default: current directory)
+    #[arg(long, value_name = "PATH", default_value = ".")]
+    pub git_repo: String,
+
     #[command(subcommand)]
     pub command: Option<Command>,
 }
