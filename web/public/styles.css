@@ -70,3 +70,133 @@ button.danger { background: #c53030; color: #fff; }
 button.danger:hover { background: #a02020; }
 .error { color: #e06060; margin-bottom: 12px; }
 .success { color: #6bc98a; margin-bottom: 12px; }
+
+/* Unified table view */
+.container.wide { max-width: 1400px; }
+.unified-columns {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  align-items: flex-start;
+}
+.table-column {
+  flex: 1 1 0;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+}
+.table-column.hidden-column { display: none; }
+.table-column-header {
+  background: #111;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #2a2a2a;
+  margin-bottom: 8px;
+}
+.table-column-header h3 {
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+}
+.column-filters {
+  display: flex;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: #ccc;
+}
+.column-filters label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+}
+.table-column-scroll {
+  overflow-y: auto;
+  max-height: 70vh;
+  padding-right: 4px;
+}
+.table-column-scroll .tier-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #111;
+  font-size: 0.8rem;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #2a2a2a;
+  padding: 4px 0;
+  margin-bottom: 6px;
+}
+.table-column .tier-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.column-stats {
+  margin-bottom: 8px;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+}
+
+/* Summary progress bars */
+.summary-row { margin-bottom: 10px; }
+.summary-row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.summary-row-header .table-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+.summary-row-header .lamp-counts {
+  font-size: 0.7rem;
+  color: #888;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.progress-bar-container {
+  height: 14px;
+  background: #222;
+  border-radius: 7px;
+  overflow: hidden;
+  display: flex;
+}
+.progress-bar-segment {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+/* Table toggles */
+.table-toggles {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+.table-toggles label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  color: #ccc;
+}
+
+/* Responsive: stack columns on mobile */
+@media (max-width: 768px) {
+  .unified-columns {
+    flex-direction: column;
+  }
+  .table-column {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .table-column-scroll {
+    max-height: none;
+    overflow-y: visible;
+  }
+}

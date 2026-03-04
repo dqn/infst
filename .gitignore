@@ -10,6 +10,7 @@ offsets.txt
 sessions/
 tracker.tsv
 .infst-cache.json
+.infst-sync-cache.json
 
 # Wrangler local state
 web/.wrangler/

@@ -3,10 +3,11 @@ import type { Child, FC } from "hono/jsx";
 interface LayoutProps {
   title?: string | undefined;
   user?: { username: string | null } | null | undefined;
+  wide?: boolean;
   children: Child;
 }
 
-export const Layout: FC<LayoutProps> = ({ title, user, children }) => {
+export const Layout: FC<LayoutProps> = ({ title, user, wide, children }) => {
   const pageTitle = title ? `${title} - infst` : "infst";
 
   return (
@@ -47,7 +48,7 @@ export const Layout: FC<LayoutProps> = ({ title, user, children }) => {
             </div>
           </div>
         </nav>
-        <div class="container">
+        <div class={`container${wide ? " wide" : ""}`}>
           {children}
         </div>
         <script src="/register-sw.js"></script>

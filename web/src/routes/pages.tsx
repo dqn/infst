@@ -11,6 +11,7 @@ import { RegisterPage } from "../components/RegisterPage";
 import { SettingsPage } from "../components/SettingsPage";
 import { GuidePage } from "../components/GuidePage";
 import { TableView } from "../components/TableView";
+import { UnifiedTableView } from "../components/UnifiedTableView";
 
 export const pageRoutes = new Hono<AppEnv>();
 
@@ -67,7 +68,7 @@ pageRoutes.get("/guide", optionalSession, (c) => {
   return c.html(<GuidePage user={user} />);
 });
 
-// GET /:username - User's table list
+// GET /:username - Unified difficulty table view
 pageRoutes.get("/:username", optionalSession, async (c) => {
   const username = c.req.param("username");
   const sessionUser = c.get("user") as SessionUser | null;
@@ -108,37 +109,54 @@ pageRoutes.get("/:username", optionalSession, async (c) => {
     );
   }
 
-  // Get distinct table keys for this user's lamps
-  const userCharts = sortTableKeys(
-    await db
-      .select({ tableKey: charts.tableKey })
-      .from(charts)
-      .groupBy(charts.tableKey),
+  // Fetch all charts and user lamps
+  const allCharts = await db
+    .select()
+    .from(charts)
+    .orderBy(asc(charts.sortOrder));
+
+  if (allCharts.length === 0) {
+    return c.html(
+      <Layout user={sessionUser}>
+        <div style="margin-top:24px;">
+          <h2 style="margin-bottom:16px;">{username}</h2>
+          <p style="color:#666;">No tables available.</p>
+        </div>
+      </Layout>,
+    );
+  }
+
+  const userLamps = await db
+    .select()
+    .from(lamps)
+    .where(eq(lamps.userId, targetUser.id));
+
+  const lampMap = buildLampMap(userLamps);
+
+  // Group charts by tableKey
+  const tableGroups = new Map<string, typeof allCharts>();
+  for (const chart of allCharts) {
+    const group = tableGroups.get(chart.tableKey);
+    if (group) {
+      group.push(chart);
+    } else {
+      tableGroups.set(chart.tableKey, [chart]);
+    }
+  }
+
+  // Build sorted table data
+  const tables = sortTableKeys(
+    Array.from(tableGroups.entries()).map(([tableKey, rows]) => ({
+      tableKey,
+      tiers: groupChartsByTier(rows, lampMap),
+    })),
   );
 
   return c.html(
-    <Layout user={sessionUser}>
-      <div style="margin-top:24px;">
+    <Layout title={username} user={sessionUser} wide>
+      <div style="margin-top:16px;">
         <h2 style="margin-bottom:16px;">{username}</h2>
-        <h3 style="font-size:1rem;margin-bottom:12px;color:#999;">Difficulty Tables</h3>
-        {userCharts.length === 0 ? (
-          <p style="color:#666;">No tables available.</p>
-        ) : (
-          <ul style="list-style:none;display:flex;flex-direction:column;gap:8px;">
-            {userCharts.map((chart) => (
-              <li>
-                <a
-                  href={`/${username}/${chart.tableKey}`}
-                  style="display:block;padding:12px 16px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#e0e0e0;text-decoration:none;transition:border-color 0.15s;"
-                  onmouseover="this.style.borderColor='#444'"
-                  onmouseout="this.style.borderColor='#2a2a2a'"
-                >
-                  {formatTableKey(chart.tableKey)}
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
+        <UnifiedTableView tables={tables} username={username} />
       </div>
     </Layout>,
   );
