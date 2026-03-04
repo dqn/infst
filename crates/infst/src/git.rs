@@ -44,6 +44,18 @@ pub fn ensure_repo(repo_path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Check if the repository has any remote configured.
+fn has_remote(repo_path: &Path) -> Result<bool> {
+    let output = Command::new("git")
+        .args(["remote"])
+        .current_dir(repo_path)
+        .output()
+        .context("Failed to run git remote")?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(!stdout.trim().is_empty())
+}
+
 /// Stage, commit, and push a file in the given git repository.
 ///
 /// Push failures are logged as warnings but do not cause an error return,
@@ -86,6 +98,12 @@ pub fn add_commit_push(repo_path: &Path, file: &str, message: &str) -> Result<()
     }
 
     debug!("Committed: {}", message);
+
+    // Skip push if no remote is configured
+    if !has_remote(repo_path)? {
+        debug!("No remote configured, skipping push");
+        return Ok(());
+    }
 
     // git push (best-effort)
     let output = Command::new("git")
