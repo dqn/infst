@@ -285,31 +285,54 @@ impl Infst {
             .score_map
             .get_or_insert(play_data.chart.song_id);
         let diff = play_data.chart.difficulty;
+        let diff_index = diff as usize;
+
+        let old_lamp = entry.get_lamp(diff);
+        let old_score = entry.get_score(diff);
+        let old_miss = entry.miss_count[diff_index];
+        let mut updated = false;
 
         // Update lamp (keep best)
-        if play_data.lamp > entry.get_lamp(diff) {
+        if play_data.lamp > old_lamp {
             entry.set_lamp(diff, play_data.lamp);
+            updated = true;
         }
 
         // Update EX score (keep best)
-        if play_data.ex_score > entry.get_score(diff) {
+        if play_data.ex_score > old_score {
             entry.set_score(diff, play_data.ex_score);
+            updated = true;
         }
 
         // Update miss count (keep lowest)
         if play_data.miss_count_valid() {
-            let diff_index = diff as usize;
             let current_miss = play_data.miss_count();
-            match entry.miss_count[diff_index] {
+            match old_miss {
                 Some(best) if current_miss < best => {
                     entry.miss_count[diff_index] = Some(current_miss);
+                    updated = true;
                 }
                 None => {
                     entry.miss_count[diff_index] = Some(current_miss);
+                    updated = true;
                 }
                 _ => {}
             }
         }
+
+        info!(
+            "score_map update: song={} {} | lamp: {}→{} | ex: {}→{} | miss: {:?}→{} (valid={}) | changed={}",
+            play_data.chart.song_id,
+            diff.short_name(),
+            old_lamp,
+            play_data.lamp,
+            old_score,
+            play_data.ex_score,
+            old_miss,
+            play_data.miss_count(),
+            play_data.miss_count_valid(),
+            updated,
+        );
     }
 
     /// Export full score data to JSON and git commit/push in a background thread

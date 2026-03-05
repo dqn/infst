@@ -6,7 +6,7 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 /// Check if the given path is the root of its own git repository.
 ///
@@ -81,7 +81,7 @@ pub fn add_commit_push(repo_path: &Path, file: &str, message: &str, label: &str)
         .context("Failed to run git diff")?;
 
     if output.status.success() {
-        debug!("No changes to commit, skipping git commit");
+        info!("No changes to commit for {}, skipping", label);
         return Ok(());
     }
 
