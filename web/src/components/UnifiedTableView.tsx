@@ -64,9 +64,10 @@ export const UnifiedTableView: FC<UnifiedTableViewProps> = ({
             }
 
             const match = levelKey.match(/^(sp|dp)(\d+)$/);
-            const label = match
-              ? `${match[1].toUpperCase()}☆${match[2]}`
-              : levelKey;
+            const label =
+              match !== null
+                ? `${match[1]!.toUpperCase()}☆${match[2]!}`
+                : levelKey;
 
             return (
               <div class="summary-row" data-summary-level={levelKey}>
