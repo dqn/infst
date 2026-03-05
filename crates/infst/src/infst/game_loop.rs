@@ -377,16 +377,14 @@ impl Infst {
     /// Handle transition to song select screen
     fn handle_song_select(&mut self, reader: &MemoryReader) {
         // Re-scan for newly loaded songs (handles lazy loading)
-        let prev_count = self.game_data.song_db.len();
+        let _prev_count = self.game_data.song_db.len();
         self.rescan_song_database(reader);
 
         // Poll unlock state changes
         self.poll_unlock_changes(reader);
 
-        // Reload score map if new songs were discovered
-        if self.game_data.song_db.len() > prev_count {
-            self.reload_score_map(reader);
-        }
+        // Reload score map to reflect latest play results
+        self.reload_score_map(reader);
 
         // Export tracker file if auto-export is enabled
         if self.config.auto_export
