@@ -10,6 +10,7 @@ import { cacheControl } from "../middleware/cache";
 import { users, charts, lamps } from "../db/schema";
 import { buildLampMap, groupChartsByTier } from "../lib/chart-table";
 import { validateLampInput } from "../lib/validators";
+import { BULK_MAX_ENTRIES } from "../lib/constants";
 
 interface LampInput {
   songId: number;
@@ -182,6 +183,10 @@ apiRoutes.post("/lamps/bulk", bearerAuth, async (c) => {
     return c.json({ error: "Expected an array of lamp entries or { entries: [...] }" }, 400);
   }
 
+  if (entries.length > BULK_MAX_ENTRIES) {
+    return c.json({ error: `Too many entries (max ${BULK_MAX_ENTRIES})` }, 400);
+  }
+
   const user = c.get("user");
   if (!user) {
     return c.json({ error: "Unauthorized" }, 401);
@@ -282,12 +287,19 @@ apiRoutes.post("/lamps/bulk", bearerAuth, async (c) => {
     );
   }
 
+  const ALLOWED_COLUMNS: Record<string, string> = {
+    lamp: "lamp",
+    updatedAt: "updated_at",
+    exScore: "ex_score",
+    missCount: "miss_count",
+  };
+
   for (const upd of updates) {
     const setClauses: string[] = [];
     const bindValues: unknown[] = [];
     for (const [k, v] of Object.entries(upd.values)) {
-      // Convert camelCase to snake_case for SQL
-      const col = k.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+      const col = ALLOWED_COLUMNS[k];
+      if (!col) continue;
       setClauses.push(`${col} = ?`);
       bindValues.push(v);
     }
@@ -331,7 +343,7 @@ apiRoutes.get(
       .limit(1);
 
     const targetUser = userResult[0];
-    if (!targetUser) {
+    if (!targetUser || !targetUser.isPublic) {
       return c.json({ lamps: [] });
     }
 
@@ -358,10 +370,23 @@ apiRoutes.get(
   },
 );
 
+// Constant-time string comparison
+function timingSafeEqual(a: string, b: string): boolean {
+  const encoder = new TextEncoder();
+  const aBuf = encoder.encode(a);
+  const bBuf = encoder.encode(b);
+  if (aBuf.length !== bBuf.length) return false;
+  let diff = 0;
+  for (let i = 0; i < aBuf.length; i++) {
+    diff |= aBuf[i]! ^ bBuf[i]!;
+  }
+  return diff === 0;
+}
+
 // POST /api/charts/sync - Sync title-mapping.json to charts table (Admin auth)
 apiRoutes.post("/charts/sync", async (c) => {
   const adminToken = c.req.header("Authorization")?.replace("Bearer ", "");
-  if (adminToken !== c.env.ADMIN_TOKEN) {
+  if (!adminToken || !timingSafeEqual(adminToken, c.env.ADMIN_TOKEN)) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 

@@ -8,6 +8,13 @@
       "when": 1771283332025,
       "tag": "0000_bright_jackpot",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1772722154452,
+      "tag": "0001_aromatic_midnight",
+      "breakpoints": true
     }
   ]
 }

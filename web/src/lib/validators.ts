@@ -1,5 +1,6 @@
 import { isValidLamp } from "./lamp";
 import {
+  EMAIL_PATTERN,
   PASSWORD_MIN_LENGTH,
   PASSWORD_MAX_LENGTH,
   USERNAME_PATTERN,
@@ -15,6 +16,9 @@ export function validateLoginInput(email: unknown, password: unknown): Validatio
   if (typeof email !== "string" || typeof password !== "string") {
     return { valid: false, error: "Email and password are required" };
   }
+  if (!EMAIL_PATTERN.test(email)) {
+    return { valid: false, error: "Invalid email format" };
+  }
   return { valid: true };
 }
 
@@ -29,6 +33,10 @@ export function validateRegisterInput(
     typeof username !== "string"
   ) {
     return { valid: false, error: "All fields are required" };
+  }
+
+  if (!EMAIL_PATTERN.test(email)) {
+    return { valid: false, error: "Invalid email format" };
   }
 
   if (password.length < PASSWORD_MIN_LENGTH || password.length > PASSWORD_MAX_LENGTH) {

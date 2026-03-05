@@ -23,8 +23,12 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Never cache API and auth routes
-  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/auth/")) {
+  // Never cache API, auth, and authenticated-only routes
+  if (
+    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/auth/") ||
+    url.pathname === "/settings"
+  ) {
     return;
   }
 

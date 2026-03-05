@@ -19,6 +19,8 @@ import {
   RATE_LIMIT_REGISTER_WINDOW_SECONDS,
   RATE_LIMIT_DEVICE_CODE_MAX,
   RATE_LIMIT_DEVICE_CODE_WINDOW_SECONDS,
+  RATE_LIMIT_DEVICE_TOKEN_MAX,
+  RATE_LIMIT_DEVICE_TOKEN_WINDOW_SECONDS,
 } from "./lib/constants";
 
 const app = new Hono<AppEnv>();
@@ -33,6 +35,9 @@ app.use("*", dbMiddleware);
 app.use("/auth/login", csrf());
 app.use("/auth/register", csrf());
 app.use("/auth/device/confirm", csrf());
+
+// CSRF protection for logout
+app.use("/auth/logout", csrf());
 
 // CSRF protection for session-authenticated API endpoints
 app.use("/api/users/me", csrf());
@@ -58,6 +63,13 @@ app.use(
   rateLimit({
     max: RATE_LIMIT_DEVICE_CODE_MAX,
     windowSeconds: RATE_LIMIT_DEVICE_CODE_WINDOW_SECONDS,
+  }),
+);
+app.use(
+  "/auth/device/token",
+  rateLimit({
+    max: RATE_LIMIT_DEVICE_TOKEN_MAX,
+    windowSeconds: RATE_LIMIT_DEVICE_TOKEN_WINDOW_SECONDS,
   }),
 );
 

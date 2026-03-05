@@ -76,8 +76,14 @@ export const lamps = sqliteTable(
   ],
 );
 
-export const rateLimits = sqliteTable("rate_limits", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  key: text("key").notNull(),
-  createdAt: text("created_at").notNull(),
-});
+export const rateLimits = sqliteTable(
+  "rate_limits",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    key: text("key").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    index("rate_limits_key_created_at_idx").on(table.key, table.createdAt),
+  ],
+);

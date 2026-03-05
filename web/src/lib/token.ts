@@ -6,9 +6,19 @@ export function generateToken(): string {
 // Generate an 8-character user code in XXXX-XXXX format
 export function generateUserCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = new Uint8Array(8);
-  crypto.getRandomValues(bytes);
-  const code = Array.from(bytes, (b) => chars[b % chars.length]).join("");
+  // Use rejection sampling to avoid modular bias (256 % 31 != 0)
+  const maxValid = 256 - (256 % chars.length); // 248
+  const result: string[] = [];
+  while (result.length < 8) {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    for (const b of bytes) {
+      if (b < maxValid && result.length < 8) {
+        result.push(chars[b % chars.length]!);
+      }
+    }
+  }
+  const code = result.join("");
   return `${code.slice(0, 4)}-${code.slice(4)}`;
 }
 
@@ -92,5 +102,12 @@ export async function verifyJwt(
   }
 
   const payloadJson = new TextDecoder().decode(base64urlDecode(body));
-  return JSON.parse(payloadJson) as Record<string, unknown>;
+  const payload = JSON.parse(payloadJson) as Record<string, unknown>;
+
+  // Check expiration
+  if (typeof payload.exp === "number" && Date.now() / 1000 > payload.exp) {
+    return null;
+  }
+
+  return payload;
 }

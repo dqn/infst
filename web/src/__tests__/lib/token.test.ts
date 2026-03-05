@@ -62,4 +62,25 @@ describe("signJwt / verifyJwt", () => {
     expect(await verifyJwt("a.b", secret)).toBeNull();
     expect(await verifyJwt("a", secret)).toBeNull();
   });
+
+  it("returns null for expired token", async () => {
+    const payload = { userId: 1, exp: Math.floor(Date.now() / 1000) - 60 };
+    const token = await signJwt(payload, secret);
+    const result = await verifyJwt(token, secret);
+    expect(result).toBeNull();
+  });
+
+  it("returns payload for non-expired token", async () => {
+    const payload = { userId: 1, exp: Math.floor(Date.now() / 1000) + 3600 };
+    const token = await signJwt(payload, secret);
+    const result = await verifyJwt(token, secret);
+    expect(result).toEqual(payload);
+  });
+
+  it("returns payload when no exp claim is present", async () => {
+    const payload = { userId: 1 };
+    const token = await signJwt(payload, secret);
+    const result = await verifyJwt(token, secret);
+    expect(result).toEqual(payload);
+  });
 });

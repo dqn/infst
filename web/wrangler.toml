@@ -10,8 +10,9 @@ routes = [
 crons = ["0 3 * * *"]
 
 [vars]
-JWT_SECRET = "change-me-in-production"
 APP_URL = "https://infst.oidehosp.me"
+# JWT_SECRET and ADMIN_TOKEN must be set via `wrangler secret put`
+# For local dev, create a .dev.vars file with: JWT_SECRET=dev-secret
 
 [[d1_databases]]
 binding = "DB"

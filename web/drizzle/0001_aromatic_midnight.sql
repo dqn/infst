@@ -1,0 +1,1 @@
+CREATE INDEX `rate_limits_key_created_at_idx` ON `rate_limits` (`key`,`created_at`);

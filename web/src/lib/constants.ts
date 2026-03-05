@@ -9,6 +9,9 @@ export const POLLING_INTERVAL_SECONDS = 5;
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 72;
 
+// Email constraints
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // Username constraints
 export const USERNAME_MIN_LENGTH = 3;
 export const USERNAME_MAX_LENGTH = 20;
@@ -33,9 +36,14 @@ export const RATE_LIMIT_REGISTER_MAX = 3;
 export const RATE_LIMIT_REGISTER_WINDOW_SECONDS = 3600;
 export const RATE_LIMIT_DEVICE_CODE_MAX = 10;
 export const RATE_LIMIT_DEVICE_CODE_WINDOW_SECONDS = 60;
+export const RATE_LIMIT_DEVICE_TOKEN_MAX = 60;
+export const RATE_LIMIT_DEVICE_TOKEN_WINDOW_SECONDS = 300;
 
 // API token expiry
 export const API_TOKEN_EXPIRY_DAYS = 90;
+
+// Bulk API
+export const BULK_MAX_ENTRIES = 10_000;
 
 // Cleanup
 export const CLEANUP_PROBABILITY = 0.1; // 10% chance per poll

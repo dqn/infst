@@ -67,7 +67,8 @@ export async function createSessionCookie(
   userId: number,
   secret: string,
 ): Promise<string> {
-  return signJwt({ userId, iat: Math.floor(Date.now() / 1000) }, secret);
+  const iat = Math.floor(Date.now() / 1000);
+  return signJwt({ userId, iat, exp: iat + SESSION_MAX_AGE_SECONDS }, secret);
 }
 
 // Set session cookie on the response
