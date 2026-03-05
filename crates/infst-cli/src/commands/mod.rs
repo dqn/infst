@@ -19,3 +19,4 @@ pub mod sync;
 pub mod tracking;
 pub mod upload;
 pub mod validate;
+pub mod web;

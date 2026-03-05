@@ -78,6 +78,7 @@ fn main() -> Result<()> {
             token,
             pid,
         }) => commands::sync::run(endpoint.as_deref(), token.as_deref(), pid),
+        Some(Command::Web { endpoint }) => commands::web::run(endpoint.as_deref()),
         Some(Command::Upload {
             tracker,
             mapping,

@@ -188,6 +188,12 @@ pub enum Command {
         #[arg(long)]
         pid: Option<u32>,
     },
+    /// Open the web interface in the default browser
+    Web {
+        /// API endpoint URL (defaults to saved credentials or https://infst.oidehosp.me)
+        #[arg(long, env = "INFST_API_ENDPOINT")]
+        endpoint: Option<String>,
+    },
     /// Upload tracker data to the web service
     Upload {
         /// Tracker TSV file path
