@@ -256,11 +256,14 @@ impl Infst {
 
     /// Process and save play result data
     fn process_play_result(&mut self, play_data: &PlayData) {
-        // Get personal best for comparison
+        // Get personal best for comparison (before updating score_map)
         let personal_best = self.game_data.score_map.get(play_data.chart.song_id);
 
         // Print detailed play data to console (with PB comparison)
         println!("{}", format_play_data_console(play_data, personal_best));
+
+        // Update score_map with current play data so the export reflects this play
+        self.update_score_map(play_data);
 
         // Save to session files
         self.save_session_data(play_data);
@@ -270,6 +273,43 @@ impl Infst {
 
         // Export scores and git commit/push (non-blocking)
         self.export_and_git_push(play_data);
+    }
+
+    /// Update score_map with the current play's data
+    ///
+    /// Ensures the JSON export includes the latest play result immediately,
+    /// rather than waiting for a full reload from game memory on song select.
+    fn update_score_map(&mut self, play_data: &PlayData) {
+        let entry = self
+            .game_data
+            .score_map
+            .get_or_insert(play_data.chart.song_id);
+        let diff = play_data.chart.difficulty;
+
+        // Update lamp (keep best)
+        if play_data.lamp > entry.get_lamp(diff) {
+            entry.set_lamp(diff, play_data.lamp);
+        }
+
+        // Update EX score (keep best)
+        if play_data.ex_score > entry.get_score(diff) {
+            entry.set_score(diff, play_data.ex_score);
+        }
+
+        // Update miss count (keep lowest)
+        if play_data.miss_count_valid() {
+            let diff_index = diff as usize;
+            let current_miss = play_data.miss_count();
+            match entry.miss_count[diff_index] {
+                Some(best) if current_miss < best => {
+                    entry.miss_count[diff_index] = Some(current_miss);
+                }
+                None => {
+                    entry.miss_count[diff_index] = Some(current_miss);
+                }
+                _ => {}
+            }
+        }
     }
 
     /// Export full score data to JSON and git commit/push in a background thread
@@ -377,7 +417,6 @@ impl Infst {
     /// Handle transition to song select screen
     fn handle_song_select(&mut self, reader: &MemoryReader) {
         // Re-scan for newly loaded songs (handles lazy loading)
-        let _prev_count = self.game_data.song_db.len();
         self.rescan_song_database(reader);
 
         // Poll unlock state changes
