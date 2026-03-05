@@ -1,15 +1,18 @@
 # infst
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Release](https://img.shields.io/github/v/release/dqn/reflux-rs)](https://github.com/dqn/reflux-rs/releases)
+[![Release](https://img.shields.io/github/v/release/dqn/infst)](https://github.com/dqn/infst/releases)
 
 beatmania IIDX INFINITAS のリアルタイムスコアトラッカー。
+
+**Web サービス:** <https://infst.oidehosp.me> ([使い方](https://infst.oidehosp.me/guide))
 
 ## 機能
 
 - プレイデータをリアルタイムで自動記録
 - TSV/JSON 形式でスコアをエクスポート
-- プレイデータを Web サービスに直接同期
+- プレイデータを Web サービスに同期
+- Web インターフェースでスコア・ランプを閲覧
 
 ## 必要条件
 
@@ -18,7 +21,7 @@ beatmania IIDX INFINITAS のリアルタイムスコアトラッカー。
 
 ## インストール
 
-1. [GitHub Releases](https://github.com/dqn/reflux-rs/releases) から `infst.exe` をダウンロード
+1. [GitHub Releases](https://github.com/dqn/infst/releases) から `infst.exe` をダウンロード
 2. 任意の場所に配置
 
 ## 使い方
@@ -74,6 +77,14 @@ infst sync
 | `--endpoint` | API エンドポイント URL（環境変数: `INFST_API_ENDPOINT`） |
 | `--token` | API トークン（環境変数: `INFST_API_TOKEN`） |
 | `--pid` | プロセスID（省略時は自動検出） |
+
+### Web インターフェース
+
+デフォルトブラウザで Web インターフェースを開く：
+
+```bash
+infst web
+```
 
 ## ライセンス
 
