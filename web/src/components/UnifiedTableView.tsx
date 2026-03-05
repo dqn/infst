@@ -26,24 +26,56 @@ export const UnifiedTableView: FC<UnifiedTableViewProps> = ({
       {/* Summary */}
       <div id="unified-summary" class="card" style="margin-bottom:16px;">
         <h3 style="font-size:1rem;margin-bottom:12px;">Summary</h3>
-        {tables.map((table) => {
-          const allEntries = table.tiers.flatMap((t) => t.entries);
-          const total = allEntries.length;
-          const lampCounts = new Map<string, number>();
-          for (const entry of allEntries) {
-            lampCounts.set(
-              entry.lamp,
-              (lampCounts.get(entry.lamp) ?? 0) + 1,
-            );
+        {(() => {
+          // Group tables by level (e.g., sp11-normal + sp11-hard -> sp11)
+          const levelGroups = new Map<string, typeof tables>();
+          for (const table of tables) {
+            const match = table.tableKey.match(/^(sp|dp)(\d+)-(normal|hard)$/);
+            const levelKey = match ? `${match[1]}${match[2]}` : table.tableKey;
+            const group = levelGroups.get(levelKey);
+            if (group) {
+              group.push(table);
+            } else {
+              levelGroups.set(levelKey, [table]);
+            }
           }
 
-          return (
-            <div class="summary-row" data-summary-table={table.tableKey}>
-              <div class="summary-row-header">
-                <span class="table-name">{formatTableKey(table.tableKey)}</span>
-                <span class="lamp-counts">
-                  {LAMP_VALUES.filter((l) => (lampCounts.get(l) ?? 0) > 0).map(
-                    (lamp) => {
+          return Array.from(levelGroups.entries()).map(([levelKey, group]) => {
+            // Deduplicate by songId:difficulty
+            const seen = new Map<string, typeof group[0]["tiers"][0]["entries"][0]>();
+            for (const t of group) {
+              for (const tier of t.tiers) {
+                for (const entry of tier.entries) {
+                  const key = `${entry.songId}:${entry.difficulty}`;
+                  if (!seen.has(key)) {
+                    seen.set(key, entry);
+                  }
+                }
+              }
+            }
+            const uniqueEntries = Array.from(seen.values());
+            const total = uniqueEntries.length;
+            const lampCounts = new Map<string, number>();
+            for (const entry of uniqueEntries) {
+              lampCounts.set(
+                entry.lamp,
+                (lampCounts.get(entry.lamp) ?? 0) + 1,
+              );
+            }
+
+            const match = levelKey.match(/^(sp|dp)(\d+)$/);
+            const label = match
+              ? `${match[1].toUpperCase()}☆${match[2]}`
+              : levelKey;
+
+            return (
+              <div class="summary-row" data-summary-level={levelKey}>
+                <div class="summary-row-header">
+                  <span class="table-name">{label}</span>
+                  <span class="lamp-counts">
+                    {LAMP_VALUES.filter(
+                      (l) => (lampCounts.get(l) ?? 0) > 0,
+                    ).map((lamp) => {
                       const style = getLampStyle(lamp);
                       return (
                         <span
@@ -56,33 +88,33 @@ export const UnifiedTableView: FC<UnifiedTableViewProps> = ({
                           </span>
                         </span>
                       );
-                    },
-                  )}
-                </span>
+                    })}
+                  </span>
+                </div>
+                <div class="progress-bar-container">
+                  {PROGRESS_LAMP_ORDER.filter(
+                    (l) => (lampCounts.get(l) ?? 0) > 0,
+                  ).map((lamp) => {
+                    const count = lampCounts.get(lamp) ?? 0;
+                    const pct = total > 0 ? (count / total) * 100 : 0;
+                    const style = getLampStyle(lamp);
+                    const bg = style.background.startsWith("linear")
+                      ? style.background
+                      : style.background;
+                    return (
+                      <div
+                        class="progress-bar-segment"
+                        data-lamp={lamp}
+                        style={`width:${pct}%;background:${bg};`}
+                        title={`${lamp}: ${count} (${pct.toFixed(1)}%)`}
+                      />
+                    );
+                  })}
+                </div>
               </div>
-              <div class="progress-bar-container">
-                {PROGRESS_LAMP_ORDER.filter(
-                  (l) => (lampCounts.get(l) ?? 0) > 0,
-                ).map((lamp) => {
-                  const count = lampCounts.get(lamp) ?? 0;
-                  const pct = total > 0 ? (count / total) * 100 : 0;
-                  const style = getLampStyle(lamp);
-                  const bg = style.background.startsWith("linear")
-                    ? style.background
-                    : style.background;
-                  return (
-                    <div
-                      class="progress-bar-segment"
-                      data-lamp={lamp}
-                      style={`width:${pct}%;background:${bg};`}
-                      title={`${lamp}: ${count} (${pct.toFixed(1)}%)`}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
+            );
+          });
+        })()}
       </div>
 
       {/* Table visibility toggles */}

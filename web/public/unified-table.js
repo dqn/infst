@@ -149,7 +149,7 @@
 
       function onChange() {
         applyFilter(key);
-        updateSummary(key);
+        updateSummaryForLevel(tableKeyToLevelKey(key));
         var current = loadSettings();
         if (!current.filters) current.filters = {};
         current.filters[key] = {
@@ -170,23 +170,31 @@
   }
 
   // --- Summary updates ---
-  function updateSummary(tableKey) {
-    var col = document.querySelector(
-      '.table-column[data-table-key="' + tableKey + '"]',
-    );
+  function tableKeyToLevelKey(tableKey) {
+    var match = tableKey.match(/^(sp|dp)(\d+)-(normal|hard)$/);
+    return match ? match[1] + match[2] : tableKey;
+  }
+
+  function updateSummaryForLevel(levelKey) {
     var summaryRow = document.querySelector(
-      '[data-summary-table="' + tableKey + '"]',
+      '[data-summary-level="' + levelKey + '"]',
     );
-    if (!col || !summaryRow) return;
+    if (!summaryRow) return;
 
-    // Recount all lamps in this column (including hidden ones for summary)
-    var cells = col.querySelectorAll(".lamp-cell");
+    // Aggregate lamp counts across all columns, deduplicating by songId:difficulty
+    var seen = {};
     var counts = {};
-    var total = cells.length;
-
-    cells.forEach(function (cell) {
-      var lamp = cell.dataset.lamp || "NO PLAY";
-      counts[lamp] = (counts[lamp] || 0) + 1;
+    var total = 0;
+    document.querySelectorAll(".table-column").forEach(function (col) {
+      if (tableKeyToLevelKey(col.dataset.tableKey) !== levelKey) return;
+      col.querySelectorAll(".lamp-cell").forEach(function (cell) {
+        var key = cell.dataset.key;
+        if (!key || seen[key]) return;
+        seen[key] = true;
+        var lamp = cell.dataset.lamp || "NO PLAY";
+        counts[lamp] = (counts[lamp] || 0) + 1;
+        total++;
+      });
     });
 
     // Update lamp count text
@@ -218,8 +226,8 @@
   }
 
   function updateAllSummaries() {
-    document.querySelectorAll(".table-column").forEach(function (col) {
-      updateSummary(col.dataset.tableKey);
+    document.querySelectorAll("[data-summary-level]").forEach(function (row) {
+      updateSummaryForLevel(row.dataset.summaryLevel);
     });
   }
 
