@@ -132,8 +132,10 @@ INFST_API_ENDPOINT=https://infst.oidehosp.me INFST_API_TOKEN=<TOKEN> infst sync
 
 1. ゲームプロセスのメモリからスコアデータを読み取り
 2. 全曲 × 全難易度（SP+DP）のランプ・EXスコア・ミスカウントを収集
-3. `NO PLAY` と譜面なし（total_notes == 0）をフィルタ
+3. `NO PLAY`、譜面なし（total_notes == 0）、**レベル11/12以外**をフィルタ
 4. `/api/lamps/bulk` に一括 POST
+
+**注意**: 現在はレベル11/12の譜面のみ同期対象。
 
 API はべき等のため、何度実行しても安全。
 

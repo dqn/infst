@@ -1,9 +1,9 @@
 //! Sync command for reading game memory and uploading directly to the web service.
 
 use std::collections::HashMap;
+use std::fs;
 use std::io::Write;
 use std::time::Duration;
-use std::{fs, path::Path};
 
 use anyhow::{Context, Result};
 use flate2::Compression;
@@ -44,7 +44,7 @@ const ALL_DIFFICULTIES: [Difficulty; 10] = [
 
 // --- Sync cache for differential sync ---
 
-const SYNC_CACHE_FILE: &str = ".infst-sync-cache.json";
+const SYNC_CACHE_FILENAME: &str = "sync-cache.json";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 struct CachedEntry {
@@ -59,17 +59,28 @@ struct SyncCache {
 }
 
 impl SyncCache {
+    fn cache_path() -> Option<std::path::PathBuf> {
+        let cache_dir = dirs::cache_dir()?.join("infst");
+        Some(cache_dir.join(SYNC_CACHE_FILENAME))
+    }
+
     fn load() -> Option<Self> {
-        let path = Path::new(SYNC_CACHE_FILE);
+        let path = Self::cache_path()?;
         let content = fs::read_to_string(path).ok()?;
         serde_json::from_str(&content).ok()
     }
 
     fn save(&self) {
+        let Some(path) = Self::cache_path() else {
+            return;
+        };
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
         let Ok(content) = serde_json::to_string(self) else {
             return;
         };
-        let _ = fs::write(SYNC_CACHE_FILE, content);
+        let _ = fs::write(path, content);
     }
 
     fn make_key(song_id: u32, difficulty: &str) -> String {

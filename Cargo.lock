@@ -552,7 +552,7 @@ dependencies = [
 
 [[package]]
 name = "infst"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -571,7 +571,7 @@ dependencies = [
 
 [[package]]
 name = "infst-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
