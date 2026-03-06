@@ -42,6 +42,16 @@ export const RATE_LIMIT_DEVICE_TOKEN_WINDOW_SECONDS = 300;
 // API token expiry
 export const API_TOKEN_EXPIRY_DAYS = 90;
 
+// Valid difficulties
+export const VALID_DIFFICULTIES = [
+  "SPB", "SPN", "SPH", "SPA", "SPL",
+  "DPB", "DPN", "DPH", "DPA", "DPL",
+] as const;
+
+// Score constraints
+export const EX_SCORE_MAX = 4000;
+export const MISS_COUNT_MAX = 10000;
+
 // Bulk API
 export const BULK_MAX_ENTRIES = 10_000;
 

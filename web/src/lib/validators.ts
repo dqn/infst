@@ -5,6 +5,9 @@ import {
   PASSWORD_MAX_LENGTH,
   USERNAME_PATTERN,
   RESERVED_USERNAMES,
+  VALID_DIFFICULTIES,
+  EX_SCORE_MAX,
+  MISS_COUNT_MAX,
 } from "./constants";
 
 interface ValidationResult {
@@ -83,8 +86,24 @@ export function validateLampInput(entry: LampInput): ValidationResult {
     };
   }
 
+  if (!(VALID_DIFFICULTIES as readonly string[]).includes(entry.difficulty)) {
+    return { valid: false, error: "Invalid difficulty value" };
+  }
+
   if (!isValidLamp(entry.lamp)) {
     return { valid: false, error: "Invalid lamp value" };
+  }
+
+  if (entry.exScore !== undefined) {
+    if (typeof entry.exScore !== "number" || !Number.isInteger(entry.exScore) || entry.exScore < 0 || entry.exScore > EX_SCORE_MAX) {
+      return { valid: false, error: `exScore must be an integer between 0 and ${EX_SCORE_MAX}` };
+    }
+  }
+
+  if (entry.missCount !== undefined) {
+    if (typeof entry.missCount !== "number" || !Number.isInteger(entry.missCount) || entry.missCount < 0 || entry.missCount > MISS_COUNT_MAX) {
+      return { valid: false, error: `missCount must be an integer between 0 and ${MISS_COUNT_MAX}` };
+    }
   }
 
   return { valid: true };

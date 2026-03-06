@@ -252,6 +252,17 @@ apiRoutes.post("/lamps/bulk", bearerAuth, async (c) => {
         updates.push({ id: existingLamp.id, values: updateValues });
         updatedCount++;
       } else {
+        // Still update exScore and missCount if provided (same as single endpoint)
+        const updateValues: Record<string, unknown> = { updatedAt: now };
+        if (entry.exScore !== undefined) {
+          updateValues.exScore = entry.exScore;
+        }
+        if (entry.missCount !== undefined) {
+          updateValues.missCount = entry.missCount;
+        }
+        if (Object.keys(updateValues).length > 1) {
+          updates.push({ id: existingLamp.id, values: updateValues });
+        }
         skippedCount++;
       }
     } else {
@@ -407,46 +418,57 @@ apiRoutes.post("/charts/sync", async (c) => {
   const db = c.get("db");
   let upsertCount = 0;
 
+  // Batch fetch all existing charts to avoid N+1
+  const existingCharts = await db.select().from(charts);
+  const existingMap = new Map<string, typeof existingCharts[number]>();
+  for (const ch of existingCharts) {
+    existingMap.set(`${ch.tableKey}:${ch.songId}:${ch.difficulty}`, ch);
+  }
+
+  const insertStatements: D1PreparedStatement[] = [];
+  const updateStatements: D1PreparedStatement[] = [];
+
   for (const [tableKey, tableEntries] of Object.entries(body)) {
     for (const entry of tableEntries) {
-      // Try to update existing, insert if not found
-      const existing = await db
-        .select()
-        .from(charts)
-        .where(
-          and(
-            eq(charts.tableKey, tableKey),
-            eq(charts.songId, entry.songId),
-            eq(charts.difficulty, entry.difficulty),
-          ),
-        )
-        .limit(1);
+      const key = `${tableKey}:${entry.songId}:${entry.difficulty}`;
+      const existing = existingMap.get(key);
 
-      if (existing[0]) {
-        await db
-          .update(charts)
-          .set({
-            songId: entry.songId,
-            title: entry.title,
-            difficulty: entry.difficulty,
-            tier: entry.tier,
-            attributes: entry.attributes ?? null,
-            sortOrder: entry.sortOrder ?? null,
-          })
-          .where(eq(charts.id, existing[0].id));
+      if (existing) {
+        updateStatements.push(
+          c.env.DB.prepare(
+            "UPDATE charts SET song_id = ?, title = ?, difficulty = ?, tier = ?, attributes = ?, sort_order = ? WHERE id = ?",
+          ).bind(
+            entry.songId,
+            entry.title,
+            entry.difficulty,
+            entry.tier,
+            entry.attributes ?? null,
+            entry.sortOrder ?? null,
+            existing.id,
+          ),
+        );
       } else {
-        await db.insert(charts).values({
-          tableKey,
-          songId: entry.songId,
-          title: entry.title,
-          difficulty: entry.difficulty,
-          tier: entry.tier,
-          attributes: entry.attributes ?? null,
-          sortOrder: entry.sortOrder ?? null,
-        });
+        insertStatements.push(
+          c.env.DB.prepare(
+            "INSERT INTO charts (table_key, song_id, title, difficulty, tier, attributes, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          ).bind(
+            tableKey,
+            entry.songId,
+            entry.title,
+            entry.difficulty,
+            entry.tier,
+            entry.attributes ?? null,
+            entry.sortOrder ?? null,
+          ),
+        );
       }
       upsertCount++;
     }
+  }
+
+  const statements = [...insertStatements, ...updateStatements];
+  if (statements.length > 0) {
+    await c.env.DB.batch(statements);
   }
 
   return c.json({ synced: upsertCount });
