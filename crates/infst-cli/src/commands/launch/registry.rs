@@ -127,8 +127,7 @@ pub fn setup_asio_spoof(asio_device: Option<&str>) -> Result<()> {
                     available.join(", ")
                 )
             })?,
-        None if candidates.len() == 1 => candidates[0],
-        None => prompt_asio_driver(&candidates)?,
+        None => auto_or_prompt_asio_driver(&candidates)?,
     };
 
     println!(
@@ -145,6 +144,20 @@ pub fn setup_asio_spoof(asio_device: Option<&str>) -> Result<()> {
     }
 
     Ok(())
+}
+
+const PREFERRED_ASIO_DRIVER: &str = "Generic Low Latency ASIO Driver";
+
+/// Auto-select the preferred driver if available, otherwise prompt interactively.
+fn auto_or_prompt_asio_driver<'a>(drivers: &[&'a AsioDriver]) -> Result<&'a AsioDriver> {
+    if let Some(preferred) = drivers.iter().find(|d| d.name == PREFERRED_ASIO_DRIVER) {
+        println!("Auto-selected: {}", preferred.name);
+        return Ok(preferred);
+    }
+    if drivers.len() == 1 {
+        return Ok(drivers[0]);
+    }
+    prompt_asio_driver(drivers)
 }
 
 /// Interactively prompt the user to select an ASIO driver.
