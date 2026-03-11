@@ -14,14 +14,18 @@ use url::parse_launch_url;
 
 pub fn run(action: LaunchAction) -> Result<()> {
     match action {
-        LaunchAction::Install { special_k_path } => install(special_k_path),
+        LaunchAction::Install {
+            special_k_path,
+            asio,
+            asio_device,
+        } => install(special_k_path, asio, asio_device),
         LaunchAction::Uninstall => uninstall(),
-        LaunchAction::Run { url } => run_game(&url),
+        LaunchAction::Run { url, asio } => run_game(&url, asio),
     }
 }
 
 #[cfg(target_os = "windows")]
-fn install(special_k_path: Option<String>) -> Result<()> {
+fn install(special_k_path: Option<String>, asio: bool, asio_device: Option<String>) -> Result<()> {
     let install_dir = registry::read_infinitas_install_dir()?;
     let game_dir = std::path::Path::new(&install_dir).join("game").join("app");
 
@@ -30,18 +34,33 @@ fn install(special_k_path: Option<String>) -> Result<()> {
     // Set up Special K
     special_k::install(&game_dir, special_k_path.as_deref())?;
 
-    // Register URL handler
+    // Set up ASIO device spoofing
+    if asio {
+        registry::setup_asio_spoof(asio_device.as_deref())?;
+    }
+
+    // Register URL handler (embed --asio flag if requested)
     let exe_path = std::env::current_exe()?;
-    registry::register_url_handler(&exe_path)?;
+    registry::register_url_handler(&exe_path, asio)?;
 
     println!("Installation complete!");
     println!("  - Special K DLL and config installed");
-    println!("  - URL handler registered for bm2dxinf://");
+    if asio {
+        println!("  - ASIO spoof device registered");
+    }
+    println!(
+        "  - URL handler registered for bm2dxinf:// (ASIO: {})",
+        if asio { "enabled" } else { "disabled" }
+    );
     Ok(())
 }
 
 #[cfg(not(target_os = "windows"))]
-fn install(_special_k_path: Option<String>) -> Result<()> {
+fn install(
+    _special_k_path: Option<String>,
+    _asio: bool,
+    _asio_device: Option<String>,
+) -> Result<()> {
     bail!("Launch install is only supported on Windows");
 }
 
@@ -55,11 +74,15 @@ fn uninstall() -> Result<()> {
     // Remove Special K files
     special_k::uninstall(&game_dir)?;
 
+    // Remove ASIO spoof
+    registry::remove_asio_spoof()?;
+
     // Restore original URL handler
     registry::restore_url_handler(&install_dir)?;
 
     println!("Uninstallation complete!");
     println!("  - Special K DLL and config removed");
+    println!("  - ASIO spoof removed (if present)");
     println!("  - Original URL handler restored");
     Ok(())
 }
@@ -70,7 +93,7 @@ fn uninstall() -> Result<()> {
 }
 
 #[cfg(target_os = "windows")]
-fn run_game(raw_url: &str) -> Result<()> {
+fn run_game(raw_url: &str, asio: bool) -> Result<()> {
     let params = parse_launch_url(raw_url)?;
 
     let install_dir = registry::read_infinitas_install_dir()?;
@@ -84,15 +107,18 @@ fn run_game(raw_url: &str) -> Result<()> {
     }
 
     let mut cmd = std::process::Command::new(&bm2dx_exe);
-    cmd.arg("--asio");
+    if asio {
+        cmd.arg("--asio");
+    }
     cmd.arg("-t").arg(&params.token);
     if params.trial {
         cmd.arg("--trial");
     }
 
     println!(
-        "Launching: {} --asio -t <token>{}",
+        "Launching: {}{} -t <token>{}",
         bm2dx_exe.display(),
+        if asio { " --asio" } else { "" },
         if params.trial { " --trial" } else { "" }
     );
     cmd.spawn()?;
@@ -100,6 +126,6 @@ fn run_game(raw_url: &str) -> Result<()> {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn run_game(_raw_url: &str) -> Result<()> {
+fn run_game(_raw_url: &str, _asio: bool) -> Result<()> {
     bail!("Launch run is only supported on Windows");
 }

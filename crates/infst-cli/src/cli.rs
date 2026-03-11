@@ -223,6 +223,12 @@ pub enum LaunchAction {
         /// Path to SpecialK64.dll (auto-detected from default location)
         #[arg(long)]
         special_k_path: Option<String>,
+        /// Enable ASIO audio mode and register spoofed Xonar device
+        #[arg(long)]
+        asio: bool,
+        /// ASIO driver to spoof as Xonar (auto-detected if only one exists)
+        #[arg(long)]
+        asio_device: Option<String>,
     },
     /// Uninstall: restore original launcher
     Uninstall,
@@ -230,6 +236,9 @@ pub enum LaunchAction {
     Run {
         /// The bm2dxinf:// URL
         url: String,
+        /// Enable ASIO audio mode
+        #[arg(long)]
+        asio: bool,
     },
 }
 

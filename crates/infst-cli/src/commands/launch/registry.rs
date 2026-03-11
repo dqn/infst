@@ -2,10 +2,11 @@
 
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use windows::Win32::System::Registry::{
     HKEY, HKEY_CLASSES_ROOT, HKEY_LOCAL_MACHINE, KEY_READ, KEY_WRITE, REG_OPTION_NON_VOLATILE,
-    REG_SZ, RegCloseKey, RegCreateKeyExW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW,
+    REG_SZ, RegCloseKey, RegCreateKeyExW, RegEnumKeyExW, RegOpenKeyExW, RegQueryValueExW,
+    RegSetValueExW,
 };
 use windows::core::HSTRING;
 
@@ -52,12 +53,13 @@ pub fn read_infinitas_install_dir() -> Result<String> {
 }
 
 /// Register infst as the bm2dxinf:// URL handler.
-pub fn register_url_handler(exe_path: &Path) -> Result<()> {
+pub fn register_url_handler(exe_path: &Path, asio: bool) -> Result<()> {
     let exe_str = exe_path
         .to_str()
         .ok_or_else(|| anyhow::anyhow!("Executable path is not valid UTF-8"))?;
 
-    let command_value = format!(r#""{exe_str}" launch run "%1""#);
+    let asio_flag = if asio { " --asio" } else { "" };
+    let command_value = format!(r#""{exe_str}" launch run{asio_flag} "%1""#);
 
     unsafe {
         // Create/open HKCR\bm2dxinf
@@ -91,6 +93,176 @@ pub fn restore_url_handler(install_dir: &str) -> Result<()> {
     }
 
     Ok(())
+}
+
+const XONAR_KEY_NAME: &str = "XONAR SOUND CARD(64)";
+const ASIO_SUBKEY: &str = r"SOFTWARE\ASIO";
+
+/// Register a spoofed "XONAR SOUND CARD(64)" ASIO device by cloning the CLSID
+/// from an existing ASIO driver. INFINITAS only recognizes the Xonar device name.
+pub fn setup_asio_spoof(asio_device: Option<&str>) -> Result<()> {
+    let drivers = enumerate_asio_drivers()?;
+
+    if drivers.is_empty() {
+        bail!("No ASIO drivers found in registry. Install an ASIO driver first (e.g. ASIO4ALL)");
+    }
+
+    // Check if Xonar entry already exists
+    if let Some(existing) = drivers.iter().find(|d| d.name == XONAR_KEY_NAME) {
+        println!(
+            "ASIO spoof already configured: {} (CLSID: {})",
+            existing.name, existing.clsid
+        );
+        return Ok(());
+    }
+
+    // Pick the source driver
+    let source = match asio_device {
+        Some(name) => drivers.iter().find(|d| d.name == name).ok_or_else(|| {
+            let available: Vec<&str> = drivers.iter().map(|d| d.name.as_str()).collect();
+            anyhow::anyhow!(
+                "ASIO device '{}' not found. Available: {}",
+                name,
+                available.join(", ")
+            )
+        })?,
+        None => {
+            if drivers.len() == 1 {
+                &drivers[0]
+            } else {
+                println!("Multiple ASIO drivers found:");
+                for (i, d) in drivers.iter().enumerate() {
+                    println!("  [{}] {} (CLSID: {})", i + 1, d.name, d.clsid);
+                }
+                bail!(
+                    "Multiple ASIO drivers found. Specify one with --asio-device, e.g.: --asio-device \"{}\"",
+                    drivers[0].name
+                );
+            }
+        }
+    };
+
+    println!(
+        "Creating ASIO spoof: {} -> {} (CLSID: {})",
+        source.name, XONAR_KEY_NAME, source.clsid
+    );
+
+    let xonar_subkey = format!(r"{ASIO_SUBKEY}\{XONAR_KEY_NAME}");
+    unsafe {
+        let key = create_key(HKEY_LOCAL_MACHINE, &xonar_subkey)?;
+        let _guard = KeyGuard(key);
+        set_string_value(key, Some("CLSID"), &source.clsid)?;
+        set_string_value(key, Some("Description"), XONAR_KEY_NAME)?;
+    }
+
+    Ok(())
+}
+
+/// Remove the spoofed XONAR ASIO device entry.
+pub fn remove_asio_spoof() -> Result<()> {
+    let xonar_subkey = HSTRING::from(format!(r"{ASIO_SUBKEY}\{XONAR_KEY_NAME}"));
+    unsafe {
+        // Try to delete; ignore if it doesn't exist
+        let result =
+            windows::Win32::System::Registry::RegDeleteKeyW(HKEY_LOCAL_MACHINE, &xonar_subkey);
+        if result.is_ok() {
+            println!("Removed ASIO spoof: {XONAR_KEY_NAME}");
+        }
+    }
+    Ok(())
+}
+
+struct AsioDriver {
+    name: String,
+    clsid: String,
+}
+
+/// Enumerate all ASIO drivers from HKLM\SOFTWARE\ASIO.
+fn enumerate_asio_drivers() -> Result<Vec<AsioDriver>> {
+    let subkey = HSTRING::from(ASIO_SUBKEY);
+    let mut drivers = Vec::new();
+
+    unsafe {
+        let mut asio_key = HKEY::default();
+        let res = RegOpenKeyExW(HKEY_LOCAL_MACHINE, &subkey, 0, KEY_READ, &mut asio_key);
+        if res.is_err() {
+            return Ok(drivers); // No ASIO key at all
+        }
+        let _guard = KeyGuard(asio_key);
+
+        let mut index: u32 = 0;
+        loop {
+            let mut name_buf = [0u16; 256];
+            let mut name_len = name_buf.len() as u32;
+            let res = RegEnumKeyExW(
+                asio_key,
+                index,
+                windows::core::PWSTR(name_buf.as_mut_ptr()),
+                &mut name_len,
+                None,
+                windows::core::PWSTR::null(),
+                None,
+                None,
+            );
+            if res.is_err() {
+                break;
+            }
+
+            let name = String::from_utf16_lossy(&name_buf[..name_len as usize]);
+
+            // Read CLSID from subkey
+            if let Ok(clsid) = read_string_value_under(
+                HKEY_LOCAL_MACHINE,
+                &format!(r"{ASIO_SUBKEY}\{name}"),
+                "CLSID",
+            ) {
+                drivers.push(AsioDriver { name, clsid });
+            }
+
+            index += 1;
+        }
+    }
+
+    Ok(drivers)
+}
+
+/// Read a REG_SZ value from a subkey.
+fn read_string_value_under(root: HKEY, subkey: &str, value_name: &str) -> Result<String> {
+    let subkey_h = HSTRING::from(subkey);
+    let value_h = HSTRING::from(value_name);
+
+    unsafe {
+        let mut hkey = HKEY::default();
+        RegOpenKeyExW(root, &subkey_h, 0, KEY_READ, &mut hkey)
+            .ok()
+            .with_context(|| format!("Failed to open key: {subkey}"))?;
+        let _guard = KeyGuard(hkey);
+
+        let mut size: u32 = 0;
+        RegQueryValueExW(hkey, &value_h, None, None, None, Some(&mut size))
+            .ok()
+            .with_context(|| format!("Failed to query {value_name} size"))?;
+
+        let mut buffer = vec![0u8; size as usize];
+        RegQueryValueExW(
+            hkey,
+            &value_h,
+            None,
+            None,
+            Some(buffer.as_mut_ptr()),
+            Some(&mut size),
+        )
+        .ok()
+        .with_context(|| format!("Failed to read {value_name}"))?;
+
+        let wide: Vec<u16> = buffer
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect();
+        Ok(String::from_utf16_lossy(&wide)
+            .trim_end_matches('\0')
+            .to_string())
+    }
 }
 
 /// Create or open a registry key.
