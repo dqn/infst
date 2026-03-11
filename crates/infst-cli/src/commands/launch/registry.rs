@@ -126,7 +126,8 @@ pub fn setup_asio_spoof(asio_device: Option<&str>) -> Result<()> {
                 available.join(", ")
             )
         })?,
-        None => &drivers[0],
+        None if drivers.len() == 1 => &drivers[0],
+        None => prompt_asio_driver(&drivers)?,
     };
 
     println!(
@@ -143,6 +144,30 @@ pub fn setup_asio_spoof(asio_device: Option<&str>) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Interactively prompt the user to select an ASIO driver.
+fn prompt_asio_driver(drivers: &[AsioDriver]) -> Result<&AsioDriver> {
+    println!("Select ASIO driver to use:");
+    for (i, d) in drivers.iter().enumerate() {
+        println!("  [{}] {}", i + 1, d.name);
+    }
+    print!("Enter number (1-{}): ", drivers.len());
+    use std::io::Write;
+    std::io::stdout().flush()?;
+
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input)?;
+
+    let index: usize = input
+        .trim()
+        .parse::<usize>()
+        .ok()
+        .and_then(|n| n.checked_sub(1))
+        .filter(|&i| i < drivers.len())
+        .ok_or_else(|| anyhow::anyhow!("Invalid selection: {}", input.trim()))?;
+
+    Ok(&drivers[index])
 }
 
 /// Remove the spoofed XONAR ASIO device entry.
