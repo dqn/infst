@@ -58,8 +58,8 @@ pub fn register_url_handler(exe_path: &Path, asio: bool) -> Result<()> {
         .to_str()
         .ok_or_else(|| anyhow::anyhow!("Executable path is not valid UTF-8"))?;
 
-    let asio_flag = if asio { " --asio" } else { "" };
-    let command_value = format!(r#""{exe_str}" launch run{asio_flag} "%1""#);
+    let no_asio_flag = if asio { "" } else { " --no-asio" };
+    let command_value = format!(r#""{exe_str}" launch run{no_asio_flag} "%1""#);
 
     unsafe {
         // Create/open HKCR\bm2dxinf
