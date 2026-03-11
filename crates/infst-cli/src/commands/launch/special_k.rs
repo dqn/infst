@@ -19,6 +19,10 @@ const DXGI_INI: &str = r#"[Render.FrameRate]
 TargetFPS=120.0
 SleeplessRender=true
 PresentationInterval=0
+AllowTearing=true
+
+[Render.DXGI]
+UseFlipDiscard=true
 
 [Window.System]
 Borderless=true
