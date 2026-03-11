@@ -209,6 +209,28 @@ pub enum Command {
         #[arg(long, env = "INFST_API_TOKEN")]
         token: Option<String>,
     },
+    /// Manage INFINITAS launcher (URL handler + Special K)
+    Launch {
+        #[command(subcommand)]
+        action: LaunchAction,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum LaunchAction {
+    /// Install URL handler and Special K (requires admin)
+    Install {
+        /// Path to SpecialK64.dll (auto-detected from default location)
+        #[arg(long)]
+        special_k_path: Option<String>,
+    },
+    /// Uninstall: restore original launcher
+    Uninstall,
+    /// Handle a bm2dxinf:// URL (called by browser)
+    Run {
+        /// The bm2dxinf:// URL
+        url: String,
+    },
 }
 
 #[derive(Clone, clap::ValueEnum)]

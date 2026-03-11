@@ -587,6 +587,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "ureq",
+ "windows",
 ]
 
 [[package]]

@@ -10,6 +10,7 @@ pub mod find_offsets;
 pub mod hex_utils;
 pub mod hexdump;
 
+pub mod launch;
 pub mod login;
 pub mod offset;
 pub mod scan;
