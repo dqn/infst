@@ -107,6 +107,7 @@ fn run_game(raw_url: &str, asio: bool) -> Result<()> {
     }
 
     let mut cmd = std::process::Command::new(&bm2dx_exe);
+    cmd.arg("-w"); // Windowed mode; Special K makes it borderless
     if asio {
         cmd.arg("--asio");
     }
@@ -116,7 +117,7 @@ fn run_game(raw_url: &str, asio: bool) -> Result<()> {
     }
 
     println!(
-        "Launching: {}{} -t <token>{}",
+        "Launching: {} -w{} -t <token>{}",
         bm2dx_exe.display(),
         if asio { " --asio" } else { "" },
         if params.trial { " --trial" } else { "" }
