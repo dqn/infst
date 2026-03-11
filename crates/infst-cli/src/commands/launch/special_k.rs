@@ -22,6 +22,10 @@ PresentationInterval=0
 
 [Window.System]
 Borderless=true
+Fullscreen=true
+Center=true
+ConfineCursor=true
+OverrideRes=0x0
 
 [Steam.Log]
 Silent=true
