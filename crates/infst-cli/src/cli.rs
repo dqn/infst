@@ -223,10 +223,10 @@ pub enum LaunchAction {
         /// Path to SpecialK64.dll (auto-detected from default location)
         #[arg(long)]
         special_k_path: Option<String>,
-        /// Enable ASIO audio mode and register spoofed Xonar device
+        /// Disable ASIO audio mode (ASIO is enabled by default)
         #[arg(long)]
-        asio: bool,
-        /// ASIO driver to spoof as Xonar (auto-detected if only one exists)
+        no_asio: bool,
+        /// ASIO driver to spoof as Xonar (auto-selected if not specified)
         #[arg(long)]
         asio_device: Option<String>,
     },
@@ -236,9 +236,9 @@ pub enum LaunchAction {
     Run {
         /// The bm2dxinf:// URL
         url: String,
-        /// Enable ASIO audio mode
+        /// Disable ASIO audio mode (ASIO is enabled by default)
         #[arg(long)]
-        asio: bool,
+        no_asio: bool,
     },
 }
 

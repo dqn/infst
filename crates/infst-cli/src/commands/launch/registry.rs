@@ -126,20 +126,7 @@ pub fn setup_asio_spoof(asio_device: Option<&str>) -> Result<()> {
                 available.join(", ")
             )
         })?,
-        None => {
-            if drivers.len() == 1 {
-                &drivers[0]
-            } else {
-                println!("Multiple ASIO drivers found:");
-                for (i, d) in drivers.iter().enumerate() {
-                    println!("  [{}] {} (CLSID: {})", i + 1, d.name, d.clsid);
-                }
-                bail!(
-                    "Multiple ASIO drivers found. Specify one with --asio-device, e.g.: --asio-device \"{}\"",
-                    drivers[0].name
-                );
-            }
-        }
+        None => &drivers[0],
     };
 
     println!(
