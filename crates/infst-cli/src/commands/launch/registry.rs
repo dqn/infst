@@ -103,31 +103,32 @@ const ASIO_SUBKEY: &str = r"SOFTWARE\ASIO";
 pub fn setup_asio_spoof(asio_device: Option<&str>) -> Result<()> {
     let drivers = enumerate_asio_drivers()?;
 
-    if drivers.is_empty() {
-        bail!("No ASIO drivers found in registry. Install an ASIO driver first (e.g. ASIO4ALL)");
-    }
+    // Filter out the spoof entry itself from candidates
+    let candidates: Vec<&AsioDriver> = drivers
+        .iter()
+        .filter(|d| d.name != XONAR_KEY_NAME)
+        .collect();
 
-    // Check if Xonar entry already exists
-    if let Some(existing) = drivers.iter().find(|d| d.name == XONAR_KEY_NAME) {
-        println!(
-            "ASIO spoof already configured: {} (CLSID: {})",
-            existing.name, existing.clsid
-        );
-        return Ok(());
+    if candidates.is_empty() {
+        bail!("No ASIO drivers found in registry. Install an ASIO driver first (e.g. ASIO4ALL)");
     }
 
     // Pick the source driver
     let source = match asio_device {
-        Some(name) => drivers.iter().find(|d| d.name == name).ok_or_else(|| {
-            let available: Vec<&str> = drivers.iter().map(|d| d.name.as_str()).collect();
-            anyhow::anyhow!(
-                "ASIO device '{}' not found. Available: {}",
-                name,
-                available.join(", ")
-            )
-        })?,
-        None if drivers.len() == 1 => &drivers[0],
-        None => prompt_asio_driver(&drivers)?,
+        Some(name) => candidates
+            .iter()
+            .find(|d| d.name == name)
+            .copied()
+            .ok_or_else(|| {
+                let available: Vec<&str> = candidates.iter().map(|d| d.name.as_str()).collect();
+                anyhow::anyhow!(
+                    "ASIO device '{}' not found. Available: {}",
+                    name,
+                    available.join(", ")
+                )
+            })?,
+        None if candidates.len() == 1 => candidates[0],
+        None => prompt_asio_driver(&candidates)?,
     };
 
     println!(
@@ -147,7 +148,7 @@ pub fn setup_asio_spoof(asio_device: Option<&str>) -> Result<()> {
 }
 
 /// Interactively prompt the user to select an ASIO driver.
-fn prompt_asio_driver(drivers: &[AsioDriver]) -> Result<&AsioDriver> {
+fn prompt_asio_driver<'a>(drivers: &[&'a AsioDriver]) -> Result<&'a AsioDriver> {
     println!("Select ASIO driver to use:");
     for (i, d) in drivers.iter().enumerate() {
         println!("  [{}] {}", i + 1, d.name);
@@ -167,7 +168,7 @@ fn prompt_asio_driver(drivers: &[AsioDriver]) -> Result<&AsioDriver> {
         .filter(|&i| i < drivers.len())
         .ok_or_else(|| anyhow::anyhow!("Invalid selection: {}", input.trim()))?;
 
-    Ok(&drivers[index])
+    Ok(drivers[index])
 }
 
 /// Remove the spoofed XONAR ASIO device entry.
