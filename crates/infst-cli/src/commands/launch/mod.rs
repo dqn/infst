@@ -94,9 +94,25 @@ fn uninstall() -> Result<()> {
 
 #[cfg(target_os = "windows")]
 fn run_game(raw_url: &str, asio: bool) -> Result<()> {
-    let params = parse_launch_url(raw_url)?;
-
     let install_dir = registry::read_infinitas_install_dir()?;
+
+    println!("[1] Launch game (default)");
+    println!("[0] Use launcher (for updates)");
+    println!("Auto-launching in 3 seconds...");
+
+    let choice = read_choice_with_timeout(std::time::Duration::from_secs(3));
+
+    if choice == "0" {
+        let launcher = std::path::Path::new(&install_dir)
+            .join("launcher")
+            .join("modules")
+            .join("bm2dx_launcher.exe");
+        println!("Launching original launcher...");
+        std::process::Command::new(&launcher).arg(raw_url).spawn()?;
+        return Ok(());
+    }
+
+    let params = parse_launch_url(raw_url)?;
     let bm2dx_exe = std::path::Path::new(&install_dir)
         .join("game")
         .join("app")
@@ -124,6 +140,19 @@ fn run_game(raw_url: &str, asio: bool) -> Result<()> {
     );
     cmd.spawn()?;
     Ok(())
+}
+
+/// Read a single line from stdin with a timeout. Returns empty string on timeout.
+#[cfg(target_os = "windows")]
+fn read_choice_with_timeout(timeout: std::time::Duration) -> String {
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut input = String::new();
+        if std::io::stdin().read_line(&mut input).is_ok() {
+            let _ = tx.send(input.trim().to_string());
+        }
+    });
+    rx.recv_timeout(timeout).unwrap_or_default()
 }
 
 #[cfg(not(target_os = "windows"))]
