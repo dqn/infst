@@ -16,11 +16,11 @@ pub fn run(action: LaunchAction) -> Result<()> {
     match action {
         LaunchAction::Install {
             special_k_path,
-            no_asio,
+            asio,
             asio_device,
-        } => install(special_k_path, !no_asio, asio_device),
+        } => install(special_k_path, asio, asio_device),
         LaunchAction::Uninstall => uninstall(),
-        LaunchAction::Run { url, no_asio } => run_game(&url, !no_asio),
+        LaunchAction::Run { url, asio } => run_game(&url, asio),
     }
 }
 
