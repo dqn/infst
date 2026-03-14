@@ -220,9 +220,6 @@ pub enum Command {
 pub enum LaunchAction {
     /// Install URL handler and Special K (requires admin)
     Install {
-        /// Path to SpecialK64.dll (auto-detected from default location)
-        #[arg(long)]
-        special_k_path: Option<String>,
         /// Enable ASIO audio mode with spoofed Xonar device
         #[arg(long)]
         asio: bool,

@@ -14,25 +14,21 @@ use url::parse_launch_url;
 
 pub fn run(action: LaunchAction) -> Result<()> {
     match action {
-        LaunchAction::Install {
-            special_k_path,
-            asio,
-            asio_device,
-        } => install(special_k_path, asio, asio_device),
+        LaunchAction::Install { asio, asio_device } => install(asio, asio_device),
         LaunchAction::Uninstall => uninstall(),
         LaunchAction::Run { url, asio } => run_game(&url, asio),
     }
 }
 
 #[cfg(target_os = "windows")]
-fn install(special_k_path: Option<String>, asio: bool, asio_device: Option<String>) -> Result<()> {
+fn install(asio: bool, asio_device: Option<String>) -> Result<()> {
     let install_dir = registry::read_infinitas_install_dir()?;
     let game_dir = std::path::Path::new(&install_dir).join("game").join("app");
 
     println!("INFINITAS install dir: {install_dir}");
 
-    // Set up Special K
-    special_k::install(&game_dir, special_k_path.as_deref())?;
+    // Configure Special K profile for borderless 120fps
+    special_k::install(&game_dir)?;
 
     // Set up ASIO device spoofing
     if asio {
@@ -44,7 +40,7 @@ fn install(special_k_path: Option<String>, asio: bool, asio_device: Option<Strin
     registry::register_url_handler(&exe_path, asio)?;
 
     println!("Installation complete!");
-    println!("  - Special K DLL and config installed");
+    println!("  - Special K profile configured for borderless 120fps");
     if asio {
         println!("  - ASIO spoof device registered");
     }
@@ -56,11 +52,7 @@ fn install(special_k_path: Option<String>, asio: bool, asio_device: Option<Strin
 }
 
 #[cfg(not(target_os = "windows"))]
-fn install(
-    _special_k_path: Option<String>,
-    _asio: bool,
-    _asio_device: Option<String>,
-) -> Result<()> {
+fn install(_asio: bool, _asio_device: Option<String>) -> Result<()> {
     bail!("Launch install is only supported on Windows");
 }
 
@@ -95,6 +87,9 @@ fn uninstall() -> Result<()> {
 #[cfg(target_os = "windows")]
 fn run_game(raw_url: &str, asio: bool) -> Result<()> {
     let install_dir = registry::read_infinitas_install_dir()?;
+
+    // Ensure Special K injection is ready
+    special_k::ensure_running()?;
 
     println!("[1] Launch game (default)");
     println!("[0] Use launcher (for updates)");
