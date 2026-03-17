@@ -522,8 +522,12 @@ pub fn load_song_database_from_tsv<P: AsRef<Path>>(
     // DPA: 65=Rating, 70=Note Count
     // DPL: 73=Rating, 78=Note Count
 
-    const RATING_COLS: [usize; 10] = [9, 17, 25, 33, 41, 0, 49, 57, 65, 73]; // 0 for DPB (not in file)
-    const NOTE_COLS: [usize; 10] = [14, 22, 30, 38, 46, 0, 54, 62, 70, 78]; // 0 for DPB
+    // Column indices are 0-based. Column 0 = Song ID, Column 1 = Title.
+    // Per difficulty: +0=Unlocked, +1=Rating, +2=Lamp, +3=Letter, +4=EX Score,
+    //                 +5=Miss Count, +6=Note Count, +7=DJ Points
+    // SPB starts at column 10, each difficulty block is 8 columns.
+    const RATING_COLS: [usize; 10] = [10, 18, 26, 34, 42, 0, 50, 58, 66, 74]; // 0 for DPB (not in file)
+    const NOTE_COLS: [usize; 10] = [15, 23, 31, 39, 47, 0, 55, 63, 71, 79]; // 0 for DPB
 
     let mut line_num = 0;
     for line_result in reader.lines() {
@@ -540,7 +544,12 @@ pub fn load_song_database_from_tsv<P: AsRef<Path>>(
             continue;
         }
 
-        let title = cols[0].trim();
+        // Column 0 is Song ID, column 1 is Title
+        let title = if cols.len() > 1 {
+            cols[1].trim()
+        } else {
+            continue;
+        };
         if title.is_empty() {
             continue;
         }
@@ -673,6 +682,27 @@ pub fn build_song_database_from_tsv_with_memory<R: ReadMemory>(
         let normalized = normalize_title_for_matching(&song.title);
         title_to_id.insert(normalized, song.id);
     }
+
+    // Debug: show first entries from each source
+    if let Some(first_mem) = memory_songs.values().next() {
+        debug!(
+            "First memory title: {:?} (normalized: {:?})",
+            first_mem.title,
+            normalize_title_for_matching(&first_mem.title)
+        );
+    }
+    if let Some((first_tsv_title, _)) = tsv_db.iter().next() {
+        debug!(
+            "First TSV title: {:?} (normalized: {:?})",
+            first_tsv_title,
+            normalize_title_for_matching(first_tsv_title)
+        );
+    }
+    debug!(
+        "title_to_id has {} entries, tsv_db has {} entries",
+        title_to_id.len(),
+        tsv_db.len()
+    );
 
     // Step 3: Match TSV entries with song_ids
     let mut result: HashMap<u32, SongInfo> = HashMap::new();
