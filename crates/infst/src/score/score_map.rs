@@ -105,7 +105,7 @@ impl ScoreMap {
     pub fn load_from_memory<R: ReadMemory>(
         reader: &R,
         data_map_addr: u64,
-        song_db: &HashMap<u32, SongInfo>,
+        _song_db: &HashMap<u32, SongInfo>,
     ) -> Result<Self> {
         let mut nodes: HashMap<(u32, i32, i32), ListNode> = HashMap::new();
 
@@ -135,9 +135,11 @@ impl ScoreMap {
             }
         }
 
-        // Follow linked lists from each entry point
+        // Follow linked lists from each entry point.
+        // Share visited set across all calls to avoid re-traversing shared list segments.
+        let mut visited: HashSet<u64> = HashSet::new();
         for entry_point in entry_points {
-            Self::follow_linked_list(reader, entry_point, null_obj, song_db, &mut nodes);
+            Self::follow_linked_list(reader, entry_point, null_obj, &mut visited, &mut nodes);
         }
 
         // Convert nodes to ScoreData
@@ -169,10 +171,9 @@ impl ScoreMap {
         reader: &R,
         entry_point: u64,
         null_obj: u64,
-        _song_db: &HashMap<u32, SongInfo>,
+        visited: &mut HashSet<u64>,
         nodes: &mut HashMap<(u32, i32, i32), ListNode>,
     ) {
-        let mut visited: HashSet<u64> = HashSet::new();
         let mut current_addr = entry_point;
 
         loop {
