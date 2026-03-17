@@ -169,7 +169,7 @@ impl ScoreMap {
         reader: &R,
         entry_point: u64,
         null_obj: u64,
-        song_db: &HashMap<u32, SongInfo>,
+        _song_db: &HashMap<u32, SongInfo>,
         nodes: &mut HashMap<(u32, i32, i32), ListNode>,
     ) {
         let mut visited: HashSet<u64> = HashSet::new();
@@ -190,9 +190,11 @@ impl ScoreMap {
             let song_id = node.song as u32;
             let next_addr = node.next;
 
-            // Break on unknown songs (matches C# reference behavior)
-            // Score map is reloaded when new songs are discovered (Fix 3)
-            if !song_db.contains_key(&song_id) {
+            // Skip songs not in our database but continue traversal.
+            // In V3, game_id != internal_id, so many valid DataMap entries
+            // won't be in the song_db. We still collect them for score data.
+            // Only break on clearly invalid song_ids (data corruption).
+            if !(1000..=90000).contains(&(song_id as i32)) {
                 break;
             }
 
