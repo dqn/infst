@@ -110,7 +110,8 @@ pub fn run(endpoint: Option<&str>, token: Option<&str>, pid: Option<u32>) -> Res
 
     // Load song database (bulk read for fewer syscalls)
     eprintln!("Loading song database...");
-    let song_db = fetch_song_database_bulk(&reader, offsets.song_list)?;
+    let song_db =
+        fetch_song_database_bulk(&reader, offsets.song_db_address(), offsets.entry_stride())?;
     eprintln!("Loaded {} songs", song_db.len());
 
     // Load score map

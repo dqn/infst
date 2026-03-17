@@ -26,8 +26,8 @@ pub fn run(base_addr: u64, pid: Option<u32>) -> Result<()> {
     );
     let reader = MemoryReader::new(&process);
 
-    const ENTRY_SIZE: u64 = 0x3F0; // 1008 bytes
-    const METADATA_OFFSET: u64 = 0x7E0; // 2016 bytes
+    const ENTRY_SIZE: u64 = infst::chart::SongInfo::MEMORY_SIZE as u64;
+    const METADATA_OFFSET: u64 = infst::chart::SongInfo::METADATA_TABLE_OFFSET as u64;
 
     // Analyze entry states
     println!();

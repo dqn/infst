@@ -16,6 +16,7 @@ pub mod offset;
 pub mod probe_entry;
 pub mod scan;
 pub mod search;
+pub mod songid_map;
 pub mod status;
 pub mod sync;
 pub mod tracking;

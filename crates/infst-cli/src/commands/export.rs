@@ -30,7 +30,7 @@ pub fn run(output: Option<&str>, format: ExportFormat, pid: Option<u32>) -> Resu
 
     // Load song database
     eprintln!("Loading song database...");
-    let song_db = fetch_song_database(&reader, offsets.song_list)?;
+    let song_db = fetch_song_database(&reader, offsets.song_db_address(), offsets.entry_stride())?;
     eprintln!("Loaded {} songs", song_db.len());
 
     // Load unlock data

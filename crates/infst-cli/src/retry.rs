@@ -44,7 +44,7 @@ pub fn load_song_database_with_retry(
             return Ok(None);
         }
 
-        match fetch_song_database(reader, song_list) {
+        match fetch_song_database(reader, song_list, SongInfo::MEMORY_SIZE) {
             Ok(db) => match validate_song_database(&db) {
                 ValidationResult::Valid => return Ok(Some(db)),
                 ValidationResult::TooFewSongs(count) => {

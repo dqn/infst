@@ -218,6 +218,12 @@ pub enum Command {
         #[arg(long)]
         pid: Option<u32>,
     },
+    /// Investigate song_id mapping between entry table and game
+    SongidMap {
+        /// Process ID (skip automatic detection)
+        #[arg(long)]
+        pid: Option<u32>,
+    },
     /// Manage INFINITAS launcher (URL handler + Special K)
     Launch {
         #[command(subcommand)]

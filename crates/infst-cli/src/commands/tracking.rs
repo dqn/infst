@@ -265,11 +265,13 @@ fn load_song_database(
     shutdown: &ShutdownSignal,
 ) -> Result<Option<HashMap<u32, SongInfo>>> {
     let tsv_path = "tracker.tsv";
+    // Scan enough entries to cover the full song database (~5000 entries max)
+    let scan_size = infst::SongInfo::MEMORY_SIZE * 5000;
 
     if std::path::Path::new(tsv_path).exists() {
         debug!("Building song database from TSV + memory scan...");
         let db = infst::chart::build_song_database_from_tsv_with_memory(
-            reader, song_list, tsv_path, 0x100000, // 1MB scan
+            reader, song_list, tsv_path, scan_size,
         );
 
         if db.is_empty() {
@@ -281,7 +283,12 @@ fn load_song_database(
 
     // No TSV, use memory-only approach
     debug!("No TSV file found, using memory scan...");
-    let song_db = infst::chart::fetch_song_database_from_memory_scan(reader, song_list, 0x100000);
+    let song_db = infst::chart::fetch_song_database_from_memory_scan(
+        reader,
+        song_list,
+        scan_size,
+        infst::SongInfo::MEMORY_SIZE,
+    );
 
     if song_db.is_empty() {
         debug!("Memory scan found no songs, trying legacy approach...");
@@ -319,7 +326,7 @@ fn run_tracking_session(
     }
 
     // Load game resources
-    let song_db = match load_song_database(&reader, infst.offsets().song_list, shutdown)? {
+    let song_db = match load_song_database(&reader, infst.offsets().song_db_address(), shutdown)? {
         Some(db) => db,
         None => return Ok(()), // Shutdown requested
     };
