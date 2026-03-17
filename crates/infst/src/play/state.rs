@@ -56,9 +56,11 @@ impl GameStateDetector {
             return GameState::Playing;
         }
 
-        // "Cannot go from song select to result screen anyway" (C# implementation)
-        // Maintain SongSelect during intermediate transitions
-        if last_state == GameState::SongSelect {
+        // In V1/V2 C# implementation, SongSelect was unconditionally sticky
+        // because Playing was always detected via marker1+marker2. In V3,
+        // the Playing markers may not fire, so we only stay in SongSelect
+        // while the song_select_marker is still active.
+        if last_state == GameState::SongSelect && song_select_marker == 1 {
             return GameState::SongSelect;
         }
 
@@ -128,20 +130,20 @@ mod tests {
     }
 
     #[test]
-    fn test_song_select_intermediate_state() {
+    fn test_song_select_stays_while_marker_active() {
         let mut detector = GameStateDetector::new();
         // Go to SongSelect
         detector.detect(0, 0, 1);
         assert_eq!(detector.last_state(), GameState::SongSelect);
 
-        // Intermediate state during transition (both markers = 0)
-        // Should stay in SongSelect without warning
-        let state = detector.detect(0, 0, 0);
+        // song_select_marker still 1 → stays in SongSelect
+        let state = detector.detect(0, 0, 1);
         assert_eq!(state, GameState::SongSelect);
 
-        // Then transition to Playing
-        let state = detector.detect(1, 1, 0);
-        assert_eq!(state, GameState::Playing);
+        // song_select_marker goes to 0 → transitions to ResultScreen
+        // (V3: Playing markers may not fire, so we allow this transition)
+        let state = detector.detect(0, 0, 0);
+        assert_eq!(state, GameState::ResultScreen);
     }
 
     #[test]

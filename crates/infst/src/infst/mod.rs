@@ -180,6 +180,10 @@ pub struct Infst {
     /// Currently playing chart (set during Playing state)
     /// Used for cross-validation when fetching play data on ResultScreen
     pub(crate) current_playing: Option<(u32, Difficulty)>,
+    /// Last observed marker values (for diagnostic change logging)
+    pub(crate) last_markers: (i32, i32, i32),
+    /// Last captured result fingerprint (song_id, difficulty, ex_score) for dedup
+    pub(crate) last_result_fingerprint: Option<(u32, u8, u32)>,
 }
 
 impl Infst {
@@ -212,6 +216,8 @@ impl Infst {
             state_detector: GameStateDetector::new(),
             session_manager: SessionManager::new(&session_dir),
             current_playing: None,
+            last_markers: (0, 0, 0),
+            last_result_fingerprint: None,
         }
     }
 

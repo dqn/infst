@@ -150,6 +150,17 @@ impl Infst {
             "song_select_marker",
         );
 
+        // Temporary diagnostic: log raw markers when they change
+        let last = self.state_detector.last_state();
+        let markers = (state_marker_1, state_marker_2, song_select_marker);
+        if self.last_markers != markers {
+            debug!(
+                "Markers: m1={} m2={} ss={} (last_state={:?})",
+                state_marker_1, state_marker_2, song_select_marker, last
+            );
+            self.last_markers = markers;
+        }
+
         Ok(self
             .state_detector
             .detect(state_marker_1, state_marker_2, song_select_marker))
@@ -158,11 +169,11 @@ impl Infst {
     fn handle_state_change(
         &mut self,
         reader: &MemoryReader,
-        _old_state: GameState,
+        old_state: GameState,
         new_state: GameState,
     ) -> Result<()> {
         match new_state {
-            GameState::ResultScreen => self.handle_result_screen(reader),
+            GameState::ResultScreen => self.handle_result_screen(reader, old_state),
             GameState::SongSelect => self.handle_song_select(reader),
             GameState::Playing => self.handle_playing(reader),
             GameState::Unknown => {}
@@ -171,7 +182,14 @@ impl Infst {
     }
 
     /// Handle transition to result screen
-    fn handle_result_screen(&mut self, reader: &MemoryReader) {
+    fn handle_result_screen(&mut self, reader: &MemoryReader, from_state: GameState) {
+        // In V3, SongSelect -> ResultScreen can happen without Playing being detected
+        // (marker offsets may be wrong). When this happens during the loading screen,
+        // the judge/play data is stale from the previous play. Skip processing.
+        if from_state == GameState::SongSelect {
+            debug!("SongSelect -> ResultScreen without Playing, skipping stale data");
+            return;
+        }
         info!("Detected result screen, waiting for data...");
 
         // Initial delay to allow game data to settle (matching C# implementation)
@@ -219,10 +237,22 @@ impl Infst {
                     );
 
                     if total_notes > 0 && chart_valid && lamp_valid {
+                        // Dedup: skip if this is the same result we already captured
+                        let fingerprint = (
+                            play_data.chart.song_id,
+                            play_data.chart.difficulty as u8,
+                            play_data.ex_score,
+                        );
+                        if self.last_result_fingerprint == Some(fingerprint) {
+                            debug!("Skipping duplicate result: {:?}", fingerprint);
+                            return;
+                        }
+
                         info!(
                             "Play result captured: {} ({}) - EX: {}",
                             play_data.chart.title, play_data.chart.song_id, play_data.ex_score
                         );
+                        self.last_result_fingerprint = Some(fingerprint);
                         self.process_play_result(&play_data);
                         self.current_playing = None; // Clear after processing
                         return;
@@ -640,7 +670,9 @@ impl Infst {
                 "IIDX resolved game_id={} -> internal_id={} {:?}",
                 song_id, internal_id, song.title
             );
-            let chart = ChartInfo::from_song_info(song, difficulty, true);
+            let mut chart = ChartInfo::from_song_info(song, difficulty, true);
+            // Use game_id for ChartInfo so cross-validation with CurrentSong works
+            chart.song_id = song_id;
             // Cache: insert under game_id so future lookups are instant
             let mut aliased = song.clone();
             aliased.id = song_id;
