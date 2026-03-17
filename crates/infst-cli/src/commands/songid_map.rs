@@ -101,6 +101,26 @@ pub fn run(pid: Option<u32>) -> Result<()> {
         search_game_songid_near_table(&reader, entry_addr, game_song_id);
     }
 
+    // Step 7: Investigate DataMap node unknown fields
+    println!();
+    println!("=== Step 7: DataMap Node Unknown Fields ===");
+    investigate_datamap_nodes(&reader, &offsets, game_song_id);
+
+    // Step 8: Full hexdump of entry for internal_id = game_song_id - 1
+    if game_song_id > 1000 {
+        println!();
+        println!("=== Step 8: Full Entry Hexdump (neighboring internal_ids) ===");
+        for delta in [-1i32, 0, 1] {
+            let target_iid = game_song_id + delta;
+            println!();
+            println!(
+                "--- Entry for internal_id={} (game_id{:+}) ---",
+                target_iid, delta
+            );
+            dump_full_entry(&reader, entry_addr, stride, target_iid, game_song_id);
+        }
+    }
+
     Ok(())
 }
 
@@ -560,5 +580,283 @@ fn truncate_str(s: &str, max_len: usize) -> String {
     } else {
         let truncated: String = s.chars().take(max_len - 3).collect();
         format!("{}...", truncated)
+    }
+}
+
+/// Investigate DataMap linked list nodes for unknown fields that might contain internal_id.
+///
+/// The ListNode structure (64 bytes) has several unknown fields:
+///   0-7: next (u64), 8-15: prev (u64), 16-19: diff (i32), 20-23: song/game_id (i32),
+///   24-27: playtype (i32), 28-31: uk2 (?), 32-35: score (u32), 36-39: miss_count (u32),
+///   40-43: uk3 (?), 44-47: uk4 (?), 48-51: lamp (i32), 52-63: unknown (12 bytes)
+fn investigate_datamap_nodes<R: ReadMemory>(
+    reader: &R,
+    offsets: &OffsetsCollection,
+    target_game_id: i32,
+) {
+    use infst::process::ByteBuffer;
+
+    let data_map_addr = offsets.data_map;
+    if data_map_addr == 0 {
+        println!("  DataMap address not available");
+        return;
+    }
+
+    // Read DataMap hash table boundaries
+    let Ok(null_obj) = reader.read_u64(data_map_addr.wrapping_sub(16)) else {
+        println!("  Failed to read DataMap null_obj");
+        return;
+    };
+    let Ok(start_addr) = reader.read_u64(data_map_addr) else {
+        println!("  Failed to read DataMap start");
+        return;
+    };
+    let Ok(end_addr) = reader.read_u64(data_map_addr + 8) else {
+        println!("  Failed to read DataMap end");
+        return;
+    };
+
+    if end_addr <= start_addr {
+        println!("  DataMap is empty");
+        return;
+    }
+
+    let buf_size = (end_addr - start_addr) as usize;
+    let Ok(hash_buf) = reader.read_bytes(start_addr, buf_size) else {
+        println!("  Failed to read DataMap hash table");
+        return;
+    };
+
+    // Collect entry points
+    let buf = ByteBuffer::new(&hash_buf);
+    let mut entry_points = Vec::new();
+    for i in 0..(buf_size / 8) {
+        let addr = buf.read_u64_at(i * 8).unwrap_or(0);
+        if addr != 0 && addr != null_obj && addr != 0x494fdce0 {
+            entry_points.push(addr);
+        }
+    }
+
+    println!(
+        "  DataMap: {} buckets, null_obj=0x{:X}",
+        entry_points.len(),
+        null_obj
+    );
+
+    // Follow linked lists and collect raw node data
+    let mut target_nodes: Vec<(u64, [u8; 64])> = Vec::new();
+    let mut sample_nodes: Vec<(i32, u64, [u8; 64])> = Vec::new();
+    let mut visited = std::collections::HashSet::new();
+
+    for &ep in &entry_points {
+        let mut current = ep;
+        for _ in 0..1000 {
+            if visited.contains(&current) || current == 0 || current == null_obj {
+                break;
+            }
+            visited.insert(current);
+
+            let Ok(node_bytes) = reader.read_bytes(current, 64) else {
+                break;
+            };
+            let mut raw = [0u8; 64];
+            raw.copy_from_slice(&node_bytes);
+
+            let song_id = i32::from_le_bytes(raw[20..24].try_into().unwrap());
+
+            if song_id == target_game_id {
+                target_nodes.push((current, raw));
+            } else if sample_nodes.len() < 10
+                && (1000..=90000).contains(&song_id)
+                && raw[32..36] != [0, 0, 0, 0]
+            {
+                // Sample some nodes with non-zero scores for comparison
+                sample_nodes.push((song_id, current, raw));
+            }
+
+            let next = u64::from_le_bytes(raw[0..8].try_into().unwrap());
+            if next == 0 || next == null_obj {
+                break;
+            }
+            current = next;
+        }
+    }
+
+    // Print target nodes
+    if target_nodes.is_empty() {
+        println!("  No DataMap nodes found for game_id={}", target_game_id);
+    } else {
+        println!(
+            "  Found {} nodes for game_id={}:",
+            target_nodes.len(),
+            target_game_id
+        );
+        for (addr, raw) in &target_nodes {
+            print_raw_node(*addr, raw, target_game_id);
+        }
+    }
+
+    // Print sample nodes for comparison
+    if !sample_nodes.is_empty() {
+        println!();
+        println!("  Sample nodes (for comparison):");
+        for (song_id, addr, raw) in &sample_nodes {
+            print_raw_node(*addr, raw, *song_id);
+        }
+    }
+}
+
+/// Print a raw 64-byte DataMap node with all fields annotated.
+fn print_raw_node(addr: u64, raw: &[u8; 64], game_id: i32) {
+    let diff = i32::from_le_bytes(raw[16..20].try_into().unwrap());
+    let playtype = i32::from_le_bytes(raw[24..28].try_into().unwrap());
+    let uk2 = i32::from_le_bytes(raw[28..32].try_into().unwrap());
+    let score = u32::from_le_bytes(raw[32..36].try_into().unwrap());
+    let miss = u32::from_le_bytes(raw[36..40].try_into().unwrap());
+    let uk3 = i32::from_le_bytes(raw[40..44].try_into().unwrap());
+    let uk4 = i32::from_le_bytes(raw[44..48].try_into().unwrap());
+    let lamp = i32::from_le_bytes(raw[48..52].try_into().unwrap());
+    let uk5 = i32::from_le_bytes(raw[52..56].try_into().unwrap());
+    let uk6 = i32::from_le_bytes(raw[56..60].try_into().unwrap());
+    let uk7 = i32::from_le_bytes(raw[60..64].try_into().unwrap());
+
+    println!(
+        "    0x{:X}: gid={} diff={} pt={} | uk2={} score={} miss={} uk3={} uk4={} lamp={} | uk5={} uk6={} uk7={}",
+        addr, game_id, diff, playtype, uk2, score, miss, uk3, uk4, lamp, uk5, uk6, uk7
+    );
+
+    // Hex dump of the full 64 bytes
+    let hex: Vec<String> = raw.iter().map(|b| format!("{:02X}", b)).collect();
+    println!("      hex: {}", hex.join(" "));
+}
+
+/// Dump a full entry from the entry table for a given internal_id.
+fn dump_full_entry<R: ReadMemory>(
+    reader: &R,
+    entry_base: u64,
+    stride: usize,
+    target_iid: i32,
+    game_id: i32,
+) {
+    // Find the entry index for this internal_id
+    for i in 0..2000u64 {
+        let addr = entry_base + i * stride as u64;
+        let id = match reader.read_i32(addr) {
+            Ok(id) => id,
+            Err(_) => break,
+        };
+
+        if id == target_iid {
+            println!(
+                "  Found internal_id={} at index {} (0x{:X})",
+                target_iid, i, addr
+            );
+
+            // Read full entry
+            let Ok(data) = reader.read_bytes(addr, stride) else {
+                println!("  Failed to read entry");
+                return;
+            };
+
+            // Title
+            if data.len() >= 0x180 + 64 {
+                let title = decode_shift_jis_to_string(&data[0x180..0x180 + 64]);
+                println!("  Title: {:?}", title);
+            }
+
+            // Search for game_id value within this entry
+            let game_id_bytes = game_id.to_le_bytes();
+            let mut found_offsets = Vec::new();
+            for off in 0..data.len().saturating_sub(4) {
+                if data[off..off + 4] == game_id_bytes {
+                    found_offsets.push(off);
+                }
+            }
+            if found_offsets.is_empty() {
+                println!(
+                    "  game_id={} NOT found within this entry's {} bytes",
+                    game_id,
+                    data.len()
+                );
+            } else {
+                println!(
+                    "  game_id={} found at offsets: {:?}",
+                    game_id,
+                    found_offsets
+                        .iter()
+                        .map(|o| format!("0x{:03X}", o))
+                        .collect::<Vec<_>>()
+                );
+            }
+
+            // Hexdump the interesting regions (non-zero areas)
+            println!("  Non-zero regions:");
+            let mut in_nonzero = false;
+            let mut region_start = 0;
+            for off in (0..data.len()).step_by(4) {
+                let is_nonzero = data[off..off.min(data.len()).max(off).min(off + 4).max(off)]
+                    .iter()
+                    .chain(data.get(off..off + 4).unwrap_or(&[]).iter())
+                    .any(|&b| b != 0);
+                let chunk = &data[off..(off + 4).min(data.len())];
+                let is_nz = chunk.iter().any(|&b| b != 0);
+                if is_nz && !in_nonzero {
+                    region_start = off;
+                    in_nonzero = true;
+                } else if !is_nz && in_nonzero {
+                    // Dump this non-zero region
+                    let region_end = off;
+                    hexdump_region_inline(
+                        &data[region_start..region_end],
+                        addr + region_start as u64,
+                        region_start,
+                    );
+                    in_nonzero = false;
+                }
+                let _ = is_nonzero; // suppress warning
+            }
+            if in_nonzero {
+                hexdump_region_inline(
+                    &data[region_start..],
+                    addr + region_start as u64,
+                    region_start,
+                );
+            }
+
+            return;
+        }
+
+        if id == 0 {
+            continue;
+        }
+    }
+    println!("  internal_id={} not found in entry table", target_iid);
+}
+
+/// Hexdump a region with offset annotations
+fn hexdump_region_inline(data: &[u8], addr: u64, entry_offset: usize) {
+    for row in (0..data.len()).step_by(16) {
+        let row_end = (row + 16).min(data.len());
+        let hex: Vec<String> = data[row..row_end]
+            .iter()
+            .map(|b| format!("{:02X}", b))
+            .collect();
+        let ascii: String = data[row..row_end]
+            .iter()
+            .map(|&b| {
+                if (0x20..0x7F).contains(&b) {
+                    b as char
+                } else {
+                    '.'
+                }
+            })
+            .collect();
+        println!(
+            "    0x{:03X} {:012X}: {:48} {}",
+            entry_offset + row,
+            addr + row as u64,
+            hex.join(" "),
+            ascii,
+        );
     }
 }
