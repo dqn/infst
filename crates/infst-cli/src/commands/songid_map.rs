@@ -199,24 +199,22 @@ fn probe_text_table<R: ReadMemory>(reader: &R, text_base: u64, game_song_id: i32
         }
     }
 
-    // Scan text table region for game song_id value
+    // Scan full entry table region for game song_id value
+    // 1809 entries * 0x630 = ~2.8MB, so scan 4MB to be safe
     if game_song_id > 0 {
         println!();
         println!(
-            "  --- Scanning text table region for game song_id={} ---",
+            "  --- Scanning entry table region for game song_id={} ---",
             game_song_id
         );
-        let scan_size = 0x100000; // 1MB
+        let scan_size = 0x400000; // 4MB
         if let Ok(buffer) = reader.read_bytes(text_base, scan_size) {
             let target = game_song_id.to_le_bytes();
             let mut found = 0;
             for i in 0..buffer.len().saturating_sub(4) {
                 if buffer[i..i + 4] == target {
-                    println!(
-                        "    Found at 0x{:X} (text_base+0x{:X})",
-                        text_base + i as u64,
-                        i
-                    );
+                    let abs_addr = text_base + i as u64;
+                    println!("    Found at 0x{:X} (text_base+0x{:X})", abs_addr, i);
                     found += 1;
                     if found >= 10 {
                         println!("    ... (stopping after 10 matches)");
@@ -225,7 +223,7 @@ fn probe_text_table<R: ReadMemory>(reader: &R, text_base: u64, game_song_id: i32
                 }
             }
             if found == 0 {
-                println!("    NOT FOUND in text table region (1MB)");
+                println!("    NOT FOUND in entry table region (4MB)");
             }
         }
     }
@@ -379,11 +377,12 @@ fn cross_reference_tables<R: ReadMemory>(
 /// Search for the game's song_id value in memory around the entry table
 fn search_game_songid_near_table<R: ReadMemory>(reader: &R, entry_base: u64, game_song_id: i32) {
     let target = game_song_id.to_le_bytes();
-    let search_start = entry_base.saturating_sub(0x100000); // 1MB before
-    let search_size = 0x200000usize; // 2MB total
+    // Search 2MB before and 4MB after to cover full entry table
+    let search_start = entry_base.saturating_sub(0x200000);
+    let search_size = 0x600000usize; // 6MB total
 
     if let Ok(buffer) = reader.read_bytes(search_start, search_size) {
-        let mut found = 0;
+        let mut found_addrs: Vec<u64> = Vec::new();
         for i in 0..buffer.len().saturating_sub(4) {
             if buffer[i..i + 4] == target {
                 let abs_addr = search_start + i as u64;
@@ -407,18 +406,130 @@ fn search_game_songid_near_table<R: ReadMemory>(reader: &R, entry_base: u64, gam
                     "    0x{:X} (entry_base{:+}) {} {}",
                     abs_addr, rel_to_entry, context_str, next_str,
                 );
-                found += 1;
-                if found >= 20 {
+                found_addrs.push(abs_addr);
+                if found_addrs.len() >= 20 {
                     println!("    ... (stopping after 20 matches)");
                     break;
                 }
             }
         }
-        if found == 0 {
-            println!("    NOT FOUND within 1MB of entry table");
+        if found_addrs.is_empty() {
+            println!("    NOT FOUND within search range");
         } else {
-            println!("    Total: {} matches", found);
+            println!("    Total: {} matches", found_addrs.len());
+
+            // Hexdump around first match for context
+            if let Some(&first_addr) = found_addrs.first() {
+                println!();
+                println!("  --- Hexdump around first match (0x{:X}) ---", first_addr);
+                hexdump_region(reader, first_addr.saturating_sub(64), 192);
+            }
         }
+    }
+
+    // Also check: find the closest internal_id to game_song_id in entry table
+    println!();
+    println!(
+        "  --- Searching entry table for internal_id closest to {} ---",
+        game_song_id
+    );
+    find_closest_internal_id(reader, entry_base, 0x630, game_song_id);
+}
+
+/// Find the entry with internal_id closest to the target game song_id
+fn find_closest_internal_id<R: ReadMemory>(
+    reader: &R,
+    entry_base: u64,
+    stride: usize,
+    target_id: i32,
+) {
+    let mut closest: Option<(i32, u64, String)> = None;
+    let mut closest_diff = i32::MAX;
+
+    for i in 0..2000u64 {
+        let addr = entry_base + i * stride as u64;
+        let id = match reader.read_i32(addr) {
+            Ok(id) if (1000..=90000).contains(&id) => id,
+            Ok(0) => continue,
+            _ => break,
+        };
+
+        let diff = (id - target_id).abs();
+        if diff < closest_diff {
+            closest_diff = diff;
+            let title = match reader.read_bytes(addr + 0x180, 64) {
+                Ok(bytes) => decode_shift_jis_to_string(&bytes),
+                Err(_) => String::new(),
+            };
+            closest = Some((id, addr, title));
+
+            if diff == 0 {
+                break; // Exact match
+            }
+        }
+    }
+
+    if let Some((id, addr, title)) = closest {
+        let diff = id - target_id;
+        println!(
+            "    Closest: internal_id={} at 0x{:X}, title={:?} (diff={})",
+            id, addr, title, diff
+        );
+
+        // Also show neighbors
+        if diff != 0 {
+            // Show entries around the closest match
+            let idx = ((addr - entry_base) / stride as u64) as i64;
+            for delta in [-2i64, -1, 0, 1, 2] {
+                let check_idx = idx + delta;
+                if check_idx < 0 {
+                    continue;
+                }
+                let check_addr = entry_base + (check_idx as u64) * stride as u64;
+                let check_id = reader.read_i32(check_addr).unwrap_or(0);
+                let check_title = match reader.read_bytes(check_addr + 0x180, 64) {
+                    Ok(bytes) => decode_shift_jis_to_string(&bytes),
+                    Err(_) => String::new(),
+                };
+                let marker = if delta == 0 { " <-- closest" } else { "" };
+                println!(
+                    "      [idx {}] internal_id={}, title={:?}{}",
+                    check_idx, check_id, check_title, marker
+                );
+            }
+        }
+    }
+}
+
+/// Print a hex dump of a memory region
+fn hexdump_region<R: ReadMemory>(reader: &R, addr: u64, size: usize) {
+    let Ok(buffer) = reader.read_bytes(addr, size) else {
+        println!("    (read failed)");
+        return;
+    };
+
+    for row in (0..buffer.len()).step_by(16) {
+        let row_end = (row + 16).min(buffer.len());
+        let hex: Vec<String> = buffer[row..row_end]
+            .iter()
+            .map(|b| format!("{:02X}", b))
+            .collect();
+        let ascii: String = buffer[row..row_end]
+            .iter()
+            .map(|&b| {
+                if (0x20..0x7F).contains(&b) {
+                    b as char
+                } else {
+                    '.'
+                }
+            })
+            .collect();
+        println!(
+            "    {:012X}: {:48} {}",
+            addr + row as u64,
+            hex.join(" "),
+            ascii,
+        );
     }
 }
 
