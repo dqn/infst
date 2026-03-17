@@ -171,6 +171,8 @@ mod tests {
             current_song: 0x5000,
             data_map: 0x6000,
             unlock_data: 0x7000,
+            song_entry_table: 0,
+            song_entry_size: 0,
         };
 
         let cache = OffsetCache::new("P2D:J:B:A:2026012800".to_string(), offsets.clone());
@@ -192,6 +194,8 @@ mod tests {
             current_song: 0x5000,
             data_map: 0x6000,
             unlock_data: 0x7000,
+            song_entry_table: 0,
+            song_entry_size: 0,
         };
 
         let cache = OffsetCache::new("P2D:J:B:A:2026012800".to_string(), offsets);

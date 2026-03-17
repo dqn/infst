@@ -5,6 +5,7 @@
 
 use tracing::debug;
 
+use crate::chart::SongInfo;
 use crate::error::{Error, Result};
 use crate::offset::{CodeSignature, OffsetSignatureSet};
 use crate::process::{ByteBuffer, ReadMemory};
@@ -86,7 +87,9 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                 if !addr.is_multiple_of(4) {
                     continue;
                 }
-                let song_count = self.reader.count_songs_at_address(addr);
+                let song_count = self
+                    .reader
+                    .count_songs_at_address(addr, SongInfo::MEMORY_SIZE);
                 if song_count < MIN_EXPECTED_SONGS {
                     continue;
                 }

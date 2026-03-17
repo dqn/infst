@@ -634,6 +634,8 @@ mod offsets_collection {
             current_song: 0x5000,
             data_map: 0x6000,
             unlock_data: 0x7000,
+            song_entry_table: 0,
+            song_entry_size: 0,
         };
 
         assert!(offsets.is_valid());
@@ -650,6 +652,8 @@ mod offsets_collection {
             current_song: 0x5000,
             data_map: 0x6000,
             unlock_data: 0x7000,
+            song_entry_table: 0,
+            song_entry_size: 0,
         };
 
         assert!(!offsets.is_valid());
@@ -666,6 +670,8 @@ mod offsets_collection {
             current_song: 0x5000,
             data_map: 0x6000,
             unlock_data: 0x7000,
+            song_entry_table: 0,
+            song_entry_size: 0,
         };
 
         assert!(!offsets.is_valid());
@@ -683,6 +689,8 @@ mod offsets_collection {
             current_song: 0x5000,
             data_map: 0,    // Optional
             unlock_data: 0, // Optional
+            song_entry_table: 0,
+            song_entry_size: 0,
         };
 
         // Note: is_valid() checks all fields are non-zero

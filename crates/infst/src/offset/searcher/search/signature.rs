@@ -210,7 +210,8 @@ pub fn search_song_list_by_signature<R: ReadMemory>(
             if !addr.is_multiple_of(4) {
                 continue;
             }
-            let song_count = reader.count_songs_at_address(addr);
+            let song_count =
+                reader.count_songs_at_address(addr, crate::chart::SongInfo::MEMORY_SIZE);
             if song_count < MIN_EXPECTED_SONGS {
                 continue;
             }

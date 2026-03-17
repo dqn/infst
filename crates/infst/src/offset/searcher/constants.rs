@@ -67,38 +67,45 @@ pub const MAX_SONG_ID: i32 = 50000;
 // Relative Offsets (derived from historical analysis of 9 versions)
 // ============================================================================
 
-/// Expected offset: judgeData - playSettings ≈ 0x2ACFA8
+/// Expected offset: judgeData - playSettings ≈ 0x2AD058
 ///
 /// Historical values:
 /// - Version 1 (2025122400): 0x2ACEE8
 /// - Version 2 (2026012800): 0x2ACFA8
+/// - Version 3 (2026031200): 0x2AD058
 ///
-///   Using Version 2 value as it's the current version.
-pub const JUDGE_TO_PLAY_SETTINGS: u64 = 0x2ACFA8;
+///   Using Version 3 value as it's the current version.
+pub const JUDGE_TO_PLAY_SETTINGS: u64 = 0x2AD058;
 
 /// Search range for playSettings (±512 bytes)
 ///
-/// Historical variation between versions is ~192 bytes (0xC0).
+/// Historical variation between versions is ~0x170 (368 bytes).
 /// Using 512 bytes to cover with some margin while avoiding false positives.
 pub const PLAY_SETTINGS_SEARCH_RANGE: usize = 0x200;
 
-/// Expected offset: songList - judgeData ≈ 0x94E3C8
+/// Expected offset: songList - judgeData ≈ 0x94E684
+///
+/// Historical values:
+/// - Version 1 (2025122400): 0x94E374
+/// - Version 2 (2026012800): 0x94E4B4
+/// - Version 3 (2026031200): 0x94E684
 ///
 /// Historical variation: ±0x600 (1.5KB)
-pub const JUDGE_TO_SONG_LIST: u64 = 0x94E3C8;
+pub const JUDGE_TO_SONG_LIST: u64 = 0x94E684;
 
-/// Expected offset: playData - playSettings ≈ 0x2A0
+/// Expected offset: playData - playSettings ≈ 0x2D0
 ///
 /// Historical values:
 /// - Version 1 (2025122400): 0x2C0 (704 bytes)
 /// - Version 2 (2026012800): 0x2A0 (672 bytes)
+/// - Version 3 (2026031200): 0x2D0 (720 bytes)
 ///
-///   Using Version 2 value as it's the current version.
-pub const PLAY_SETTINGS_TO_PLAY_DATA: u64 = 0x2A0;
+///   Using Version 3 value as it's the current version.
+pub const PLAY_SETTINGS_TO_PLAY_DATA: u64 = 0x2D0;
 
 /// Search range for playData (±256 bytes)
 ///
-/// This is ~16x the measured variation to ensure reliable detection.
+/// Historical variation is ~0x30 (48 bytes). Using 256 bytes for margin.
 pub const PLAY_DATA_SEARCH_RANGE: usize = 0x100;
 
 /// Expected offset: currentSong - judgeData ≈ 0x1E4

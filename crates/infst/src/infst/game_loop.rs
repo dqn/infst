@@ -10,7 +10,7 @@ use chrono::Utc;
 use tracing::{debug, error, info, warn};
 
 use crate::chart::{
-    ChartInfo, Difficulty, fetch_song_by_id, fetch_song_database_from_memory_scan,
+    ChartInfo, Difficulty, SongInfo, fetch_song_by_id, fetch_song_database_from_memory_scan,
     get_unlock_states,
 };
 use crate::config::{check_version_match, find_game_version, polling, retry};
@@ -475,8 +475,18 @@ impl Infst {
     /// This handles lazy loading in newer INFINITAS versions where songs are
     /// only loaded into memory when scrolled to in the song select screen.
     fn rescan_song_database(&mut self, reader: &MemoryReader) {
-        let scan_result =
-            fetch_song_database_from_memory_scan(reader, self.offsets.song_list, 0x200000);
+        let entry_stride = if self.offsets.song_entry_size > 0 {
+            self.offsets.song_entry_size
+        } else {
+            SongInfo::MEMORY_SIZE
+        };
+        let scan_size = entry_stride * 5000;
+        let scan_result = fetch_song_database_from_memory_scan(
+            reader,
+            self.offsets.song_db_address(),
+            scan_size,
+            entry_stride,
+        );
 
         let mut new_songs = 0usize;
         for (song_id, song) in scan_result {
@@ -620,7 +630,19 @@ impl Infst {
         }
 
         // Try to dynamically load from memory
-        if let Some(song) = fetch_song_by_id(reader, self.offsets.song_list, song_id, 0x200000) {
+        let entry_stride = if self.offsets.song_entry_size > 0 {
+            self.offsets.song_entry_size
+        } else {
+            SongInfo::MEMORY_SIZE
+        };
+        let scan_size = entry_stride * 5000;
+        if let Some(song) = fetch_song_by_id(
+            reader,
+            self.offsets.song_db_address(),
+            song_id,
+            scan_size,
+            entry_stride,
+        ) {
             info!("Dynamically loaded song: {} ({})", song.title, song_id);
             let chart = ChartInfo::from_song_info(&song, difficulty, true);
             // Add to song database for future lookups

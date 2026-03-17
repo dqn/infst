@@ -32,39 +32,49 @@ pub struct SongInfo {
 
 impl SongInfo {
     /// Size of one song entry in memory
-    /// Version 2026012800+: 0x4B0 = 1200 bytes (was 0x3F0 = 1008 bytes in older versions)
-    pub const MEMORY_SIZE: usize = 0x4B0; // 1200 bytes
+    /// Version 2016051600+: 0x630 = 1584 bytes
+    /// (was 0x4B0 in 2026012800, 0x3F0 in older versions)
+    pub const MEMORY_SIZE: usize = 0x630; // 1584 bytes
 
     /// Offset from text table to metadata table (legacy, kept for compatibility)
     pub const METADATA_TABLE_OFFSET: usize = 0x7E0;
 
     // Memory layout constants
-    // INFINITAS stores song metadata in fixed-size blocks with the following layout:
     const SLAB: usize = 64; // String block size (64 bytes per Shift-JIS string field)
-    const WORD: usize = 4; // i32/u32 size
 
     // Memory offsets (relative to song entry start)
-    // Version 2026012800+ layout - 3 additional 64-byte fields compared to older versions
+    // Version 2016051600+ layout:
+    //
+    // Header:
+    //   0x000: Song ID (i32)
+    //   0x004: Folder (i32)
+    //   0x008: Identifier string (~22 bytes, includes 0xFF88 marker)
+    //   0x020-0x17F: Reserved/padding
     //
     // String fields (each 64 bytes, Shift-JIS encoded):
-    //   0x000: Title
-    //   0x040: Title (English)
-    //   0x080: Genre
-    //   0x0C0: Artist
-    //   0x100-0x1BF: Additional fields (unknown purpose)
-    const TITLE_OFFSET: usize = 0;
-    const TITLE_ENGLISH_OFFSET: usize = Self::SLAB; // 64
-    const GENRE_OFFSET: usize = Self::SLAB * 2; // 128
-    const ARTIST_OFFSET: usize = Self::SLAB * 3; // 192
-
-    // Metadata section (updated for version 2026012800+):
-    // Old offsets were: folder=280, levels=288, bpm=320, notes=432, song_id=624
-    // New offsets add 192 bytes (3 x 64-byte fields) to most positions
-    const FOLDER_OFFSET: usize = 472; // folder byte (estimated)
-    const LEVELS_OFFSET: usize = 480; // 10 bytes for difficulty levels
-    const BPM_OFFSET: usize = 512; // 8 bytes: max, min (estimated)
-    const NOTES_OFFSET: usize = 624; // 40 bytes: 10 x i32 (estimated)
-    const SONG_ID_OFFSET: usize = 816; // 4 bytes
+    //   0x180: Title
+    //   0x1C0: (unknown, often empty)
+    //   0x200: Title (English)
+    //   0x240: Genre
+    //   0x280: (unknown, often empty)
+    //   0x2C0: Artist
+    //
+    // Metadata:
+    //   0x360: Difficulty levels (10 bytes)
+    //   0x378: Total notes (10 x u32, 8-byte stride)
+    //
+    // Score data (player-specific):
+    //   0x3F0: EX scores (10 x u32)
+    //   0x430+: Clear lamps, DJ points, etc.
+    const SONG_ID_OFFSET: usize = 0;
+    const FOLDER_OFFSET: usize = 4;
+    const TITLE_OFFSET: usize = 0x180; // 384
+    const TITLE_ENGLISH_OFFSET: usize = 0x200; // 512
+    const GENRE_OFFSET: usize = 0x240; // 576
+    const ARTIST_OFFSET: usize = 0x2C0; // 704
+    const LEVELS_OFFSET: usize = 0x360; // 864
+    const NOTES_OFFSET: usize = 0x378; // 888
+    const NOTES_STRIDE: usize = 8; // 8 bytes per note entry (u32 + 4 bytes padding)
 
     /// Get level for a specific difficulty index
     pub fn get_level(&self, difficulty_index: usize) -> u8 {
@@ -92,10 +102,14 @@ impl SongInfo {
     fn parse_entry(entry: &[u8]) -> Result<Option<Self>> {
         let buf = ByteBuffer::new(entry);
 
-        // Check if entry is valid (first 4 bytes should not be 0)
-        if buf.read_i32_at(0).unwrap_or(0) == 0 {
+        // Check if entry is valid (song_id at offset 0 should not be 0)
+        let song_id = buf.read_i32_at(Self::SONG_ID_OFFSET).unwrap_or(0);
+        if song_id == 0 {
             return Ok(None);
         }
+
+        // Parse folder (i32)
+        let folder = buf.read_i32_at(Self::FOLDER_OFFSET).unwrap_or(0);
 
         // Parse strings (Shift-JIS encoded, with encoding fixes for non-Shift-JIS characters)
         let mut title = decode_shift_jis(buf.slice_at(Self::TITLE_OFFSET, Self::SLAB)?);
@@ -110,31 +124,18 @@ impl SongInfo {
             artist = fixed;
         }
 
-        // Parse folder (1 byte)
-        let folder = entry[Self::FOLDER_OFFSET] as i32;
-
         // Parse difficulty levels (10 bytes)
         let mut levels = [0u8; 10];
         levels.copy_from_slice(buf.slice_at(Self::LEVELS_OFFSET, 10)?);
 
-        // Parse BPM (8 bytes: max, min)
-        let bpm_max = buf.read_i32_at(Self::BPM_OFFSET)?;
-        let bpm_min = buf.read_i32_at(Self::BPM_OFFSET + Self::WORD)?;
+        // BPM is not stored in this structure version (2016051600+)
+        let bpm: Arc<str> = Arc::from("");
 
-        let bpm: Arc<str> = if bpm_min != 0 && bpm_min != bpm_max {
-            format!("{:03}~{:03}", bpm_min, bpm_max).into()
-        } else {
-            format!("{:03}", bpm_max).into()
-        };
-
-        // Parse note counts (40 bytes = 10 x i32)
+        // Parse note counts (10 entries, 8-byte stride: u32 value + 4 bytes padding)
         let mut total_notes = [0u32; 10];
         for (i, note_count) in total_notes.iter_mut().enumerate() {
-            *note_count = buf.read_u32_at(Self::NOTES_OFFSET + i * Self::WORD)?;
+            *note_count = buf.read_u32_at(Self::NOTES_OFFSET + i * Self::NOTES_STRIDE)?;
         }
-
-        // Parse song ID (4 bytes)
-        let song_id = buf.read_i32_at(Self::SONG_ID_OFFSET)?;
 
         Ok(Some(SongInfo {
             id: song_id as u32,
@@ -300,8 +301,8 @@ pub fn build_song_id_title_map<R: ReadMemory>(
     text_base: u64,
     scan_size: usize,
 ) -> HashMap<u32, Arc<str>> {
-    const ENTRY_SIZE: u64 = SongInfo::MEMORY_SIZE as u64; // 0x3F0 = 1008 bytes
-    const METADATA_OFFSET: u64 = SongInfo::METADATA_TABLE_OFFSET as u64; // 0x7E0 = 2016 bytes
+    const ENTRY_SIZE: u64 = SongInfo::MEMORY_SIZE as u64;
+    const METADATA_OFFSET: u64 = SongInfo::METADATA_TABLE_OFFSET as u64;
 
     let mut result = HashMap::new();
     let max_entries = (scan_size as u64 / ENTRY_SIZE).min(5000);
@@ -365,16 +366,17 @@ pub fn build_song_id_title_map<R: ReadMemory>(
 pub fn fetch_song_database_bulk<R: ReadMemory>(
     reader: &R,
     song_list_addr: u64,
+    entry_stride: usize,
 ) -> Result<HashMap<u32, SongInfo>> {
     const MAX_ENTRIES: usize = 5000;
-    let bulk_size = MAX_ENTRIES * SongInfo::MEMORY_SIZE;
+    let bulk_size = MAX_ENTRIES * entry_stride;
 
     // Try bulk read
     let buffer = match reader.read_bytes(song_list_addr, bulk_size) {
         Ok(buf) => buf,
         Err(e) => {
             warn!("Bulk read failed ({}), falling back to per-entry read", e);
-            return fetch_song_database(reader, song_list_addr);
+            return fetch_song_database(reader, song_list_addr, entry_stride);
         }
     };
 
@@ -391,7 +393,7 @@ pub fn fetch_song_database_bulk<R: ReadMemory>(
     const MAX_CONSECUTIVE_FAILURES: u32 = 10;
 
     for entry_index in 0..MAX_ENTRIES {
-        let offset = entry_index * SongInfo::MEMORY_SIZE;
+        let offset = entry_index * entry_stride;
         if offset + SongInfo::MEMORY_SIZE > buffer.len() {
             break;
         }
@@ -404,7 +406,7 @@ pub fn fetch_song_database_bulk<R: ReadMemory>(
             Ok(Some(mut song)) if song.id == 0 && !song.title.is_empty() => {
                 // Try metadata table fallback
                 if let Some(ref meta_buf) = metadata_buffer {
-                    let meta_offset = entry_index * SongInfo::MEMORY_SIZE;
+                    let meta_offset = entry_index * entry_stride;
                     if meta_offset + 8 <= meta_buf.len() {
                         let meta = ByteBuffer::new(&meta_buf[meta_offset..]);
                         let alt_song_id = meta.read_i32_at(0).unwrap_or(0);
@@ -443,6 +445,7 @@ pub fn fetch_song_database_bulk<R: ReadMemory>(
 pub fn fetch_song_database<R: ReadMemory>(
     reader: &R,
     song_list_addr: u64,
+    entry_stride: usize,
 ) -> Result<HashMap<u32, SongInfo>> {
     let mut result = HashMap::new();
     let mut entry_index: u64 = 0;
@@ -450,7 +453,7 @@ pub fn fetch_song_database<R: ReadMemory>(
     const MAX_CONSECUTIVE_FAILURES: u32 = 10;
 
     loop {
-        let address = song_list_addr + entry_index * SongInfo::MEMORY_SIZE as u64;
+        let address = song_list_addr + entry_index * entry_stride as u64;
 
         // Use fallback method for new INFINITAS versions where metadata is split
         match SongInfo::read_from_memory_with_fallback(
@@ -656,7 +659,12 @@ pub fn build_song_database_from_tsv_with_memory<R: ReadMemory>(
     };
 
     // Step 2: Scan memory for song_id -> title mappings
-    let memory_songs = fetch_song_database_from_memory_scan(reader, song_list_addr, scan_size);
+    let memory_songs = fetch_song_database_from_memory_scan(
+        reader,
+        song_list_addr,
+        scan_size,
+        SongInfo::MEMORY_SIZE,
+    );
     info!("Found {} songs in memory scan", memory_songs.len());
 
     // Build reverse mapping: normalized_title -> song_id
@@ -744,27 +752,27 @@ fn normalize_title_for_matching(title: &str) -> String {
 /// song_id is stored at offset 816 within each 1200-byte entry.
 ///
 /// Memory structure:
-/// - entry[i] = song_list_addr + i * ENTRY_SIZE (0x3F0 = 1008 bytes)
-/// - song_id is at offset 624 within each entry
+/// - entry[i] = song_list_addr + i * ENTRY_SIZE (0x630 = 1584 bytes)
+/// - song_id is at offset 0 within each entry
 pub fn fetch_song_by_id<R: ReadMemory>(
     reader: &R,
     song_list_addr: u64,
     target_song_id: u32,
     scan_size: usize,
+    entry_stride: usize,
 ) -> Option<SongInfo> {
     if song_list_addr == 0 {
         return None;
     }
 
-    const ENTRY_SIZE: u64 = SongInfo::MEMORY_SIZE as u64; // 0x3F0 = 1008 bytes
-
-    let max_entries = (scan_size as u64 / ENTRY_SIZE).min(5000);
+    let stride = entry_stride as u64;
+    let max_entries = (scan_size as u64 / stride).min(5000);
 
     // Scan each entry for the target song_id
     for i in 0..max_entries {
-        let entry_addr = song_list_addr + i * ENTRY_SIZE;
+        let entry_addr = song_list_addr + i * stride;
 
-        // Use the proper read_from_memory function that reads song_id from offset 624
+        // Use the proper read_from_memory function
         match SongInfo::read_from_memory(reader, entry_addr) {
             Ok(Some(song)) if song.id == target_song_id => {
                 debug!(
@@ -786,21 +794,22 @@ pub fn fetch_song_by_id<R: ReadMemory>(
 /// and contains all song metadata including song_id at offset 624.
 ///
 /// Memory structure:
-/// - entry[i] = song_list_base + i * ENTRY_SIZE (0x3F0 = 1008 bytes)
+/// - entry[i] = song_list_base + i * ENTRY_SIZE (0x630 = 1584 bytes)
 pub fn fetch_song_database_from_memory_scan<R: ReadMemory>(
     reader: &R,
     song_list_base: u64,
     scan_size: usize,
+    entry_stride: usize,
 ) -> HashMap<u32, SongInfo> {
-    const ENTRY_SIZE: u64 = SongInfo::MEMORY_SIZE as u64; // 0x3F0 = 1008 bytes
+    let stride = entry_stride as u64;
 
     let mut result = HashMap::new();
-    let max_entries = (scan_size as u64 / ENTRY_SIZE).min(5000);
+    let max_entries = (scan_size as u64 / stride).min(5000);
 
     // Note: With lazy loading, songs may be scattered across the entry table.
     // We scan all entries to find all loaded songs.
     for i in 0..max_entries {
-        let entry_addr = song_list_base + i * ENTRY_SIZE;
+        let entry_addr = song_list_base + i * stride;
 
         // Use the proper read_from_memory function
         let song = match SongInfo::read_from_memory(reader, entry_addr) {
@@ -838,14 +847,15 @@ mod tests {
     /// Build a mock song entry buffer with a title and song_id
     fn build_song_entry(title: &str, song_id: u32) -> Vec<u8> {
         let mut entry = vec![0u8; SongInfo::MEMORY_SIZE];
-        // Write title as Shift-JIS at offset 0
+        // Write song_id at offset 0
+        entry[SongInfo::SONG_ID_OFFSET..SongInfo::SONG_ID_OFFSET + 4]
+            .copy_from_slice(&(song_id as i32).to_le_bytes());
+        // Write title as Shift-JIS at TITLE_OFFSET (0x180)
         let (encoded, _, _) = encoding_rs::SHIFT_JIS.encode(title);
         let title_bytes = encoded.as_ref();
         let len = title_bytes.len().min(SongInfo::SLAB);
-        entry[..len].copy_from_slice(&title_bytes[..len]);
-        // Write song_id at SONG_ID_OFFSET
-        entry[SongInfo::SONG_ID_OFFSET..SongInfo::SONG_ID_OFFSET + 4]
-            .copy_from_slice(&(song_id as i32).to_le_bytes());
+        entry[SongInfo::TITLE_OFFSET..SongInfo::TITLE_OFFSET + len]
+            .copy_from_slice(&title_bytes[..len]);
         // Write at least one non-zero level and note count for the entry to be meaningful
         entry[SongInfo::LEVELS_OFFSET] = 12; // SPB level = 12
         entry[SongInfo::NOTES_OFFSET..SongInfo::NOTES_OFFSET + 4]
@@ -917,7 +927,7 @@ mod tests {
             .write_bytes(0, &buffer)
             .build();
 
-        let db = fetch_song_database_bulk(&reader, base).unwrap();
+        let db = fetch_song_database_bulk(&reader, base, SongInfo::MEMORY_SIZE).unwrap();
         assert_eq!(db.len(), 3);
         assert!(db.contains_key(&1001));
         assert!(db.contains_key(&1002));
@@ -940,8 +950,8 @@ mod tests {
             .write_bytes(0, &buffer)
             .build();
 
-        let bulk_db = fetch_song_database_bulk(&reader, base).unwrap();
-        let per_entry_db = fetch_song_database(&reader, base).unwrap();
+        let bulk_db = fetch_song_database_bulk(&reader, base, SongInfo::MEMORY_SIZE).unwrap();
+        let per_entry_db = fetch_song_database(&reader, base, SongInfo::MEMORY_SIZE).unwrap();
 
         assert_eq!(bulk_db.len(), per_entry_db.len());
         for (id, bulk_song) in &bulk_db {

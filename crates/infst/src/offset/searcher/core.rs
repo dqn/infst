@@ -106,6 +106,27 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         offsets.song_list = self.search_song_list_offset(song_list_hint)?;
         debug!("  SongList: 0x{:X}", offsets.song_list);
 
+        // Detect song entry stride. If detection fails, song_list points to a
+        // text table header (e.g., "5.1.1."), not the entry table itself.
+        // In that case, search for the entry table separately.
+        if let Some(stride) = self.detect_entry_stride(offsets.song_list) {
+            offsets.song_entry_size = stride;
+            info!("  Song entry stride: 0x{:X} ({} bytes)", stride, stride);
+        } else {
+            info!("  SongList is a text table header, searching for song entry table...");
+            // Use the found SongList as hint (entry table is nearby)
+            if let Ok(entry_table) = self.search_song_list_by_song_id(offsets.song_list) {
+                offsets.song_entry_table = entry_table;
+                offsets.song_entry_size = self
+                    .detect_entry_stride(entry_table)
+                    .unwrap_or(crate::chart::SongInfo::MEMORY_SIZE);
+                info!(
+                    "  Song entry table: 0x{:X} (stride: 0x{:X})",
+                    entry_table, offsets.song_entry_size
+                );
+            }
+        }
+
         // Phase 2: JudgeData (relative search from SongList)
         info!("Phase 2: Searching JudgeData via relative offset from SongList...");
         offsets.judge_data = self.search_judge_data_near_song_list(offsets.song_list)?;
@@ -172,6 +193,15 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         offsets.song_list = self.search_song_list_offset(song_list_hint)?;
         debug!("  SongList: 0x{:X}", offsets.song_list);
 
+        if let Some(stride) = self.detect_entry_stride(offsets.song_list) {
+            offsets.song_entry_size = stride;
+        } else if let Ok(entry_table) = self.search_song_list_by_song_id(offsets.song_list) {
+            offsets.song_entry_table = entry_table;
+            offsets.song_entry_size = self
+                .detect_entry_stride(entry_table)
+                .unwrap_or(crate::chart::SongInfo::MEMORY_SIZE);
+        }
+
         offsets.data_map = self.search_data_map_offset(base).or_else(|e| {
             debug!(
                 "  DataMap search from base failed: {}, trying from SongList",
@@ -213,6 +243,15 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
 
         offsets.song_list = self.search_song_list_offset(song_list_hint)?;
         debug!("  SongList: 0x{:X}", offsets.song_list);
+
+        if let Some(stride) = self.detect_entry_stride(offsets.song_list) {
+            offsets.song_entry_size = stride;
+        } else if let Ok(entry_table) = self.search_song_list_by_song_id(offsets.song_list) {
+            offsets.song_entry_table = entry_table;
+            offsets.song_entry_size = self
+                .detect_entry_stride(entry_table)
+                .unwrap_or(crate::chart::SongInfo::MEMORY_SIZE);
+        }
 
         offsets.data_map = self.search_data_map_offset(base).or_else(|e| {
             debug!(

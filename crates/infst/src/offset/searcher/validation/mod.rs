@@ -83,11 +83,11 @@ pub trait OffsetValidation: ReadMemory {
     }
 
     /// Count how many songs can be read from a given song list address.
-    fn count_songs_at_address(&self, song_list_addr: u64) -> usize
+    fn count_songs_at_address(&self, song_list_addr: u64, entry_stride: usize) -> usize
     where
         Self: Sized,
     {
-        count_songs_at_address(self, song_list_addr)
+        count_songs_at_address(self, song_list_addr, entry_stride)
     }
 }
 
@@ -121,7 +121,12 @@ pub fn validate_signature_offsets<R: ReadMemory>(reader: &R, offsets: &OffsetsCo
     }
 
     // Validate song list
-    let song_count = count_songs_at_address(reader, offsets.song_list);
+    let stride = if offsets.song_entry_size > 0 {
+        offsets.song_entry_size
+    } else {
+        crate::chart::SongInfo::MEMORY_SIZE
+    };
+    let song_count = count_songs_at_address(reader, offsets.song_list, stride);
     let has_enough_songs = song_count >= MIN_EXPECTED_SONGS;
     let is_new_version =
         song_count >= 1 && validate_new_version_text_table(reader, offsets.song_list);

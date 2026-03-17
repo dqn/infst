@@ -250,6 +250,8 @@ fn test_offsets_collection_is_valid() {
         current_song: 0x5000,
         data_map: 0x6000,
         unlock_data: 0x7000,
+        song_entry_table: 0,
+        song_entry_size: 0,
     };
     assert!(valid.is_valid());
 
@@ -262,6 +264,8 @@ fn test_offsets_collection_is_valid() {
         current_song: 0x5000,
         data_map: 0x6000,
         unlock_data: 0x7000,
+        song_entry_table: 0,
+        song_entry_size: 0,
     };
     assert!(!invalid.is_valid());
 }

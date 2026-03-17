@@ -60,7 +60,9 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                         continue;
                     }
 
-                    let song_count = self.reader.count_songs_at_address(candidate_addr);
+                    let song_count = self
+                        .reader
+                        .count_songs_at_address(candidate_addr, SongInfo::MEMORY_SIZE);
                     if offset == 0 || song_count > 1 {
                         debug!(
                             "    Candidate 0x{:X} (offset {:+}): {} songs",
@@ -151,9 +153,16 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
     pub(crate) fn search_song_list_by_song_id(&mut self, base_hint: u64) -> Result<u64> {
         const NEW_STRUCT_SIZE: u64 = 312; // 0x138
 
-        let search_size = 32 * 1024 * 1024; // 32MB
-
-        if self.load_buffer_around(base_hint, search_size).is_err() {
+        // Try progressively larger buffers (entry table is usually within 1MB of the hint)
+        let search_sizes = [1024 * 1024, 4 * 1024 * 1024, 32 * 1024 * 1024];
+        let mut buffer_loaded = false;
+        for &size in &search_sizes {
+            if self.load_buffer_around(base_hint, size).is_ok() {
+                buffer_loaded = true;
+                break;
+            }
+        }
+        if !buffer_loaded {
             return Err(Error::offset_search_failed(
                 "Failed to load buffer for song_id search".to_string(),
             ));
@@ -255,7 +264,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             // Also dump first few entries
             if count > 0 {
                 for i in 0..3.min(count) {
-                    let entry_addr = *addr + (i as u64 * 0x3F0);
+                    let entry_addr = *addr + (i as u64 * SongInfo::MEMORY_SIZE as u64);
                     if let Ok(id) = self.reader.read_i32(entry_addr) {
                         debug!("        Entry {}: song_id={} at 0x{:X}", i, id, entry_addr);
                     }
@@ -455,7 +464,9 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         // First, try old-style pattern search
         info!("Attempting old-style pattern search (embedded strings)...");
         if let Ok(addr) = self.search_song_list_offset(base_hint) {
-            let song_count = self.reader.count_songs_at_address(addr);
+            let song_count = self
+                .reader
+                .count_songs_at_address(addr, SongInfo::MEMORY_SIZE);
             if song_count >= MIN_EXPECTED_SONGS {
                 info!("Found via old-style: 0x{:X} ({} songs)", addr, song_count);
                 return Ok(addr);
@@ -474,9 +485,9 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         ))
     }
 
-    /// Count songs with new layout: song_id at offset 0, struct size 0x3F0
+    /// Count songs with new layout: song_id at offset 0
     fn count_songs_new_layout(&self, start_addr: u64) -> usize {
-        const STRUCT_SIZE: u64 = 0x3F0; // 1008 bytes, same as old
+        const STRUCT_SIZE: u64 = SongInfo::MEMORY_SIZE as u64;
         let mut count = 0;
         let mut addr = start_addr;
 
@@ -516,5 +527,69 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         }
 
         count
+    }
+
+    /// Auto-detect song entry stride by finding the distance between consecutive entries.
+    ///
+    /// Starting from a known song list address (where song_id is at offset 0),
+    /// scans forward for the next valid [song_id, folder] pair and validates
+    /// the detected stride with multiple entries.
+    pub fn detect_entry_stride(&self, song_list_addr: u64) -> Option<usize> {
+        // Read enough memory to find several entries (max expected stride ~0x1000)
+        let scan_size = 0x4000; // 16KB
+        let buffer = self.reader.read_bytes(song_list_addr, scan_size).ok()?;
+
+        if buffer.len() < 8 {
+            return None;
+        }
+
+        // Verify first entry has valid song_id and folder at offset 0
+        let first_id = i32::from_le_bytes(buffer[0..4].try_into().ok()?);
+        let first_folder = i32::from_le_bytes(buffer[4..8].try_into().ok()?);
+
+        if !(MIN_SONG_ID..=MAX_SONG_ID).contains(&first_id) || !(1..=200).contains(&first_folder) {
+            return None;
+        }
+
+        // Scan for next valid [song_id, folder] pair at 16-byte aligned offsets.
+        // Start from 0x200 (minimum reasonable entry size) to skip current entry's data.
+        for offset in (0x200..scan_size.saturating_sub(8)).step_by(0x10) {
+            let sid = i32::from_le_bytes(buffer[offset..offset + 4].try_into().ok()?);
+            let fld = i32::from_le_bytes(buffer[offset + 4..offset + 8].try_into().ok()?);
+
+            if !(MIN_SONG_ID..=MAX_SONG_ID).contains(&sid) || !(1..=200).contains(&fld) {
+                continue;
+            }
+
+            let stride = offset;
+
+            // Validate: check several more entries at this stride
+            let mut valid_count = 2; // first entry + this match
+            for i in 2..20 {
+                let check_off = stride * i;
+                if check_off + 8 > buffer.len() {
+                    break;
+                }
+                let check_id =
+                    i32::from_le_bytes(buffer[check_off..check_off + 4].try_into().ok()?);
+                let check_fld =
+                    i32::from_le_bytes(buffer[check_off + 4..check_off + 8].try_into().ok()?);
+
+                if (MIN_SONG_ID..=MAX_SONG_ID).contains(&check_id) && (1..=200).contains(&check_fld)
+                {
+                    valid_count += 1;
+                }
+            }
+
+            if valid_count >= 3 {
+                info!(
+                    "  Detected song entry stride: 0x{:X} ({} bytes), verified with {} entries",
+                    stride, stride, valid_count
+                );
+                return Some(stride);
+            }
+        }
+
+        None
     }
 }

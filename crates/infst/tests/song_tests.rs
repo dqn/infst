@@ -71,34 +71,31 @@ mod song_info_read {
     fn create_song_entry_buffer(
         title: &str,
         song_id: u32,
-        folder: u8,
+        folder: i32,
         levels: [u8; 10],
-        bpm_max: i32,
-        bpm_min: i32,
+        _bpm_max: i32,
+        _bpm_min: i32,
     ) -> Vec<u8> {
         let mut buffer = vec![0u8; SongInfo::MEMORY_SIZE];
 
-        // Write title at offset 0 (Shift-JIS encoded)
-        // For test simplicity, write ASCII which is compatible with Shift-JIS
+        // Song ID at offset 0
+        buffer[0..4].copy_from_slice(&(song_id as i32).to_le_bytes());
+
+        // Folder at offset 4 (i32)
+        buffer[4..8].copy_from_slice(&folder.to_le_bytes());
+
+        // Title at offset 0x180 (Shift-JIS encoded)
         let title_bytes = title.as_bytes();
         let copy_len = title_bytes.len().min(63);
-        buffer[..copy_len].copy_from_slice(&title_bytes[..copy_len]);
+        buffer[0x180..0x180 + copy_len].copy_from_slice(&title_bytes[..copy_len]);
 
-        // Folder at offset 472
-        buffer[472] = folder;
+        // Levels at offset 0x360 (10 bytes)
+        buffer[0x360..0x36A].copy_from_slice(&levels);
 
-        // Levels at offset 480 (10 bytes)
-        buffer[480..490].copy_from_slice(&levels);
+        // BPM is not stored in version 2016051600+ structure
 
-        // BPM at offset 512 (8 bytes: max, min)
-        buffer[512..516].copy_from_slice(&bpm_max.to_le_bytes());
-        buffer[516..520].copy_from_slice(&bpm_min.to_le_bytes());
-
-        // Notes at offset 624 (40 bytes: 10 x i32)
+        // Notes at offset 0x378 (10 x u32, 8-byte stride)
         // Skip for now, leave as zeros
-
-        // Song ID at offset 816
-        buffer[816..820].copy_from_slice(&(song_id as i32).to_le_bytes());
 
         buffer
     }
@@ -123,43 +120,6 @@ mod song_info_read {
         assert_eq!(&*song.title, "Test Song");
         assert_eq!(song.folder, 5);
         assert_eq!(song.levels, [0, 3, 6, 9, 12, 0, 3, 6, 9, 12]);
-        assert_eq!(&*song.bpm, "130~150");
-    }
-
-    #[test]
-    fn test_read_song_with_same_bpm() {
-        let buffer = create_song_entry_buffer(
-            "Single BPM",
-            5678,
-            10,
-            [0, 5, 8, 10, 12, 0, 5, 8, 10, 12],
-            180,
-            0, // min = 0 means single BPM
-        );
-
-        let reader = MockMemoryReader::new(buffer);
-        let result = SongInfo::read_from_memory(&reader, 0x1000).unwrap();
-
-        let song = result.unwrap();
-        assert_eq!(&*song.bpm, "180");
-    }
-
-    #[test]
-    fn test_read_song_with_matching_bpm() {
-        let buffer = create_song_entry_buffer(
-            "Same BPM",
-            9999,
-            15,
-            [0, 4, 7, 10, 12, 0, 4, 7, 10, 12],
-            160,
-            160, // min == max means single BPM
-        );
-
-        let reader = MockMemoryReader::new(buffer);
-        let result = SongInfo::read_from_memory(&reader, 0x1000).unwrap();
-
-        let song = result.unwrap();
-        assert_eq!(&*song.bpm, "160");
     }
 
     #[test]
@@ -206,16 +166,16 @@ mod fetch_song_by_id_tests {
     fn create_song_entry(song_id: u32, title: &str) -> Vec<u8> {
         let mut buffer = vec![0u8; SongInfo::MEMORY_SIZE];
 
-        // Title at offset 0
+        // Song ID at offset 0
+        buffer[0..4].copy_from_slice(&(song_id as i32).to_le_bytes());
+
+        // Folder at offset 4 (i32)
+        buffer[4..8].copy_from_slice(&1i32.to_le_bytes());
+
+        // Title at offset 0x180
         let title_bytes = title.as_bytes();
         let copy_len = title_bytes.len().min(63);
-        buffer[..copy_len].copy_from_slice(&title_bytes[..copy_len]);
-
-        // Folder at 472
-        buffer[472] = 1;
-
-        // Song ID at offset 816
-        buffer[816..820].copy_from_slice(&(song_id as i32).to_le_bytes());
+        buffer[0x180..0x180 + copy_len].copy_from_slice(&title_bytes[..copy_len]);
 
         buffer
     }
@@ -234,7 +194,7 @@ mod fetch_song_by_id_tests {
         let base = 0x1000;
 
         // Fetch middle song
-        let result = fetch_song_by_id(&reader, base, 1002, entry_size * 5);
+        let result = fetch_song_by_id(&reader, base, 1002, entry_size * 5, SongInfo::MEMORY_SIZE);
         assert!(result.is_some());
         let song = result.unwrap();
         assert_eq!(song.id, 1002);
@@ -250,7 +210,7 @@ mod fetch_song_by_id_tests {
         buffer.extend(create_song_entry(1002, "Second Song"));
 
         let reader = MockMemoryReader::new(buffer);
-        let result = fetch_song_by_id(&reader, 0x1000, 1001, entry_size * 3);
+        let result = fetch_song_by_id(&reader, 0x1000, 1001, entry_size * 3, SongInfo::MEMORY_SIZE);
 
         assert!(result.is_some());
         assert_eq!(result.unwrap().id, 1001);
@@ -264,7 +224,7 @@ mod fetch_song_by_id_tests {
         buffer.extend(create_song_entry(1001, "Only Song"));
 
         let reader = MockMemoryReader::new(buffer);
-        let result = fetch_song_by_id(&reader, 0x1000, 9999, entry_size * 2);
+        let result = fetch_song_by_id(&reader, 0x1000, 9999, entry_size * 2, SongInfo::MEMORY_SIZE);
 
         assert!(result.is_none());
     }
@@ -272,7 +232,7 @@ mod fetch_song_by_id_tests {
     #[test]
     fn test_fetch_with_zero_address() {
         let reader = MockMemoryReader::new(vec![0u8; 100]);
-        let result = fetch_song_by_id(&reader, 0, 1001, 1000);
+        let result = fetch_song_by_id(&reader, 0, 1001, 1000, SongInfo::MEMORY_SIZE);
 
         assert!(result.is_none());
     }
@@ -285,16 +245,16 @@ mod fetch_song_database_tests {
     fn create_song_entry(song_id: u32, title: &str) -> Vec<u8> {
         let mut buffer = vec![0u8; SongInfo::MEMORY_SIZE];
 
-        // Title at offset 0
+        // Song ID at offset 0
+        buffer[0..4].copy_from_slice(&(song_id as i32).to_le_bytes());
+
+        // Folder at offset 4 (i32)
+        buffer[4..8].copy_from_slice(&1i32.to_le_bytes());
+
+        // Title at offset 0x180
         let title_bytes = title.as_bytes();
         let copy_len = title_bytes.len().min(63);
-        buffer[..copy_len].copy_from_slice(&title_bytes[..copy_len]);
-
-        // Folder at 472
-        buffer[472] = 1;
-
-        // Song ID at offset 816
-        buffer[816..820].copy_from_slice(&(song_id as i32).to_le_bytes());
+        buffer[0x180..0x180 + copy_len].copy_from_slice(&title_bytes[..copy_len]);
 
         buffer
     }
@@ -309,7 +269,12 @@ mod fetch_song_database_tests {
         buffer.extend(create_song_entry(1003, "Song C"));
 
         let reader = MockMemoryReader::new(buffer);
-        let result = fetch_song_database_from_memory_scan(&reader, 0x1000, entry_size * 4);
+        let result = fetch_song_database_from_memory_scan(
+            &reader,
+            0x1000,
+            entry_size * 4,
+            SongInfo::MEMORY_SIZE,
+        );
 
         assert_eq!(result.len(), 3);
         assert!(result.contains_key(&1001));
@@ -332,7 +297,12 @@ mod fetch_song_database_tests {
         buffer.extend(create_song_entry(2000, "Another Valid"));
 
         let reader = MockMemoryReader::new(buffer);
-        let result = fetch_song_database_from_memory_scan(&reader, 0x1000, entry_size * 4);
+        let result = fetch_song_database_from_memory_scan(
+            &reader,
+            0x1000,
+            entry_size * 4,
+            SongInfo::MEMORY_SIZE,
+        );
 
         assert_eq!(result.len(), 2);
         assert!(result.contains_key(&1001));
@@ -350,7 +320,12 @@ mod fetch_song_database_tests {
         buffer.extend(create_song_entry(1002, "Second"));
 
         let reader = MockMemoryReader::new(buffer);
-        let result = fetch_song_database_from_memory_scan(&reader, 0x1000, entry_size * 4);
+        let result = fetch_song_database_from_memory_scan(
+            &reader,
+            0x1000,
+            entry_size * 4,
+            SongInfo::MEMORY_SIZE,
+        );
 
         assert_eq!(result.len(), 2);
         // Should keep the first occurrence
@@ -360,8 +335,12 @@ mod fetch_song_database_tests {
     #[test]
     fn test_scan_empty_buffer() {
         let reader = MockMemoryReader::new(vec![0u8; SongInfo::MEMORY_SIZE * 2]);
-        let result =
-            fetch_song_database_from_memory_scan(&reader, 0x1000, SongInfo::MEMORY_SIZE * 3);
+        let result = fetch_song_database_from_memory_scan(
+            &reader,
+            0x1000,
+            SongInfo::MEMORY_SIZE * 3,
+            SongInfo::MEMORY_SIZE,
+        );
 
         assert!(result.is_empty());
     }
@@ -376,7 +355,12 @@ mod fetch_song_database_tests {
         buffer.extend(create_song_entry(1003, "Song C"));
 
         let reader = MockMemoryReader::new(buffer);
-        let result = fetch_song_database_from_memory_scan(&reader, 0x1000, entry_size * 4);
+        let result = fetch_song_database_from_memory_scan(
+            &reader,
+            0x1000,
+            entry_size * 4,
+            SongInfo::MEMORY_SIZE,
+        );
 
         assert_eq!(result.len(), 2);
         assert!(result.contains_key(&1001));
@@ -406,7 +390,7 @@ mod song_info_defaults {
     #[test]
     fn test_memory_size_constant() {
         // Ensure the constant matches expected value
-        assert_eq!(SongInfo::MEMORY_SIZE, 0x4B0);
-        assert_eq!(SongInfo::MEMORY_SIZE, 1200);
+        assert_eq!(SongInfo::MEMORY_SIZE, 0x630);
+        assert_eq!(SongInfo::MEMORY_SIZE, 1584);
     }
 }

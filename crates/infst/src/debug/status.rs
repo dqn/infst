@@ -88,7 +88,12 @@ impl StatusInfo {
         };
 
         // Count songs
-        let song_count = count_songs_at_address(reader, offsets.song_list);
+        let stride = if offsets.song_entry_size > 0 {
+            offsets.song_entry_size
+        } else {
+            crate::chart::SongInfo::MEMORY_SIZE
+        };
+        let song_count = count_songs_at_address(reader, offsets.song_list, stride);
 
         // Get current song info
         let current_song = get_current_song_info(reader, offsets.current_song, offsets.song_list);
@@ -438,7 +443,7 @@ fn validate_unlock_data<R: ReadMemory>(reader: &R, addr: u64) -> OffsetValidatio
     }
 }
 
-fn count_songs_at_address<R: ReadMemory>(reader: &R, addr: u64) -> usize {
+fn count_songs_at_address<R: ReadMemory>(reader: &R, addr: u64, entry_stride: usize) -> usize {
     if addr == 0 {
         return 0;
     }
@@ -459,7 +464,7 @@ fn count_songs_at_address<R: ReadMemory>(reader: &R, addr: u64) -> usize {
                 consecutive_failures += 1;
             }
         }
-        current_addr += SongInfo::MEMORY_SIZE as u64;
+        current_addr += entry_stride as u64;
     }
 
     count

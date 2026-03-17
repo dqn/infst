@@ -9,11 +9,18 @@ use super::super::constants::MIN_EXPECTED_SONGS;
 
 /// Count how many songs can be read from a given song list address.
 ///
+/// `entry_stride` is the distance (in bytes) between consecutive entries.
+/// This is auto-detected during offset search and may differ from `SongInfo::MEMORY_SIZE`.
+///
 /// This function counts songs until:
 /// - MIN_EXPECTED_SONGS (1000) is reached (early termination for performance)
 /// - MAX_SONGS_TO_CHECK (5000) is reached
 /// - Too many consecutive failures occur
-pub fn count_songs_at_address<R: ReadMemory>(reader: &R, song_list_addr: u64) -> usize {
+pub fn count_songs_at_address<R: ReadMemory>(
+    reader: &R,
+    song_list_addr: u64,
+    entry_stride: usize,
+) -> usize {
     let mut count = 0;
     let mut consecutive_failures = 0;
     let mut current_position: u64 = 0;
@@ -34,19 +41,10 @@ pub fn count_songs_at_address<R: ReadMemory>(reader: &R, song_list_addr: u64) ->
 
         match SongInfo::read_from_memory(reader, address) {
             Ok(Some(song)) if !song.title.is_empty() => {
-                if count < 3
-                    && let Ok(full_buffer) = reader.read_bytes(address, SongInfo::MEMORY_SIZE)
-                {
-                    let id_offset = 256 + 368; // SONG_ID_OFFSET
+                if count < 3 {
                     debug!(
                         "    Song {}: id={}, title={:?} at 0x{:X}",
                         count, song.id, song.title, address
-                    );
-                    debug!("      First 32 bytes: {:02X?}", &full_buffer[0..32]);
-                    debug!(
-                        "      Bytes at id_offset ({}): {:02X?}",
-                        id_offset,
-                        &full_buffer[id_offset..id_offset + 8]
                     );
                 }
                 count += 1;
@@ -87,7 +85,7 @@ pub fn count_songs_at_address<R: ReadMemory>(reader: &R, song_list_addr: u64) ->
             }
         }
 
-        current_position += SongInfo::MEMORY_SIZE as u64;
+        current_position += entry_stride as u64;
     }
 
     count
