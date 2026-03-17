@@ -617,13 +617,37 @@ impl Infst {
         })
     }
 
-    /// Create chart info from song database, dynamically loading from memory if not found
+    /// Create chart info from song database, dynamically loading from memory if not found.
+    ///
+    /// In V3, game_id (from CurrentSong/PlayData) may differ from internal_id
+    /// (in the entry table). This method first tries to resolve the correct
+    /// internal_id via the IIDX pointer structure before falling back to
+    /// direct song_db lookup.
     fn create_chart_info_dynamic(
         &mut self,
         reader: &MemoryReader,
         song_id: u32,
         difficulty: Difficulty,
     ) -> ChartInfo {
+        // Try IIDX pointer resolution: maps game_id -> correct internal_id
+        if let Some(internal_id) = self
+            .offsets
+            .resolve_current_song_internal_id(reader, song_id)
+            && internal_id != song_id
+            && let Some(song) = self.game_data.song_db.get(&internal_id)
+        {
+            info!(
+                "IIDX resolved game_id={} -> internal_id={} {:?}",
+                song_id, internal_id, song.title
+            );
+            let chart = ChartInfo::from_song_info(song, difficulty, true);
+            // Cache: insert under game_id so future lookups are instant
+            let mut aliased = song.clone();
+            aliased.id = song_id;
+            self.game_data.song_db.insert(song_id, aliased);
+            return chart;
+        }
+
         // First check if song is already in database
         if let Some(song) = self.game_data.song_db.get(&song_id) {
             return ChartInfo::from_song_info(song, difficulty, true);

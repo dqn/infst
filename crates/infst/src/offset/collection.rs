@@ -1,4 +1,7 @@
 use serde::{Deserialize, Serialize};
+use tracing::debug;
+
+use crate::process::ReadMemory;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct OffsetsCollection {
@@ -19,6 +22,11 @@ pub struct OffsetsCollection {
     /// 0 means not detected (callers should fall back to SongInfo::MEMORY_SIZE).
     #[serde(default)]
     pub song_entry_size: usize,
+    /// Address of the "IIDX" header in memory (V3+).
+    /// Used to resolve game_id -> internal_id via the current song pointer structure.
+    /// The pointer at iidx_header - 0x40 points to the current song's entry title field.
+    #[serde(default)]
+    pub iidx_header: u64,
 }
 
 impl OffsetsCollection {
@@ -57,4 +65,118 @@ impl OffsetsCollection {
             crate::chart::SongInfo::MEMORY_SIZE
         }
     }
+
+    /// Resolve the current song's internal_id via the IIDX pointer structure.
+    ///
+    /// The structure before the IIDX header contains a pointer to the current song's
+    /// entry in the entry table (title field at +0x180). By dereferencing and reading
+    /// offset 0, we get the true internal_id regardless of the game_id used elsewhere.
+    ///
+    /// Returns Some(internal_id) if the pointer is valid and points into the entry table.
+    /// The caller should verify that the returned internal_id is different from the game_id.
+    pub fn resolve_current_song_internal_id<R: ReadMemory>(
+        &self,
+        reader: &R,
+        expected_game_id: u32,
+    ) -> Option<u32> {
+        if self.iidx_header == 0 || self.song_entry_table == 0 {
+            return None;
+        }
+
+        // The current song pointer is at iidx_header - 0x40 (u64)
+        // The game_id verification is at iidx_header - 0x34 (i32)
+        let ptr_addr = self.iidx_header - 0x40;
+        let gid_addr = self.iidx_header - 0x34;
+
+        // Verify the game_id matches what we expect
+        let gid = reader.read_i32(gid_addr).ok()?;
+        if gid as u32 != expected_game_id {
+            debug!(
+                "IIDX game_id mismatch: expected {}, got {}",
+                expected_game_id, gid
+            );
+            return None;
+        }
+
+        // Read the pointer to the entry's title field
+        let title_ptr = reader.read_u64(ptr_addr).ok()?;
+        if title_ptr == 0 {
+            return None;
+        }
+
+        // Entry start = title_ptr - 0x180 (title is at offset 0x180 in the entry)
+        let entry_start = title_ptr.checked_sub(0x180)?;
+
+        // Validate: entry_start should be within the entry table range
+        let table_start = self.song_entry_table;
+        let stride = self.entry_stride() as u64;
+        let table_end = table_start + 1810 * stride; // conservative upper bound
+        if entry_start < table_start || entry_start >= table_end {
+            debug!(
+                "IIDX pointer out of entry table range: 0x{:X} (table: 0x{:X}-0x{:X})",
+                entry_start, table_start, table_end
+            );
+            return None;
+        }
+
+        // Verify alignment to entry stride
+        let offset_from_start = entry_start - table_start;
+        if !offset_from_start.is_multiple_of(stride) {
+            debug!(
+                "IIDX pointer not aligned to stride: offset 0x{:X}, stride 0x{:X}",
+                offset_from_start, stride
+            );
+            return None;
+        }
+
+        // Read internal_id at entry start
+        let internal_id = reader.read_i32(entry_start).ok()?;
+        if (1000..=90000).contains(&internal_id) {
+            Some(internal_id as u32)
+        } else {
+            None
+        }
+    }
+}
+
+/// Search for the "IIDX" header in memory near the entry table.
+///
+/// The IIDX header is a structure containing the ASCII bytes "IIDX" followed by
+/// metadata including an entry count close to the total number of songs.
+/// It is located before the entry table in memory.
+pub fn find_iidx_header<R: ReadMemory>(reader: &R, entry_table_addr: u64) -> Option<u64> {
+    // Search 256KB before the entry table
+    let search_size: u64 = 0x40000;
+    let search_start = entry_table_addr.saturating_sub(search_size);
+    let buf_size = (entry_table_addr - search_start) as usize;
+
+    let buffer = reader.read_bytes(search_start, buf_size).ok()?;
+    let iidx_pattern = b"IIDX";
+
+    // Search backwards (IIDX is typically near the entry table)
+    for i in (0..buffer.len().saturating_sub(12)).rev() {
+        if &buffer[i..i + 4] == iidx_pattern {
+            let addr = search_start + i as u64;
+
+            // Validate: next 4 bytes should be a small value (entry size ~80)
+            let entry_size = u32::from_le_bytes(buffer[i + 4..i + 8].try_into().ok()?);
+            if entry_size > 256 {
+                continue;
+            }
+
+            // Next 4 bytes should be the count (~1800-2000 songs)
+            let count = u32::from_le_bytes(buffer[i + 8..i + 12].try_into().ok()?);
+            if !(1500..=3000).contains(&count) {
+                continue;
+            }
+
+            debug!(
+                "Found IIDX header at 0x{:X} (entry_size={}, count={})",
+                addr, entry_size, count
+            );
+            return Some(addr);
+        }
+    }
+
+    None
 }

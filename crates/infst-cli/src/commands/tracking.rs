@@ -325,6 +325,17 @@ fn run_tracking_session(
         return Ok(());
     }
 
+    // Search for IIDX header (V3: used to resolve game_id -> internal_id at runtime)
+    if infst.offsets().song_entry_table != 0
+        && let Some(iidx_addr) =
+            infst::offset::find_iidx_header(&reader, infst.offsets().song_entry_table)
+    {
+        let mut offsets = infst.offsets().clone();
+        offsets.iidx_header = iidx_addr;
+        infst.update_offsets(offsets);
+        info!("IIDX header found at 0x{:X}", iidx_addr);
+    }
+
     // Load game resources
     let song_db = match load_song_database(&reader, infst.offsets().song_db_address(), shutdown)? {
         Some(db) => db,
