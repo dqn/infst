@@ -13,6 +13,7 @@ pub mod hexdump;
 pub mod launch;
 pub mod login;
 pub mod offset;
+pub mod probe_entry;
 pub mod scan;
 pub mod search;
 pub mod status;

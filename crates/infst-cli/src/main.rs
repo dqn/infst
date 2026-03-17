@@ -85,6 +85,7 @@ fn main() -> Result<()> {
             endpoint,
             token,
         }) => commands::upload::run(&tracker, &mapping, endpoint.as_deref(), token.as_deref()),
+        Some(Command::ProbeEntry { song_id, pid }) => commands::probe_entry::run(song_id, pid),
         Some(Command::Launch { action }) => commands::launch::run(action),
         None => commands::tracking::run(
             args.offsets_file.as_deref(),

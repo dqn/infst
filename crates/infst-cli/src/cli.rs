@@ -209,6 +209,15 @@ pub enum Command {
         #[arg(long, env = "INFST_API_TOKEN")]
         token: Option<String>,
     },
+    /// Probe a song entry structure in memory (debug tool for version changes)
+    ProbeEntry {
+        /// Song ID to search for (e.g., 1001)
+        #[arg(long)]
+        song_id: i32,
+        /// Process ID (skip automatic detection)
+        #[arg(long)]
+        pid: Option<u32>,
+    },
     /// Manage INFINITAS launcher (URL handler + Special K)
     Launch {
         #[command(subcommand)]
