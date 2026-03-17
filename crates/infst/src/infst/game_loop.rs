@@ -628,9 +628,28 @@ impl Infst {
 
         let chart = self.create_chart_info_dynamic(reader, song_id, difficulty);
 
-        // Calculate grade
-        let grade = if chart.total_notes > 0 {
-            PlayData::calculate_grade(ex_score, chart.total_notes)
+        debug!(
+            "Chart: song_id={} diff={:?} total_notes={} all_notes={:?}",
+            chart.song_id,
+            chart.difficulty,
+            chart.total_notes,
+            self.game_data.song_db.get(&song_id).map(|s| s.total_notes),
+        );
+
+        // Calculate grade.
+        // V3: entry offset 0x378 contains BPM, not total_notes. When total_notes
+        // is clearly wrong (EX score exceeds theoretical max), fall back to
+        // actual judge note count which is correct for non-FAILED plays.
+        let judge_notes = judge.pgreat + judge.great + judge.good + judge.bad + judge.poor;
+        let effective_notes = if chart.total_notes > 0 && ex_score <= chart.total_notes * 2 {
+            chart.total_notes
+        } else if judge_notes > 0 {
+            judge_notes
+        } else {
+            0
+        };
+        let grade = if effective_notes > 0 {
+            PlayData::calculate_grade(ex_score, effective_notes)
         } else {
             Grade::NoPlay
         };
