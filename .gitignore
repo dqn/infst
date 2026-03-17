@@ -11,6 +11,7 @@ sessions/
 tracker.tsv
 .infst-cache.json
 .infst-sync-cache.json
+data/
 
 # Wrangler local state
 web/.wrangler/

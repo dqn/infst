@@ -69,6 +69,13 @@ infst search --pattern "00 04 07 0A"     # バイトパターン検索（?? で�
 infst scan --entry-size 1200
 ```
 
+### エントリ構造調査
+
+```bash
+# 楽曲エントリの自動解析（song_id 指定、stride 自動検出、フィールド annotated dump）
+infst probe-entry --song-id 1001
+```
+
 ### ユーティリティ
 
 ```bash
@@ -235,8 +242,10 @@ API はべき等のため、何度実行しても安全。
 
 オフセット検索は**相対オフセット検索**を主軸としている：
 
-1. **SongList**: パターン検索（`"5.1.1."` バージョン文字列）でアンカーを取得
-   - 期待位置 `base + 0x3180000` から検索開始（高速化のため）
+1. **SongList**: 2段階フォールバック
+   - 第1段階: `"5.1.1."` パターン検索 + song count バリデーション
+   - 第2段階（フォールバック）: `[song_id=1001, folder=43]` パターン検索
+   - 検出後: **entry stride 自動検出**（次の有効エントリまでの距離を動的計算）
 2. **JudgeData**: SongList からの相対オフセット（-0x94E3C8）で検索
    - **Cross-validation**: 推論された CurrentSong 位置も検証
 3. **PlaySettings**: JudgeData からの相対オフセット（-0x2ACFA8）で検索
@@ -244,6 +253,19 @@ API はべき等のため、何度実行しても安全。
 4. **PlayData**: PlaySettings からの相対オフセット（+0x2A0）で検索
 5. **CurrentSong**: JudgeData からの相対オフセット（+0x1E4）で検索
 6. **DataMap/UnlockData**: パターン検索
+
+### Entry Stride 自動検出
+
+`OffsetsCollection.song_entry_size` に検出結果を保存。`detect_entry_stride()` のアルゴリズム:
+
+1. SongList 先頭から 16KB 読み取り
+2. 先頭エントリの `[song_id, folder]` を検証
+3. 0x200 以降、16バイト境界で次の有効な `[song_id(1000-50000), folder(1-200)]` ペアを走査
+4. 候補 stride で 3 件以上のエントリが存在すれば確定
+5. 検出失敗時は `SongInfo::MEMORY_SIZE` にフォールバック
+
+これにより、エントリサイズが変わっても SongList の検出とイテレーションは自動的に動作する。
+フィールドオフセット（title, levels 等）の変更は手動更新が必要。
 
 ### シグネチャ検索の無効化
 
@@ -259,16 +281,16 @@ API はべき等のため、何度実行しても安全。
 
 ### 相対オフセットの定数値
 
-バージョン間での相対オフセット差分（Version 1 → Version 2）：
+バージョン間での相対オフセット差分（Version 1 → Version 2 → Version 3）：
 
-| 関係 | Version 1 | Version 2 | 定数値 | 検索範囲 |
-|------|-----------|-----------|--------|---------|
-| SongList - JudgeData | 0x94E374 | 0x94E4B4 | 0x94E3C8 | ±64KB |
-| JudgeData - PlaySettings | 0x2ACEE8 | 0x2ACFA8 | **0x2ACFA8** | ±512B |
-| PlayData - PlaySettings | 0x2C0 | 0x2A0 | **0x2A0** | ±256B |
-| CurrentSong - JudgeData | 0x1E4 | 0x1E4 | 0x1E4 | ±256B |
+| 関係 | Version 1 | Version 2 | Version 3 | 定数値 | 検索範囲 |
+|------|-----------|-----------|-----------|--------|---------|
+| SongList - JudgeData | 0x94E374 | 0x94E4B4 | 0x94E684 | **0x94E684** | ±64KB |
+| JudgeData - PlaySettings | 0x2ACEE8 | 0x2ACFA8 | 0x2AD058 | **0x2AD058** | ±512B |
+| PlayData - PlaySettings | 0x2C0 | 0x2A0 | 0x2D0 | **0x2D0** | ±256B |
+| CurrentSong - JudgeData | 0x1E4 | 0x1E4 | 0x1E4 | 0x1E4 | ±256B |
 
-**注意**: 定数値は Version 2 に合わせて更新済み。検索範囲を狭めることで誤検出を防止。
+**注意**: 定数値は Version 3 に合わせて更新済み。検索範囲を狭めることで誤検出を防止。
 
 ### バリデーション戦略
 
@@ -280,12 +302,44 @@ API はべき等のため、何度実行しても安全。
 4. **CurrentSong**: song_id が有効範囲内 + 2のべき乗を除外（all zeros は拒否）
 5. **Cross-validation**: 関連オフセット同士の整合性を検証
 
+### SongEntry 構造体のバージョン履歴
+
+| Version | Entry Size | song_id Offset | title Offset | Layout |
+|---------|-----------|----------------|-------------|--------|
+| 1 (2025122400) | 0x3F0 (1008) | 0x270 | 0x000 | title-first |
+| 2 (2026012800) | 0x4B0 (1200) | 0x330 | 0x000 | title-first (3 fields added) |
+| 3 (2016051600) | 0x630 (1584) | 0x000 | 0x180 | song_id-first, score embedded |
+
+Version 3 のフィールドレイアウト:
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0x000 | 4 | song_id (i32) |
+| 0x004 | 4 | folder (i32) |
+| 0x008 | 22 | identifier (ASCII + 0xFF88 marker) |
+| 0x180 | 64 | title (Shift-JIS) |
+| 0x1C0 | 64 | unknown |
+| 0x200 | 64 | title_english (Shift-JIS) |
+| 0x240 | 64 | genre (Shift-JIS) |
+| 0x280 | 64 | unknown |
+| 0x2C0 | 64 | artist (Shift-JIS) |
+| 0x360 | 10 | levels (SPB,SPN,SPH,SPA,SPL,DPB,DPN,DPH,DPA,DPL) |
+| 0x378 | 80 | total_notes (10 x u32, 8-byte stride) |
+| 0x3F0 | 40 | ex_scores (10 x u32, embedded) |
+| 0x430 | - | clear_lamps, DJ points, etc. |
+
+**注意**: BPM はこの構造体に含まれない。0x020-0x17F は全て zeros。
+
 ### 新バージョン対応時
 
-1. `cargo run --features debug-tools -- status` でオフセット検出状態を確認
-2. 検出されたオフセットと `.agent/offsets-*.txt` の期待値を比較
-3. 差分が検索範囲を超える場合は `constants.rs` の定数を更新
-4. バリデーションが誤検出を起こす場合は検索範囲を狭める
+1. `cargo run --features debug-tools -- probe-entry --song-id 1001` でエントリ構造を自動解析
+   - entry stride の変化を自動検出
+   - フィールドの位置ずれを annotated dump で確認
+2. `cargo run --features debug-tools -- status` でオフセット検出状態を確認
+3. 検出されたオフセットと `.agent/offsets-*.txt` の期待値を比較
+4. フィールドオフセットが変わった場合は `chart/song.rs` の定数を更新
+5. 相対オフセット差分が検索範囲を超える場合は `constants.rs` の定数を更新
+6. バリデーションが誤検出を起こす場合は検索範囲を狭める
 
 ### 過去の教訓
 
@@ -293,3 +347,6 @@ API はべき等のため、何度実行しても安全。
 - **Cross-validation が重要**: 単体のバリデーションは弱いため、関連オフセット同士の整合性をチェック
 - **all zeros の許容は危険**: 間違ったアドレスでも zeros が入っている可能性があるため、オフセット検索時は拒否する
 - **定数値はバージョンごとに検証**: 新バージョン対応時は必ず実際の値と比較して更新
+- **エントリサイズはハードコードしない**: `detect_entry_stride()` で自動検出し、`OffsetsCollection.song_entry_size` に保存する。イテレーション stride はこの値を使う
+- **構造体レイアウトは大幅に変わり得る**: Version 3 で song_id が末尾(0x270)から先頭(0x000)に移動し、score data がエントリ内に統合された。`"5.1.1."` パターンも SongList から離れた位置に移動し、フォールバック検索(`[song_id=1001, folder]` パターン)が必須になった
+- **`probe-entry` を最初に使う**: 新バージョン調査時は `infst probe-entry --song-id 1001` で構造を把握してから修正に着手する
