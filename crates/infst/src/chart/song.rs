@@ -839,6 +839,128 @@ pub fn fetch_song_database_from_memory_scan<R: ReadMemory>(
     result
 }
 
+/// EX score offset within each entry (10 x u32, 4 bytes each)
+const ENTRY_EX_SCORE_OFFSET: u64 = 0x3F0;
+const ENTRY_EX_SCORE_COUNT: usize = 10;
+
+/// Build game_id -> internal_id mapping by comparing EX scores.
+///
+/// In V3, the DataMap (score system) uses game_ids while the entry table
+/// uses internal_ids. These often differ (e.g., game_id=32001 for ADAMANT
+/// but internal_id=32000). By matching EX scores between the two sources,
+/// we detect mismatches and build a correction mapping.
+///
+/// Returns: HashMap<game_id, internal_id> for ALL mismatched IDs.
+pub fn build_game_id_index<R: ReadMemory>(
+    reader: &R,
+    entry_table_addr: u64,
+    entry_stride: usize,
+    score_map: &crate::score::ScoreMap,
+    song_db: &HashMap<u32, SongInfo>,
+) -> HashMap<u32, u32> {
+    // Read all entry table EX scores: internal_id -> [10 x u32]
+    let mut entry_scores: HashMap<u32, [u32; ENTRY_EX_SCORE_COUNT]> = HashMap::new();
+    for i in 0..5000u64 {
+        let addr = entry_table_addr + i * entry_stride as u64;
+        let id = match reader.read_i32(addr) {
+            Ok(id) if (1000..=90000).contains(&id) => id as u32,
+            Ok(0) => continue,
+            _ => break,
+        };
+
+        if let Ok(bytes) = reader.read_bytes(addr + ENTRY_EX_SCORE_OFFSET, 40) {
+            let mut scores = [0u32; ENTRY_EX_SCORE_COUNT];
+            for (j, score) in scores.iter_mut().enumerate() {
+                *score = u32::from_le_bytes(bytes[j * 4..j * 4 + 4].try_into().unwrap());
+            }
+            if scores.iter().any(|&s| s > 0) {
+                entry_scores.insert(id, scores);
+            }
+        }
+    }
+
+    if entry_scores.is_empty() {
+        return HashMap::new();
+    }
+
+    // For EVERY game_id with non-zero scores, find the matching internal_id.
+    // A game_id may already exist in song_db (pointing to the WRONG song).
+    let mut mapping = HashMap::new();
+    let mut checked = 0u32;
+
+    for (&game_id, score_data) in score_map.iter() {
+        // Skip songs with no scores (can't match)
+        if score_data.score.iter().all(|&s| s == 0) {
+            continue;
+        }
+
+        // Find the entry table entry where all non-zero ScoreMap scores match.
+        // The entry table may have MORE non-zero scores (for difficulties not in DataMap).
+        let game_nonzero: Vec<(usize, u32)> = score_data
+            .score
+            .iter()
+            .enumerate()
+            .filter(|&(_, &s)| s > 0)
+            .map(|(i, &s)| (i, s))
+            .collect();
+
+        let matched_iid = entry_scores
+            .iter()
+            .find(|(_, ex)| game_nonzero.iter().all(|&(idx, score)| ex[idx] == score))
+            .map(|(&iid, _)| iid);
+
+        if let Some(iid) = matched_iid
+            && iid != game_id
+        {
+            // Mismatch detected: game uses game_id but entry table has internal_id
+            if let Some(song) = song_db.get(&iid) {
+                debug!(
+                    "game_id={} -> internal_id={} {:?}",
+                    game_id, iid, song.title
+                );
+            }
+            mapping.insert(game_id, iid);
+        }
+        checked += 1;
+    }
+
+    if !mapping.is_empty() {
+        info!(
+            "Game ID mapping: {} mismatches found (checked {} game_ids with scores)",
+            mapping.len(),
+            checked
+        );
+    }
+    mapping
+}
+
+/// Apply game_id -> internal_id mapping to the song database.
+///
+/// For each mapping entry, clones the SongInfo from the internal_id key
+/// and inserts/overwrites it under the game_id key (with the id field updated).
+/// This fixes cases where game_id X pointed to the wrong song because
+/// another song happened to have internal_id X.
+pub fn apply_game_id_mapping(song_db: &mut HashMap<u32, SongInfo>, mapping: &HashMap<u32, u32>) {
+    for (&game_id, &internal_id) in mapping {
+        if let Some(song) = song_db.get(&internal_id).cloned() {
+            let mut aliased = song;
+            aliased.id = game_id;
+            debug!(
+                "song_db[{}] = {:?} (was internal_id={})",
+                game_id, aliased.title, internal_id
+            );
+            song_db.insert(game_id, aliased);
+        }
+    }
+
+    if !mapping.is_empty() {
+        info!(
+            "Applied {} game_id corrections to song database",
+            mapping.len()
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

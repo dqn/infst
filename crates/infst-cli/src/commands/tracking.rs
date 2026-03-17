@@ -332,10 +332,22 @@ fn run_tracking_session(
     };
 
     debug!("Loaded {} songs", song_db.len());
-    infst.set_song_db(song_db.clone());
 
-    // Load score map
+    // Load score map (collects game_ids from DataMap)
     let score_map = load_score_map(&reader, infst.offsets().data_map, &song_db);
+
+    // Build game_id -> internal_id mapping (V3: IDs may differ)
+    let game_id_map = infst::chart::build_game_id_index(
+        &reader,
+        infst.offsets().song_db_address(),
+        infst.offsets().entry_stride(),
+        &score_map,
+        &song_db,
+    );
+    let mut song_db = song_db;
+    infst::chart::apply_game_id_mapping(&mut song_db, &game_id_map);
+
+    infst.set_song_db(song_db);
     infst.set_score_map(score_map);
 
     // Load unlock state
