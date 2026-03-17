@@ -44,6 +44,14 @@ pub struct RawSettings {
     pub h_ran: i32,
 }
 
+/// Convert a raw i32 value to an enum type, logging a warning and returning the default on failure.
+fn convert_enum_field<T: TryFrom<i32> + Default>(value: i32, field_name: &str) -> T {
+    value.try_into().unwrap_or_else(|_| {
+        warn!("Invalid {} value: {}, using default", field_name, value);
+        T::default()
+    })
+}
+
 impl Settings {
     /// P2 settings offset (4 * 15 = 60 bytes)
     pub const P2_OFFSET: u64 = 60;
@@ -54,29 +62,16 @@ impl Settings {
     /// Invalid enum values are replaced with defaults and logged as warnings.
     /// This can occur when memory contains unexpected values during state transitions.
     pub fn from_raw(raw: RawSettings) -> Self {
-        let style = raw.style.try_into().unwrap_or_else(|_| {
-            warn!("Invalid style value: {}, using default", raw.style);
-            Style::default()
-        });
+        let style = convert_enum_field(raw.style, "style");
 
         let style2 = if raw.play_type == PlayType::Dp {
-            Some(raw.style2.try_into().unwrap_or_else(|_| {
-                warn!("Invalid style2 value: {}, using default", raw.style2);
-                Style::default()
-            }))
+            Some(convert_enum_field(raw.style2, "style2"))
         } else {
             None
         };
 
-        let assist = raw.assist.try_into().unwrap_or_else(|_| {
-            warn!("Invalid assist value: {}, using default", raw.assist);
-            AssistType::default()
-        });
-
-        let range = raw.range.try_into().unwrap_or_else(|_| {
-            warn!("Invalid range value: {}, using default", raw.range);
-            RangeType::default()
-        });
+        let assist = convert_enum_field(raw.assist, "assist");
+        let range = convert_enum_field(raw.range, "range");
 
         Self {
             style,
