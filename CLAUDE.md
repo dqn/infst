@@ -324,11 +324,11 @@ Version 3 のフィールドレイアウト:
 | 0x280 | 64 | unknown |
 | 0x2C0 | 64 | artist (Shift-JIS) |
 | 0x360 | 10 | levels (SPB,SPN,SPH,SPA,SPL,DPB,DPN,DPH,DPA,DPL) |
-| 0x378 | 80 | total_notes (10 x u32, 8-byte stride) |
+| 0x378 | 80 | **BPM** (10 x u32, 8-byte stride; same value for all diffs) |
 | 0x3F0 | 40 | ex_scores (10 x u32, embedded) |
 | 0x430 | - | clear_lamps, DJ points, etc. |
 
-**注意**: BPM はこの構造体に含まれない。0x020-0x17F は全て zeros。
+**注意**: 0x378 は BPM であり、total_notes ではない（全難易度が同一値 = BPM）。per-difficulty の total_notes はエントリ内に存在しない。0x020-0x17F は全て zeros。
 
 ### 新バージョン対応時
 
@@ -350,3 +350,30 @@ Version 3 のフィールドレイアウト:
 - **エントリサイズはハードコードしない**: `detect_entry_stride()` で自動検出し、`OffsetsCollection.song_entry_size` に保存する。イテレーション stride はこの値を使う
 - **構造体レイアウトは大幅に変わり得る**: Version 3 で song_id が末尾(0x270)から先頭(0x000)に移動し、score data がエントリ内に統合された。`"5.1.1."` パターンも SongList から離れた位置に移動し、フォールバック検索(`[song_id=1001, folder]` パターン)が必須になった
 - **`probe-entry` を最初に使う**: 新バージョン調査時は `infst probe-entry --song-id 1001` で構造を把握してから修正に着手する
+- **フィールド解釈はゲーム動作で検証する**: メモリ構造調査で「このオフセットは X だ」と判断したら、ゲームの実際の表示（DJ LEVEL、ノーツ数等）と照合する。全難易度で同一値のフィールドは note count ではなく BPM の可能性が高い
+- **ScoreMap 変更後はパフォーマンス確認**: リンクリスト走査ロジック変更後は初期化時間を計測する。`visited` セット共有、走査範囲拡大がボトルネックになり得る
+
+### IIDX ポインタ構造体
+
+エントリテーブルの約 164KB 前に "IIDX" ASCII ヘッダがある。起動時に検索して `OffsetsCollection.iidx_header` に保存。
+
+| 相対位置 | サイズ | フィールド |
+|---------|--------|-----------|
+| iidx_header - 0x40 | 8 | 現在の曲のエントリへのポインタ (title フィールド = entry + 0x180 を指す) |
+| iidx_header - 0x34 | 4 | 現在の曲の game_id (i32) |
+| iidx_header - 0x14754 | 4 | 現在ロードされたチャートの total_notes (u32) |
+| iidx_header + 0x00 | 4 | "IIDX" ASCII |
+| iidx_header + 0x04 | 4 | entry size (80) |
+| iidx_header + 0x08 | 4 | song count (~1810) |
+
+用途:
+- **game_id → internal_id 解決**: ポインタをたどってエントリの offset 0 を読む
+- **正確な grade 計算**: chart_notes フィールドから total_notes を取得
+
+### V3 ゲーム状態検出
+
+V3 では `STATE_MARKER_1` (judge_data + 0xD8) がプレイ中に 1 にならないことがある。SongSelect のスティック・ロジックは `song_select_marker == 1` の間のみ有効にし、0 になったら ResultScreen への遷移を許可する。SongSelect → ResultScreen の直接遷移ではデータが stale なのでスキップする。
+
+### TSV フォーマット
+
+tracker.tsv は Column 0 = Song ID, Column 1 = Title。NOTE_COLS/RATING_COLS のインデックスはこれに合わせて調整済み。TSV フォーマット変更時は `load_song_database_from_tsv()` のカラム定数を更新すること。
