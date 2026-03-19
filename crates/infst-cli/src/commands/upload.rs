@@ -184,7 +184,7 @@ struct DifficultyColumns {
 }
 
 fn find_difficulty_columns(columns: &[&str]) -> Vec<(String, DifficultyColumns)> {
-    let difficulties = ["SPN", "SPH", "SPA", "SPL"];
+    let difficulties = ["SPN", "SPH", "SPA", "SPL", "DPN", "DPH", "DPA", "DPL"];
     let mut result = Vec::new();
 
     for diff in &difficulties {
