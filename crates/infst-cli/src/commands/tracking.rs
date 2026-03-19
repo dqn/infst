@@ -262,11 +262,12 @@ fn validate_or_search_offsets(
 fn load_song_database(
     reader: &MemoryReader,
     song_list: u64,
+    entry_stride: usize,
     shutdown: &ShutdownSignal,
 ) -> Result<Option<HashMap<u32, SongInfo>>> {
     let tsv_path = "tracker.tsv";
     // Scan enough entries to cover the full song database (~5000 entries max)
-    let scan_size = infst::SongInfo::MEMORY_SIZE * 5000;
+    let scan_size = entry_stride * 5000;
 
     if std::path::Path::new(tsv_path).exists() {
         debug!("Building song database from TSV + memory scan...");
@@ -287,7 +288,7 @@ fn load_song_database(
         reader,
         song_list,
         scan_size,
-        infst::SongInfo::MEMORY_SIZE,
+        entry_stride,
     );
 
     if song_db.is_empty() {
@@ -337,7 +338,12 @@ fn run_tracking_session(
     }
 
     // Load game resources
-    let song_db = match load_song_database(&reader, infst.offsets().song_db_address(), shutdown)? {
+    let song_db = match load_song_database(
+        &reader,
+        infst.offsets().song_db_address(),
+        infst.offsets().entry_stride(),
+        shutdown,
+    )? {
         Some(db) => db,
         None => return Ok(()), // Shutdown requested
     };
