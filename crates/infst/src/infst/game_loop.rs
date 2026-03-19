@@ -113,7 +113,7 @@ impl Infst {
             }
 
             // Detect game state
-            let current_state = self.detect_game_state(&reader)?;
+            let current_state = self.detect_game_state(&reader);
 
             if current_state != last_state {
                 debug!("State changed: {:?} -> {:?}", last_state, current_state);
@@ -139,7 +139,7 @@ impl Infst {
         Ok(())
     }
 
-    fn detect_game_state(&mut self, reader: &MemoryReader) -> Result<GameState> {
+    fn detect_game_state(&mut self, reader: &MemoryReader) -> GameState {
         let state_marker_1 = read_with_default(
             || reader.read_i32(self.offsets.judge_data + judge::STATE_MARKER_1),
             0,
@@ -173,9 +173,8 @@ impl Infst {
             self.last_markers = markers;
         }
 
-        Ok(self
-            .state_detector
-            .detect(state_marker_1, state_marker_2, song_select_marker))
+        self.state_detector
+            .detect(state_marker_1, state_marker_2, song_select_marker)
     }
 
     fn handle_state_change(
@@ -828,26 +827,34 @@ impl Infst {
             })
             .unwrap_or(false);
 
-        let effective_notes = if chart_notes > 0 {
-            chart_notes
+        // Track whether the notes source is authoritative (from game memory)
+        // so we only write back reliable values to song_db.
+        // judge_notes is NOT authoritative: partial plays (premature end) yield
+        // fewer notes than the chart actually has.
+        let (effective_notes, notes_from_chart_memory) = if chart_notes > 0 {
+            (chart_notes, true)
         } else if chart.total_notes > 0
             && !entry_notes_likely_bpm
             && (ex_score as u64) <= (chart.total_notes as u64) * 2
         {
-            chart.total_notes
+            (chart.total_notes, false) // already in song_db, no writeback needed
         } else if judge_notes > 0 {
-            judge_notes
+            (judge_notes, false) // unreliable for partial plays, do NOT write back
         } else {
-            0
+            (0, false)
         };
 
-        // Update chart and song_db with correct total_notes learned from memory
+        // Update chart's total_notes for grade calculation
         if effective_notes > 0 {
             chart.total_notes = effective_notes;
-            if let Some(song) = self.game_data.song_db.get_mut(&song_id) {
-                let diff_index = difficulty as usize;
-                song.total_notes[diff_index] = effective_notes;
-            }
+        }
+
+        // Only write back to song_db when the source is chart_notes (from
+        // CurrentSong memory read), which is the game's authoritative value.
+        // judge_notes would pollute song_db with partial play data.
+        if notes_from_chart_memory && let Some(song) = self.game_data.song_db.get_mut(&song_id) {
+            let diff_index = difficulty as usize;
+            song.total_notes[diff_index] = effective_notes;
         }
 
         let grade = if effective_notes > 0 {
