@@ -9,9 +9,9 @@ use tracing::{debug, info, warn};
 use crate::play::UnlockType;
 use crate::process::ReadMemory;
 
-use crate::chart::encoding_fixes::fix_title_encoding;
-use super::scan::fetch_song_database_from_memory_scan;
 use super::SongInfo;
+use super::scan::fetch_song_database_from_memory_scan;
+use crate::chart::encoding_fixes::fix_title_encoding;
 
 /// Load song database from a TSV file (tracker export format)
 ///

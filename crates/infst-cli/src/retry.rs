@@ -8,7 +8,7 @@ use infst::{
     MemoryReader, OffsetSearcher, OffsetsCollection, SongInfo, builtin_signatures,
     fetch_song_database,
 };
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 use crate::shutdown::ShutdownSignal;
 use crate::validation::{ValidationResult, validate_song_database};
@@ -127,13 +127,13 @@ pub fn search_offsets_with_retry(
                     return Ok(Some(offsets));
                 }
 
-                info!(
+                warn!(
                     "Offset detection incomplete, retrying in {}s...",
                     database::RETRY_DELAY.as_secs()
                 );
             }
             Err(e) => {
-                info!(
+                warn!(
                     "Offset detection failed ({}), retrying in {}s...",
                     e,
                     database::RETRY_DELAY.as_secs()

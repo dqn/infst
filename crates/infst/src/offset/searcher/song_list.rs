@@ -149,26 +149,49 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
 
     /// Search for song list by looking for song_id patterns (new structure)
     ///
-    /// New version uses 312-byte structures with pointers to title strings.
+    /// Tries progressively larger buffers to find the entry table, which may be
+    /// far from the text table in newer versions.
     pub(crate) fn search_song_list_by_song_id(&mut self, base_hint: u64) -> Result<u64> {
         const NEW_STRUCT_SIZE: u64 = 312; // 0x138
 
-        // Try progressively larger buffers (entry table is usually within 1MB of the hint)
+        // Try progressively larger buffers until the entry table is found
         let search_sizes = [1024 * 1024, 4 * 1024 * 1024, 32 * 1024 * 1024];
-        let mut buffer_loaded = false;
+
         for &size in &search_sizes {
-            if self.load_buffer_around(base_hint, size).is_ok() {
-                buffer_loaded = true;
+            if self.load_buffer_around(base_hint, size).is_err() {
                 break;
             }
-        }
-        if !buffer_loaded {
-            return Err(Error::offset_search_failed(
-                "Failed to load buffer for song_id search".to_string(),
-            ));
+
+            debug!(
+                "  song_id search: buffer {}MB around 0x{:X}",
+                size / 1024 / 1024 * 2,
+                base_hint
+            );
+
+            // Strategy 1: Find song_id=1001 and song_id=1002 with delta=312
+            if let Some(addr) = self.try_312_byte_structure_search(NEW_STRUCT_SIZE) {
+                return Ok(addr);
+            }
+
+            // Strategy 2: Find [song_id=1001, folder=43] pattern
+            debug!("  Trying [song_id=1001, folder=43] pattern search...");
+            if let Some(addr) = self.try_song_id_folder_search() {
+                return Ok(addr);
+            }
+
+            debug!(
+                "  No entry table found in {}MB buffer, trying larger...",
+                size / 1024 / 1024 * 2
+            );
         }
 
-        // Find song_id=1001 and song_id=1002 to locate new structure
+        Err(Error::offset_search_failed(
+            "New structure SongList not found".to_string(),
+        ))
+    }
+
+    /// Try to find entry table using 312-byte structure delta between song_id=1001 and 1002.
+    fn try_312_byte_structure_search(&self, struct_size: u64) -> Option<u64> {
         let pattern_1001 = merge_byte_representations(&[1001i32]);
         let pattern_1002 = merge_byte_representations(&[1002i32]);
 
@@ -181,23 +204,21 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             matches_1002.len()
         );
 
-        // Find pair with delta=312 (new structure size)
         for addr_1001 in &matches_1001 {
             for addr_1002 in &matches_1002 {
                 if *addr_1002 > *addr_1001 {
                     let delta = addr_1002 - addr_1001;
-                    if delta == NEW_STRUCT_SIZE {
+                    if delta == struct_size {
                         debug!(
                             "  Found new structure: song_id=1001 at 0x{:X}, delta={}",
                             addr_1001, delta
                         );
 
                         // Dump full structure for analysis
-                        if let Ok(bytes) =
-                            self.reader.read_bytes(*addr_1001, NEW_STRUCT_SIZE as usize)
+                        if let Ok(bytes) = self.reader.read_bytes(*addr_1001, struct_size as usize)
                         {
                             let struct_buf = ByteBuffer::new(&bytes);
-                            debug!("    Full structure dump (312 bytes):");
+                            debug!("    Full structure dump ({} bytes):", struct_size);
                             debug!("      Bytes 0-31:   {:02X?}", &bytes[0..32]);
                             debug!("      Bytes 32-63:  {:02X?}", &bytes[32..64]);
                             debug!("      Bytes 64-95:  {:02X?}", &bytes[64..96]);
@@ -232,18 +253,18 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                                 "  SongList (new structure): 0x{:X} ({} songs)",
                                 addr_1001, song_count
                             );
-                            return Ok(*addr_1001);
+                            return Some(*addr_1001);
                         }
                     }
                 }
             }
         }
 
-        // Try alternative: SongList at 0x143186D80 with old 0x3F0 size but new layout
-        // New layout: song_id at offset 0 (instead of offset 624)
-        warn!("Trying new layout search (song_id at start)...");
+        None
+    }
 
-        // Search for song_id=1001 followed by folder=43
+    /// Try to find entry table using [song_id=1001, folder=43] pattern.
+    fn try_song_id_folder_search(&self) -> Option<u64> {
         let alt_pattern = merge_byte_representations(&[1001i32, 43i32]);
         let alt_matches = self.find_all_matches(&alt_pattern);
 
@@ -252,16 +273,15 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         for addr in &alt_matches {
             debug!("    Found potential new layout at 0x{:X}", addr);
 
-            // Try counting with old structure size (0x3F0) but song_id at offset 0
             let count = self.count_songs_new_layout(*addr);
-            debug!("      Song count (new layout, 0x3F0 size): {}", count);
+            debug!("      Song count (new layout): {}", count);
 
             if count >= MIN_EXPECTED_SONGS {
                 info!("  SongList (new layout): 0x{:X} ({} songs)", addr, count);
-                return Ok(*addr);
+                return Some(*addr);
             }
 
-            // Also dump first few entries
+            // Dump first few entries for debugging
             if count > 0 {
                 for i in 0..3.min(count) {
                     let entry_addr = *addr + (i as u64 * SongInfo::MEMORY_SIZE as u64);
@@ -272,9 +292,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             }
         }
 
-        Err(Error::offset_search_failed(
-            "New structure SongList not found".to_string(),
-        ))
+        None
     }
 
     /// Count songs using new 312-byte structure

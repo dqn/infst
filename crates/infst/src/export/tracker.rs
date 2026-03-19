@@ -412,6 +412,8 @@ mod tests {
             folder: 1,
             levels: [0, 5, 8, 10, 12, 0, 5, 8, 10, 12],
             total_notes: [0, 500, 800, 1000, 1200, 0, 500, 800, 1000, 1200],
+            embedded_ex_scores: [0u32; 10],
+            embedded_lamps: [0u32; 10],
             unlock_type: UnlockType::Base,
         }
     }

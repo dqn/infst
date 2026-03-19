@@ -5,8 +5,8 @@ use tracing::{debug, info, warn};
 
 use crate::process::{ByteBuffer, ReadMemory, decode_shift_jis};
 
-use crate::chart::encoding_fixes::fix_title_encoding;
 use super::SongInfo;
+use crate::chart::encoding_fixes::fix_title_encoding;
 
 /// Analyze metadata table structure for new INFINITAS versions
 ///
