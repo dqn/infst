@@ -1,9 +1,15 @@
 use std::collections::{HashMap, HashSet};
 
+use tracing::warn;
+
 use crate::chart::{Difficulty, SongInfo};
 use crate::error::Result;
 use crate::process::{ByteBuffer, ReadMemory};
 use crate::score::Lamp;
+
+/// Maximum allowed buffer size for the DataMap hash table (16 MB).
+/// The table is typically a few hundred KB; anything larger suggests corrupt memory.
+const MAX_DATA_MAP_BUFFER_SIZE: usize = 16 * 1024 * 1024;
 
 /// Score data for a single song (all difficulties)
 #[derive(Debug, Clone, Default)]
@@ -121,6 +127,14 @@ impl ScoreMap {
         }
 
         let buffer_size = (end_address - start_address) as usize;
+        if buffer_size > MAX_DATA_MAP_BUFFER_SIZE {
+            warn!(
+                buffer_size,
+                max = MAX_DATA_MAP_BUFFER_SIZE,
+                "DataMap buffer size exceeds maximum; likely corrupt memory, returning empty ScoreMap"
+            );
+            return Ok(Self::new());
+        }
         let buffer = reader.read_bytes(start_address, buffer_size)?;
 
         // Collect entry points from the hash table
@@ -145,11 +159,12 @@ impl ScoreMap {
         // Convert nodes to ScoreData
         let mut result = Self::new();
         for ((song_id, diff, playtype), node) in nodes {
-            // Calculate difficulty index: diff + playtype * 5
-            let difficulty_index = (diff + playtype * 5) as usize;
-            if difficulty_index >= 10 {
+            // Reject negative or out-of-range values before casting to usize
+            if !(0..5).contains(&diff) || !(0..2).contains(&playtype) {
                 continue;
             }
+            // Calculate difficulty index: diff + playtype * 5
+            let difficulty_index = (diff + playtype * 5) as usize;
 
             let score_data = result.get_or_insert(song_id);
             score_data.lamp[difficulty_index] =
@@ -249,7 +264,7 @@ impl ScoreMap {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::process::MockMemoryBuilder;
+    use crate::process::{MockMemoryBuilder, MockMemoryReader};
 
     #[test]
     fn test_score_data_new() {
@@ -364,6 +379,125 @@ mod tests {
         assert_eq!(entry2.get_lamp(Difficulty::SpN), Lamp::Clear);
 
         assert_eq!(map.len(), 1);
+    }
+
+    #[test]
+    fn test_load_from_memory_rejects_oversized_buffer() {
+        // Simulate corrupt memory where end_address - start_address > 16 MB.
+        // load_from_memory should return an empty ScoreMap instead of allocating.
+        let base = 0x1000u64;
+        let table_start = base + 32;
+        // Set table_end so the implied buffer exceeds MAX_DATA_MAP_BUFFER_SIZE
+        let table_end = table_start + (MAX_DATA_MAP_BUFFER_SIZE as u64) + 1;
+        let null_obj = 0xFFFFFFFF_FFFFFFFFu64;
+
+        let reader = MockMemoryBuilder::new()
+            .base(base - 16)
+            .with_size(64)
+            .write_u64(0, null_obj)
+            .write_u64(16, table_start)
+            .write_u64(24, table_end)
+            .build();
+
+        let song_db: HashMap<u32, SongInfo> = HashMap::new();
+        let result = ScoreMap::load_from_memory(&reader, base, &song_db).unwrap();
+        assert!(result.is_empty());
+    }
+
+    /// Helper: build a mock memory reader containing a single-node linked list.
+    /// Returns (reader, data_map_addr).
+    fn build_single_node_reader(diff: i32, playtype: i32, song: i32) -> (MockMemoryReader, u64) {
+        // Memory layout (base = 0x1000):
+        //   offset 0:  null_obj (u64)            -- data_map_addr - 16
+        //   offset 16: table_start ptr (u64)     -- data_map_addr
+        //   offset 24: table_end ptr (u64)       -- data_map_addr + 8
+        //   offset 32: bucket[0] = node_addr     -- hash table (8 bytes)
+        //   offset 40: ListNode (64 bytes)        -- the single node
+        let base = 0x1000u64;
+        let data_map_addr = base + 16;
+        let table_start = base + 32;
+        let table_end = table_start + 8; // one bucket
+        let null_obj = 0xDEADu64;
+        let node_addr = base + 40;
+
+        // Build ListNode bytes (64 bytes)
+        let mut node_bytes = [0u8; 64];
+        // next = 0 (end of list)
+        node_bytes[0..8].copy_from_slice(&0u64.to_le_bytes());
+        // prev = 0
+        node_bytes[8..16].copy_from_slice(&0u64.to_le_bytes());
+        // diff
+        node_bytes[16..20].copy_from_slice(&diff.to_le_bytes());
+        // song
+        node_bytes[20..24].copy_from_slice(&song.to_le_bytes());
+        // playtype
+        node_bytes[24..28].copy_from_slice(&playtype.to_le_bytes());
+        // score = 1500
+        node_bytes[32..36].copy_from_slice(&1500u32.to_le_bytes());
+        // miss_count = 5
+        node_bytes[36..40].copy_from_slice(&5u32.to_le_bytes());
+        // lamp = 4 (Clear)
+        node_bytes[48..52].copy_from_slice(&4i32.to_le_bytes());
+
+        let reader = MockMemoryBuilder::new()
+            .base(base)
+            .with_size(104)
+            .write_u64(0, null_obj) // null_obj at base
+            .write_u64(16, table_start)
+            .write_u64(24, table_end)
+            .write_u64(32, node_addr) // bucket points to node
+            .write_bytes(40, &node_bytes)
+            .build();
+
+        (reader, data_map_addr)
+    }
+
+    #[test]
+    fn test_load_from_memory_rejects_negative_diff() {
+        let (reader, data_map_addr) = build_single_node_reader(-1, 0, 1001);
+        let song_db: HashMap<u32, SongInfo> = HashMap::new();
+        let result = ScoreMap::load_from_memory(&reader, data_map_addr, &song_db).unwrap();
+        // Node with diff=-1 should be rejected
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_load_from_memory_rejects_negative_playtype() {
+        let (reader, data_map_addr) = build_single_node_reader(0, -1, 1001);
+        let song_db: HashMap<u32, SongInfo> = HashMap::new();
+        let result = ScoreMap::load_from_memory(&reader, data_map_addr, &song_db).unwrap();
+        // Node with playtype=-1 should be rejected
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_load_from_memory_rejects_out_of_range_diff() {
+        let (reader, data_map_addr) = build_single_node_reader(5, 0, 1001);
+        let song_db: HashMap<u32, SongInfo> = HashMap::new();
+        let result = ScoreMap::load_from_memory(&reader, data_map_addr, &song_db).unwrap();
+        // diff=5 is out of valid range 0..5
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_load_from_memory_rejects_out_of_range_playtype() {
+        let (reader, data_map_addr) = build_single_node_reader(0, 2, 1001);
+        let song_db: HashMap<u32, SongInfo> = HashMap::new();
+        let result = ScoreMap::load_from_memory(&reader, data_map_addr, &song_db).unwrap();
+        // playtype=2 is out of valid range 0..2
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_load_from_memory_accepts_valid_diff_playtype() {
+        let (reader, data_map_addr) = build_single_node_reader(3, 1, 1001);
+        let song_db: HashMap<u32, SongInfo> = HashMap::new();
+        let result = ScoreMap::load_from_memory(&reader, data_map_addr, &song_db).unwrap();
+        // diff=3, playtype=1 => difficulty_index=8 (DPA), should be accepted
+        assert_eq!(result.len(), 1);
+        let score_data = result.get(1001).unwrap();
+        assert_eq!(score_data.score[8], 1500);
+        assert_eq!(score_data.miss_count[8], Some(5));
     }
 
     #[test]
