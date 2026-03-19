@@ -366,14 +366,25 @@ Version 3 のフィールドレイアウト:
 |---------|--------|-----------|
 | iidx_header - 0x40 | 8 | 現在の曲のエントリへのポインタ (title フィールド = entry + 0x180 を指す) |
 | iidx_header - 0x34 | 4 | 現在の曲の game_id (i32) |
-| iidx_header - 0x14754 | 4 | 現在ロードされたチャートの total_notes (u32) |
+| iidx_header - 0x14754 | 4 | 未使用（旧: total_notes、現在は CurrentSong + 0x10 を使用） |
 | iidx_header + 0x00 | 4 | "IIDX" ASCII |
 | iidx_header + 0x04 | 4 | entry size (80) |
 | iidx_header + 0x08 | 4 | song count (~1810) |
 
 用途:
 - **game_id → internal_id 解決**: ポインタをたどってエントリの offset 0 を読む
-- **正確な grade 計算**: chart_notes フィールドから total_notes を取得
+
+### CurrentSong 構造体
+
+CurrentSong はオフセット検索で検出される構造体。プレイ中〜リザルト画面で有効。
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0x00 | 4 | song_id (i32) |
+| 0x04 | 4 | difficulty (i32) |
+| 0x08 | 4 | unknown (i32) |
+| 0x10 | 4 | total_notes (u32) - grade 計算に使用 |
+| 0x1C | varies | identifier (ASCII) |
 
 ### V3 ゲーム状態検出
 

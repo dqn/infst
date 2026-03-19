@@ -738,9 +738,9 @@ impl Infst {
 
         // Calculate grade.
         // V3: entry offset 0x378 contains BPM, not total_notes. Read the
-        // actual total_notes from the current chart data structure in memory
-        // (at iidx_header - 0x14754). Fall back to entry data if available,
-        // then to judge note count as last resort.
+        // actual total_notes from CurrentSong + 0x10 in memory.
+        // Fall back to entry data if available, then to judge note count
+        // as last resort.
         let chart_notes = self.read_current_chart_notes(reader);
         let judge_notes = judge.pgreat + judge.great + judge.good + judge.bad + judge.poor;
         let effective_notes = if chart_notes > 0 {
@@ -857,17 +857,17 @@ impl Infst {
 
     /// Read total_notes for the currently loaded chart from memory.
     ///
-    /// In V3, the chart's total_notes is stored at a fixed offset before
-    /// the IIDX header (iidx_header - 0x14754). This value is set by the
-    /// game when a chart is loaded and remains valid through the result screen.
+    /// The chart's total_notes is stored at CurrentSong + 0x10. This value
+    /// is set by the game when a chart is loaded and remains valid through
+    /// the result screen.
     fn read_current_chart_notes(&self, reader: &MemoryReader) -> u32 {
-        const CHART_NOTES_OFFSET: u64 = 0x14754;
+        const TOTAL_NOTES_OFFSET: u64 = 0x10;
 
-        if self.offsets.iidx_header == 0 {
+        if self.offsets.current_song == 0 {
             return 0;
         }
 
-        let addr = self.offsets.iidx_header.saturating_sub(CHART_NOTES_OFFSET);
+        let addr = self.offsets.current_song + TOTAL_NOTES_OFFSET;
         match reader.read_i32(addr) {
             Ok(n) if (1..=10000).contains(&n) => n as u32,
             _ => 0,
