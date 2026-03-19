@@ -117,8 +117,20 @@ impl Infst {
 
             if current_state != last_state {
                 debug!("State changed: {:?} -> {:?}", last_state, current_state);
+                // Clear pending result polling when leaving ResultScreen
+                if last_state == GameState::ResultScreen {
+                    self.result_poll_pending = false;
+                    self.result_poll_ticks = 0;
+                    self.pending_result_fingerprint = None;
+                }
                 self.handle_state_change(&reader, last_state, current_state)?;
                 last_state = current_state;
+            }
+
+            // V3: Poll for uncaptured results while in ResultScreen
+            // This handles the case where Playing state was not detected
+            if current_state == GameState::ResultScreen && self.result_poll_pending {
+                self.poll_pending_result(&reader);
             }
 
             thread::sleep(Duration::from_millis(timing::GAME_STATE_POLL_INTERVAL_MS));
@@ -183,11 +195,15 @@ impl Infst {
 
     /// Handle transition to result screen
     fn handle_result_screen(&mut self, reader: &MemoryReader, from_state: GameState) {
-        // In V3, SongSelect -> ResultScreen can happen without Playing being detected
-        // (marker offsets may be wrong). When this happens during the loading screen,
-        // the judge/play data is stale from the previous play. Skip processing.
+        // In V3, Playing markers may not fire, causing SongSelect -> ResultScreen
+        // without detecting Playing. Instead of skipping, enable continuous polling
+        // in the main loop. Data will be captured once it stabilizes (same fingerprint
+        // seen twice in a row), with dedup preventing stale data capture.
         if from_state == GameState::SongSelect {
-            debug!("SongSelect -> ResultScreen without Playing, skipping stale data");
+            info!("SongSelect -> ResultScreen (Playing not detected), enabling result polling");
+            self.result_poll_pending = true;
+            self.result_poll_ticks = 0;
+            self.pending_result_fingerprint = None;
             return;
         }
         info!("Detected result screen, waiting for data...");
@@ -280,8 +296,81 @@ impl Infst {
             }
         }
 
-        // Clear current_playing even if we failed to capture data
+        // Initial polling failed; fall back to continuous polling in the main loop
+        warn!("Initial result polling failed, enabling continuous polling");
+        self.result_poll_pending = true;
+        self.result_poll_ticks = 0;
+        self.pending_result_fingerprint = None;
         self.current_playing = None;
+    }
+
+    /// Poll for result data while in ResultScreen state (V3 fallback)
+    ///
+    /// Called from the main loop when `result_poll_pending` is true.
+    /// Uses a stability check: data must produce the same fingerprint on two
+    /// consecutive checks (~1 second apart) to confirm the result is final
+    /// and not mid-play accumulating judge counts.
+    fn poll_pending_result(&mut self, reader: &MemoryReader) {
+        self.result_poll_ticks += 1;
+
+        // Throttle: check every 10 ticks (~1 second at 100ms polling)
+        if !self.result_poll_ticks.is_multiple_of(10) {
+            return;
+        }
+
+        let play_data = match self.fetch_play_data(reader) {
+            Ok(data) => data,
+            Err(_) => {
+                self.pending_result_fingerprint = None;
+                return;
+            }
+        };
+
+        let total_notes = play_data.judge.pgreat
+            + play_data.judge.great
+            + play_data.judge.good
+            + play_data.judge.bad
+            + play_data.judge.poor;
+
+        let lamp_valid = play_data.lamp >= Lamp::Failed;
+
+        if total_notes == 0 || !lamp_valid {
+            self.pending_result_fingerprint = None;
+            return;
+        }
+
+        let fingerprint = (
+            play_data.chart.song_id,
+            play_data.chart.difficulty as u8,
+            play_data.ex_score,
+        );
+
+        // Dedup: skip if this is the same result we already captured
+        if self.last_result_fingerprint == Some(fingerprint) {
+            return;
+        }
+
+        // Stability check: fingerprint must match the previous poll.
+        // During play, judge counts change constantly so fingerprints differ.
+        // On the actual result screen, data is stable.
+        match self.pending_result_fingerprint {
+            Some(prev) if prev == fingerprint => {
+                // Stable for 2 consecutive checks - capture the result
+                info!(
+                    "Play result captured (polling): {} ({}) - EX: {}",
+                    play_data.chart.title, play_data.chart.song_id, play_data.ex_score
+                );
+                self.last_result_fingerprint = Some(fingerprint);
+                self.process_play_result(&play_data);
+                self.current_playing = None;
+                self.pending_result_fingerprint = None;
+                self.result_poll_pending = false;
+            }
+            _ => {
+                // First time or data changed, remember and recheck next tick
+                self.pending_result_fingerprint = Some(fingerprint);
+            }
+        }
     }
 
     /// Process and save play result data

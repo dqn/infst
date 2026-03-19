@@ -184,6 +184,12 @@ pub struct Infst {
     pub(crate) last_markers: (i32, i32, i32),
     /// Last captured result fingerprint (song_id, difficulty, ex_score) for dedup
     pub(crate) last_result_fingerprint: Option<(u32, u8, u32)>,
+    /// Whether to poll for result data in the main loop (V3: Playing may not be detected)
+    pub(crate) result_poll_pending: bool,
+    /// Tick counter for throttling result polling (~1 second intervals)
+    pub(crate) result_poll_ticks: u32,
+    /// Fingerprint from previous poll (stability check: must match twice to confirm data is final)
+    pub(crate) pending_result_fingerprint: Option<(u32, u8, u32)>,
 }
 
 impl Infst {
@@ -218,6 +224,9 @@ impl Infst {
             current_playing: None,
             last_markers: (0, 0, 0),
             last_result_fingerprint: None,
+            result_poll_pending: false,
+            result_poll_ticks: 0,
+            pending_result_fingerprint: None,
         }
     }
 
