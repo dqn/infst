@@ -78,9 +78,9 @@ impl Settings {
             style2,
             assist,
             range,
-            flip: raw.flip == 1,
-            battle: raw.battle == 1,
-            h_ran: raw.h_ran == 1,
+            flip: raw.flip != 0,
+            battle: raw.battle != 0,
+            h_ran: raw.h_ran != 0,
         }
     }
 }
@@ -314,6 +314,24 @@ mod tests {
         assert_eq!(settings.style, Style::Off);
         assert_eq!(settings.assist, AssistType::Off);
         assert_eq!(settings.range, RangeType::Off);
+    }
+
+    #[test]
+    fn test_boolean_flags_nonzero_means_enabled() {
+        // Any non-zero value should be treated as enabled (not just 1)
+        let settings = Settings::from_raw(RawSettings {
+            play_type: PlayType::P1,
+            style: 0,
+            style2: 0,
+            assist: 0,
+            range: 0,
+            flip: 2,
+            battle: 255,
+            h_ran: -1,
+        });
+        assert!(settings.flip, "flip=2 should be enabled");
+        assert!(settings.battle, "battle=255 should be enabled");
+        assert!(settings.h_ran, "h_ran=-1 should be enabled");
     }
 
     #[test]
