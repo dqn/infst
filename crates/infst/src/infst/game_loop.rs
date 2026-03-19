@@ -696,12 +696,21 @@ impl Infst {
     /// Used during Playing state to capture what chart is being played,
     /// enabling cross-validation when reading play data on ResultScreen.
     fn fetch_current_chart(&self, reader: &MemoryReader) -> Result<(u32, Difficulty)> {
-        let song_id = reader.read_i32(self.offsets.current_song)? as u32;
+        let song_id = reader.read_i32(self.offsets.current_song)?;
         let diff = reader.read_i32(self.offsets.current_song + 4)?;
 
-        let difficulty = Difficulty::from_u8(diff as u8).unwrap_or(Difficulty::SpN);
+        if !(1000..=50000).contains(&song_id) {
+            return Err(crate::error::Error::invalid_game_state(
+                "song_id in 1000..=50000",
+                format!("{song_id}"),
+            ));
+        }
 
-        Ok((song_id, difficulty))
+        let difficulty = Difficulty::from_u8(diff as u8).ok_or_else(|| {
+            crate::error::Error::invalid_game_state("difficulty in 0..=9", format!("{diff}"))
+        })?;
+
+        Ok((song_id as u32, difficulty))
     }
 
     fn fetch_play_data(&mut self, reader: &MemoryReader) -> Result<PlayData> {
