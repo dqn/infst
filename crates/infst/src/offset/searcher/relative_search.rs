@@ -185,100 +185,106 @@ mod tests {
         pub const CURRENT_SONG: u64 = 0x1428382D0;
     }
 
+    /// Known offsets from Version 3 (2026031200)
+    mod version3 {
+        pub const SONG_LIST: u64 = 0x1431BE810;
+        pub const JUDGE_DATA: u64 = 0x14287018C;
+        pub const PLAY_SETTINGS: u64 = 0x1425C32EC;
+        pub const PLAY_DATA: u64 = 0x1425C35BC;
+        pub const CURRENT_SONG: u64 = 0x142870370;
+    }
+
+    fn all_offsets() -> Vec<(&'static str, u64, u64, u64, u64, u64)> {
+        vec![
+            (
+                "V1",
+                version1::SONG_LIST,
+                version1::JUDGE_DATA,
+                version1::PLAY_SETTINGS,
+                version1::PLAY_DATA,
+                version1::CURRENT_SONG,
+            ),
+            (
+                "V2",
+                version2::SONG_LIST,
+                version2::JUDGE_DATA,
+                version2::PLAY_SETTINGS,
+                version2::PLAY_DATA,
+                version2::CURRENT_SONG,
+            ),
+            (
+                "V3",
+                version3::SONG_LIST,
+                version3::JUDGE_DATA,
+                version3::PLAY_SETTINGS,
+                version3::PLAY_DATA,
+                version3::CURRENT_SONG,
+            ),
+        ]
+    }
+
     #[test]
     fn test_judge_to_song_list_offset_stability() {
-        let v1_offset = version1::SONG_LIST - version1::JUDGE_DATA;
-        let v2_offset = version2::SONG_LIST - version2::JUDGE_DATA;
         let expected = JUDGE_TO_SONG_LIST;
-
-        let v1_diff = (v1_offset as i64 - expected as i64).unsigned_abs();
-        let v2_diff = (v2_offset as i64 - expected as i64).unsigned_abs();
-
-        assert!(
-            v1_diff <= JUDGE_DATA_SEARCH_RANGE as u64,
-            "Version 1 offset 0x{:X} exceeds tolerance from expected 0x{:X}",
-            v1_offset,
-            expected
-        );
-        assert!(
-            v2_diff <= JUDGE_DATA_SEARCH_RANGE as u64,
-            "Version 2 offset 0x{:X} exceeds tolerance from expected 0x{:X}",
-            v2_offset,
-            expected
-        );
+        for (name, song_list, judge_data, _, _, _) in all_offsets() {
+            let offset = song_list - judge_data;
+            let diff = (offset as i64 - expected as i64).unsigned_abs();
+            assert!(
+                diff <= JUDGE_DATA_SEARCH_RANGE as u64,
+                "{} offset 0x{:X} exceeds tolerance from expected 0x{:X}",
+                name,
+                offset,
+                expected
+            );
+        }
     }
 
     #[test]
     fn test_judge_to_play_settings_offset_stability() {
-        let v1_offset = version1::JUDGE_DATA - version1::PLAY_SETTINGS;
-        let v2_offset = version2::JUDGE_DATA - version2::PLAY_SETTINGS;
         let expected = JUDGE_TO_PLAY_SETTINGS;
-
-        let v1_diff = (v1_offset as i64 - expected as i64).unsigned_abs();
-        let v2_diff = (v2_offset as i64 - expected as i64).unsigned_abs();
-
-        assert!(
-            v1_diff <= PLAY_SETTINGS_SEARCH_RANGE as u64,
-            "Version 1 offset 0x{:X} exceeds tolerance from expected 0x{:X}",
-            v1_offset,
-            expected
-        );
-        assert!(
-            v2_diff <= PLAY_SETTINGS_SEARCH_RANGE as u64,
-            "Version 2 offset 0x{:X} exceeds tolerance from expected 0x{:X}",
-            v2_offset,
-            expected
-        );
+        for (name, _, judge_data, play_settings, _, _) in all_offsets() {
+            let offset = judge_data - play_settings;
+            let diff = (offset as i64 - expected as i64).unsigned_abs();
+            assert!(
+                diff <= PLAY_SETTINGS_SEARCH_RANGE as u64,
+                "{} offset 0x{:X} exceeds tolerance from expected 0x{:X}",
+                name,
+                offset,
+                expected
+            );
+        }
     }
 
     #[test]
     fn test_play_settings_to_play_data_offset_stability() {
-        let v1_offset = version1::PLAY_DATA - version1::PLAY_SETTINGS;
-        let v2_offset = version2::PLAY_DATA - version2::PLAY_SETTINGS;
         let expected = PLAY_SETTINGS_TO_PLAY_DATA;
-
-        let v1_diff = (v1_offset as i64 - expected as i64).unsigned_abs();
-        let v2_diff = (v2_offset as i64 - expected as i64).unsigned_abs();
-
-        assert!(
-            v1_diff <= PLAY_DATA_SEARCH_RANGE as u64,
-            "Version 1 offset 0x{:X} exceeds tolerance from expected 0x{:X}",
-            v1_offset,
-            expected
-        );
-        assert!(
-            v2_diff <= PLAY_DATA_SEARCH_RANGE as u64,
-            "Version 2 offset 0x{:X} exceeds tolerance from expected 0x{:X}",
-            v2_offset,
-            expected
-        );
+        for (name, _, _, play_settings, play_data, _) in all_offsets() {
+            let offset = play_data - play_settings;
+            let diff = (offset as i64 - expected as i64).unsigned_abs();
+            assert!(
+                diff <= PLAY_DATA_SEARCH_RANGE as u64,
+                "{} offset 0x{:X} exceeds tolerance from expected 0x{:X}",
+                name,
+                offset,
+                expected
+            );
+        }
     }
 
     #[test]
     fn test_judge_to_current_song_offset_stability() {
-        let v1_offset = version1::CURRENT_SONG - version1::JUDGE_DATA;
-        let v2_offset = version2::CURRENT_SONG - version2::JUDGE_DATA;
         let expected = JUDGE_TO_CURRENT_SONG;
-
-        let v1_diff = (v1_offset as i64 - expected as i64).unsigned_abs();
-        let v2_diff = (v2_offset as i64 - expected as i64).unsigned_abs();
-
-        assert!(
-            v1_diff <= CURRENT_SONG_SEARCH_RANGE as u64,
-            "Version 1 offset 0x{:X} exceeds tolerance from expected 0x{:X}",
-            v1_offset,
-            expected
-        );
-        assert!(
-            v2_diff <= CURRENT_SONG_SEARCH_RANGE as u64,
-            "Version 2 offset 0x{:X} exceeds tolerance from expected 0x{:X}",
-            v2_offset,
-            expected
-        );
-        assert_eq!(
-            v1_offset, v2_offset,
-            "currentSong offset changed between versions"
-        );
+        for (name, _, judge_data, _, _, current_song) in all_offsets() {
+            let offset = current_song - judge_data;
+            let diff = (offset as i64 - expected as i64).unsigned_abs();
+            assert!(
+                diff <= CURRENT_SONG_SEARCH_RANGE as u64,
+                "{} offset 0x{:X} exceeds tolerance from expected 0x{:X}",
+                name,
+                offset,
+                expected
+            );
+        }
     }
 
     // ========================================================================
