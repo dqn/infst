@@ -30,8 +30,8 @@ struct LampEntry {
     lamp: String,
     #[serde(rename = "exScore")]
     ex_score: u32,
-    #[serde(rename = "missCount")]
-    miss_count: u32,
+    #[serde(rename = "missCount", skip_serializing_if = "Option::is_none")]
+    miss_count: Option<u32>,
 }
 
 const ALL_DIFFICULTIES: [Difficulty; 10] = [
@@ -69,7 +69,7 @@ const SYNC_CACHE_FILENAME: &str = "sync-cache.json";
 struct CachedEntry {
     lamp: String,
     ex_score: u32,
-    miss_count: u32,
+    miss_count: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -268,7 +268,7 @@ pub fn run(endpoint: Option<&str>, token: Option<&str>, pid: Option<u32>) -> Res
                 difficulty: diff_name,
                 lamp: lamp.short_name().to_string(),
                 ex_score: score_data.get_score(diff),
-                miss_count: score_data.miss_count[diff_idx].unwrap_or(0),
+                miss_count: score_data.miss_count[diff_idx],
             });
         }
     }

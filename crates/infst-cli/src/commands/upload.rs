@@ -25,8 +25,8 @@ struct LampEntry {
     lamp: String,
     #[serde(rename = "exScore")]
     ex_score: u32,
-    #[serde(rename = "missCount")]
-    miss_count: u32,
+    #[serde(rename = "missCount", skip_serializing_if = "Option::is_none")]
+    miss_count: Option<u32>,
 }
 
 pub fn run(
@@ -104,11 +104,13 @@ pub fn run(
                 .unwrap_or(&"0")
                 .parse()
                 .unwrap_or(0);
-            let miss_count: u32 = fields
-                .get(col_indices.miss_count)
-                .unwrap_or(&"0")
-                .parse()
-                .unwrap_or(0);
+            let miss_count: Option<u32> = fields.get(col_indices.miss_count).and_then(|v| {
+                if *v == "-" || v.is_empty() {
+                    None
+                } else {
+                    v.parse().ok()
+                }
+            });
 
             // Skip NO PLAY entries
             if lamp == "NO PLAY" || lamp.is_empty() {
