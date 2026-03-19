@@ -127,16 +127,29 @@ impl<R: ReadMemory> OffsetSearcher<'_, R> {
     }
 
     /// Search for CurrentSong near JudgeData using relative offset
+    ///
+    /// Falls back to the inferred position (judge_data + 0x1E4) when no validated
+    /// candidate is found. This happens when the game hasn't entered song selection
+    /// yet (all fields are zero). The offset has been stable at 0x1E4 across all
+    /// known versions (V1, V2, V3), so the inferred position is reliable.
     pub(crate) fn search_current_song_near_judge_data(&self, judge_data: u64) -> Result<u64> {
         let expected = judge_data.wrapping_add(JUDGE_TO_CURRENT_SONG);
-        self.search_near_expected(expected, CURRENT_SONG_SEARCH_RANGE, |this, addr| {
-            this.reader.validate_current_song_address(addr)
-        })
-        .ok_or_else(|| {
-            Error::offset_search_failed(
-                "No valid candidates found for currentSong near JudgeData".to_string(),
-            )
-        })
+        if let Some(addr) =
+            self.search_near_expected(expected, CURRENT_SONG_SEARCH_RANGE, |this, addr| {
+                this.reader.validate_current_song_address(addr)
+            })
+        {
+            return Ok(addr);
+        }
+
+        // Fallback: use inferred position without validation.
+        // CurrentSong may be all zeros before song selection, which fails validation
+        // but the relative offset from JudgeData is stable across all versions.
+        tracing::info!(
+            "  CurrentSong: using inferred position 0x{:X} (no validated candidate found)",
+            expected
+        );
+        Ok(expected)
     }
 }
 
