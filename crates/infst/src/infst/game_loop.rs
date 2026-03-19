@@ -195,6 +195,13 @@ impl Infst {
 
     /// Handle transition to result screen
     fn handle_result_screen(&mut self, reader: &MemoryReader, from_state: GameState) {
+        // Skip result polling when from_state is Unknown (app just started) -
+        // there's no real play result to capture.
+        if from_state == GameState::Unknown {
+            debug!("Unknown -> ResultScreen (startup), skipping result polling");
+            return;
+        }
+
         // In V3, Playing markers may not fire, causing SongSelect -> ResultScreen
         // without detecting Playing. Instead of skipping, enable continuous polling
         // in the main loop. Data will be captured once it stabilizes (same fingerprint
@@ -515,10 +522,27 @@ impl Infst {
             return;
         }
 
-        let miss_count = if play_data.miss_count_valid() {
+        // Look up personal best from score_map (already updated by update_score_map)
+        // to send the best values rather than the current play's values, which may
+        // be worse than the personal best.
+        let best = self.game_data.score_map.get(play_data.chart.song_id);
+        let diff = play_data.chart.difficulty;
+
+        let best_ex = best.map_or(play_data.ex_score, |s| {
+            s.get_score(diff).max(play_data.ex_score)
+        });
+        let best_lamp = best.map_or(play_data.lamp, |s| s.get_lamp(diff).max(play_data.lamp));
+
+        let current_miss = if play_data.miss_count_valid() {
             Some(play_data.miss_count())
         } else {
             None
+        };
+        let best_miss = match (best.and_then(|s| s.miss_count[diff as usize]), current_miss) {
+            (Some(pb), Some(cur)) => Some(pb.min(cur)),
+            (Some(pb), None) => Some(pb),
+            (None, Some(cur)) => Some(cur),
+            (None, None) => None,
         };
 
         let req = LampRequest {
@@ -527,9 +551,9 @@ impl Infst {
             song_id: play_data.chart.song_id,
             title: play_data.chart.title.trim().to_string(),
             difficulty: play_data.chart.difficulty.short_name().to_string(),
-            lamp: play_data.lamp.short_name().to_string(),
-            ex_score: play_data.ex_score,
-            miss_count,
+            lamp: best_lamp.short_name().to_string(),
+            ex_score: best_ex,
+            miss_count: best_miss,
         };
 
         thread::spawn(move || {
@@ -724,12 +748,44 @@ impl Infst {
         let settings = self.fetch_settings(reader, judge.play_type)?;
 
         // Read basic play data (after judge/settings to match C# timing)
-        let song_id = reader.read_i32(self.offsets.play_data + play::SONG_ID)? as u32;
+        let song_id_raw = reader.read_i32(self.offsets.play_data + play::SONG_ID)?;
         let difficulty_val = reader.read_i32(self.offsets.play_data + play::DIFFICULTY)?;
         let lamp_val = reader.read_i32(self.offsets.play_data + play::LAMP)?;
 
-        let difficulty = Difficulty::from_u8(difficulty_val as u8).unwrap_or(Difficulty::SpN);
-        let lamp = Lamp::from_u8(lamp_val as u8).unwrap_or(Lamp::NoPlay);
+        // Validate ranges before narrowing casts (same pattern as fetch_current_chart)
+        if !(1000..=50000).contains(&song_id_raw) {
+            return Err(crate::error::Error::invalid_game_state(
+                "play_data song_id in 1000..=50000",
+                format!("{song_id_raw}"),
+            ));
+        }
+        let song_id = song_id_raw as u32;
+
+        if !(0..=9).contains(&difficulty_val) {
+            return Err(crate::error::Error::invalid_game_state(
+                "play_data difficulty in 0..=9",
+                format!("{difficulty_val}"),
+            ));
+        }
+        let difficulty = Difficulty::from_u8(difficulty_val as u8).ok_or_else(|| {
+            crate::error::Error::invalid_game_state(
+                "play_data difficulty in 0..=9",
+                format!("{difficulty_val}"),
+            )
+        })?;
+
+        if !(0..=7).contains(&lamp_val) {
+            return Err(crate::error::Error::invalid_game_state(
+                "play_data lamp in 0..=7",
+                format!("{lamp_val}"),
+            ));
+        }
+        let lamp = Lamp::from_u8(lamp_val as u8).ok_or_else(|| {
+            crate::error::Error::invalid_game_state(
+                "play_data lamp in 0..=7",
+                format!("{lamp_val}"),
+            )
+        })?;
 
         // Calculate EX score
         let ex_score = judge.ex_score();
