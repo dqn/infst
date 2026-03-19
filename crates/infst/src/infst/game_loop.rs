@@ -87,8 +87,8 @@ impl Infst {
 
         debug!("Starting tracker loop...");
 
-        // Start TSV session
-        self.session_manager = crate::session::SessionManager::new("sessions");
+        // Start TSV session (re-initialize to reset state for new run)
+        self.session_manager = crate::session::SessionManager::new(&self.config.session_dir);
         match self.session_manager.start_tsv_session() {
             Ok(path) => debug!("Started TSV session at {:?}", path),
             Err(e) => warn!("Failed to start TSV session: {}", e),
@@ -515,6 +515,12 @@ impl Infst {
             return;
         }
 
+        let miss_count = if play_data.miss_count_valid() {
+            Some(play_data.miss_count())
+        } else {
+            None
+        };
+
         let req = LampRequest {
             endpoint: api_config.endpoint.clone(),
             token: api_config.token.clone(),
@@ -523,7 +529,7 @@ impl Infst {
             difficulty: play_data.chart.difficulty.short_name().to_string(),
             lamp: play_data.lamp.short_name().to_string(),
             ex_score: play_data.ex_score,
-            miss_count: play_data.miss_count(),
+            miss_count,
         };
 
         thread::spawn(move || {
@@ -738,9 +744,31 @@ impl Infst {
         // as last resort.
         let chart_notes = self.read_current_chart_notes(reader);
         let judge_notes = judge.pgreat + judge.great + judge.good + judge.bad + judge.poor;
+
+        // V3: entry offset 0x378 contains BPM, not total_notes. Detect this
+        // by checking if all non-zero values in the song's total_notes array
+        // are identical -- real note counts vary across difficulties, BPM does not.
+        let entry_notes_likely_bpm = self
+            .game_data
+            .song_db
+            .get(&song_id)
+            .map(|song| {
+                let non_zero: Vec<u32> = song
+                    .total_notes
+                    .iter()
+                    .copied()
+                    .filter(|&n| n > 0)
+                    .collect();
+                non_zero.len() >= 2 && non_zero.iter().all(|&n| n == non_zero[0])
+            })
+            .unwrap_or(false);
+
         let effective_notes = if chart_notes > 0 {
             chart_notes
-        } else if chart.total_notes > 0 && (ex_score as u64) <= (chart.total_notes as u64) * 2 {
+        } else if chart.total_notes > 0
+            && !entry_notes_likely_bpm
+            && (ex_score as u64) <= (chart.total_notes as u64) * 2
+        {
             chart.total_notes
         } else if judge_notes > 0 {
             judge_notes
@@ -985,20 +1013,22 @@ struct LampRequest {
     difficulty: String,
     lamp: String,
     ex_score: u32,
-    miss_count: u32,
+    miss_count: Option<u32>,
 }
 
 #[cfg(feature = "api")]
 fn send_lamp_request(req: &LampRequest) -> anyhow::Result<()> {
     let url = format!("{}/api/lamps", req.endpoint.trim_end_matches('/'));
-    let body = serde_json::json!({
+    let mut body = serde_json::json!({
         "songId": req.song_id,
         "title": req.title,
         "difficulty": req.difficulty,
         "lamp": req.lamp,
         "exScore": req.ex_score,
-        "missCount": req.miss_count,
     });
+    if let Some(mc) = req.miss_count {
+        body["missCount"] = serde_json::json!(mc);
+    }
 
     let config = ureq::Agent::config_builder()
         .timeout_global(Some(std::time::Duration::from_secs(5)))
