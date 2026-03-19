@@ -66,6 +66,7 @@ export function validateRegisterInput(
 
 interface LampInput {
   songId?: unknown;
+  title?: unknown;
   difficulty?: unknown;
   lamp?: unknown;
   exScore?: unknown;
@@ -74,15 +75,14 @@ interface LampInput {
 
 export function validateLampInput(entry: LampInput): ValidationResult {
   if (
-    typeof entry.songId !== "number" ||
-    !Number.isInteger(entry.songId) ||
-    entry.songId <= 0 ||
+    typeof entry.title !== "string" ||
+    entry.title.length === 0 ||
     typeof entry.difficulty !== "string" ||
     typeof entry.lamp !== "string"
   ) {
     return {
       valid: false,
-      error: "songId, difficulty, and lamp are required",
+      error: "title, difficulty, and lamp are required",
     };
   }
 

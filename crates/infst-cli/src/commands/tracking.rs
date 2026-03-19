@@ -348,6 +348,7 @@ fn run_tracking_session(
     let score_map = load_score_map(&reader, infst.offsets().data_map, &song_db);
 
     // Build game_id -> internal_id mapping (V3: IDs may differ)
+    // Remap score_map from game_id keys to internal_id keys so it matches song_db.
     let game_id_map = infst::chart::build_game_id_index(
         &reader,
         infst.offsets().song_db_address(),

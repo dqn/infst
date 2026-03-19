@@ -55,8 +55,9 @@ type EndpointKey = keyof TitleMapping;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const TRACKER_JSON_PATH = path.resolve(__dirname, "tracker.json");
+const DEFAULT_TSV_PATH = path.resolve(__dirname, "../../.agent/tracker.tsv");
 const OUTPUT_PATH = path.resolve(__dirname, "title-mapping.json");
+const RESOLUTIONS_PATH = path.resolve(__dirname, "resolutions.json");
 
 const ENDPOINTS: Record<EndpointKey, string> = {
   "sp11-normal": "https://dqn.github.io/iidxapi/sp11/normal.json",
@@ -65,12 +66,71 @@ const ENDPOINTS: Record<EndpointKey, string> = {
   "sp12-hard": "https://dqn.github.io/iidxapi/sp12/hard.json",
 };
 
+const INFINITAS_MUSIC_URL = "https://dqn.github.io/iidxapi/infinitas/music.json";
+
 const EXPECTED_RATING: Record<EndpointKey, number> = {
   "sp11-normal": 11,
   "sp11-hard": 11,
   "sp12-normal": 12,
   "sp12-hard": 12,
 };
+
+// TSV column indices (0-based)
+const COL = {
+  SONG_ID: 0,
+  TITLE: 1,
+  SPN_RATING: 18,
+  SPN_LAMP: 19,
+  SPH_RATING: 26,
+  SPH_LAMP: 27,
+  SPA_RATING: 34,
+  SPA_LAMP: 35,
+  SPL_RATING: 42,
+  SPL_LAMP: 43,
+} as const;
+
+// Mojibake fixes: full title mapping (tracker title -> correct Unicode title)
+const MOJIBAKE_FIXES: ReadonlyMap<string, string> = new Map([
+  // Latin characters (accents, special characters)
+  ["?bertreffen", "Übertreffen"],
+  ["?THER", "ÆTHER"],
+  ["?u Legends", "Ōu Legends"],
+  ["?Viva!", "¡Viva!"],
+  ["?影", "焱影"],
+  ["ACT?", "ACTØ"],
+  ["Amor De Ver?o", "Amor De Verão"],
+  ["Dans la nuit de l'?ternit?", "Dans la nuit de l'éternité"],
+  ["Geirsk?gul", "Geirskögul"],
+  ["Ignis†Ir?", "Ignis†Iræ"],
+  ["M?ch? M?nky", "Mächö Mönky"],
+  ["P?rvat?", "Pārvatī"],
+  ["POL?AMAИIA", "POLꓘAMAИIA"],
+  ["Pr?ludium", "Präludium"],
+  ["Raison d'?tre～交差する宿命～", "Raison d'être～交差する宿命～"],
+  ["V?ID", "VØID"],
+  ["旋律のドグマ～Mis?rables～", "旋律のドグマ～Misérables～"],
+  ["u?n", "uən"],
+  // Symbols (hearts)
+  ["LOVE?SHINE", "LOVE♡SHINE"],
+  ["Sweet Sweet?Magic", "Sweet Sweet♡Magic"],
+  ["Raspberry?Heart(English version)", "Raspberry♡Heart(English version)"],
+  ["Double??Loving Heart", "Double♡♡Loving Heart"],
+  ["Love?km", "Love♥km"],
+  ["超!!遠距離らぶ?メ～ル", "超!!遠距離らぶ♡メ～ル"],
+  ["キャトられ?恋はモ～モク", "キャトられ♥恋はモ～モク"],
+  ["表裏一体！？怪盗いいんちょの悩み?", "表裏一体！？怪盗いいんちょの悩み♥"],
+  // Compound (multiple types of mojibake)
+  ["?LOVE? シュガ→?", "♥LOVE² シュガ→♥"],
+  ["ジオメトリック?ティーパーティー", "ジオメトリック∮ティーパーティー"],
+]);
+
+// Titles that legitimately contain '?'
+const LEGITIMATE_QUESTION_MARKS = new Set([
+  "Wanna Party?",
+  "BLACK or WHITE?",
+  "My Sweet Bird?",
+  "がっつり陰キャ!? 怪盗いいんちょの億劫^^;",
+]);
 
 // Fullwidth to halfwidth character map
 const FULLWIDTH_TO_HALFWIDTH: ReadonlyMap<string, string> = new Map([
@@ -119,7 +179,7 @@ function analyzeSuffix(title: string): SuffixAnalysis {
   return { cleanTitle: title, difficulty: "SPA" };
 }
 
-// --- Tracker loading ---
+// --- Tracker loading (from TSV) ---
 
 function parseLamp(value: string | undefined): Lamp {
   const trimmed = (value ?? "").trim();
@@ -140,28 +200,72 @@ function parseLamp(value: string | undefined): Lamp {
   return "NO PLAY";
 }
 
-async function loadTracker(): Promise<Map<string, TrackerEntry>> {
-  const content = await fs.readFile(TRACKER_JSON_PATH, "utf-8");
-  const raw = JSON.parse(content) as {
-    songId: number;
-    title: string;
-    ratings: Record<Difficulty, number>;
-    lamps: Record<Difficulty, string>;
-  }[];
+async function loadTrackerFromTsv(
+  tsvPath: string,
+): Promise<Map<string, TrackerEntry>> {
+  const content = await fs.readFile(tsvPath, "utf-8");
+  const lines = content.split("\n");
 
   const entries = new Map<string, TrackerEntry>();
-  for (const item of raw) {
-    entries.set(item.title, {
-      songId: item.songId,
-      title: item.title,
-      ratings: item.ratings,
+  let mojibakeFixed = 0;
+
+  // Skip header line
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line === undefined || line.trim() === "") {
+      continue;
+    }
+
+    const cols = line.split("\t");
+    let title = cols[COL.TITLE];
+    if (title === undefined || title.trim() === "") {
+      continue;
+    }
+    title = title.trim();
+
+    const songId = Math.trunc(Number(cols[COL.SONG_ID] ?? "0"));
+    if (!Number.isInteger(songId) || songId <= 0) {
+      continue;
+    }
+
+    // Apply mojibake fix
+    const fixed = MOJIBAKE_FIXES.get(title);
+    if (fixed !== undefined) {
+      console.log(`  Fixed: ${title} → ${fixed}`);
+      title = fixed;
+      mojibakeFixed++;
+    }
+
+    entries.set(title, {
+      songId,
+      title,
+      ratings: {
+        SPN: Math.trunc(Number(cols[COL.SPN_RATING] ?? "0")),
+        SPH: Math.trunc(Number(cols[COL.SPH_RATING] ?? "0")),
+        SPA: Math.trunc(Number(cols[COL.SPA_RATING] ?? "0")),
+        SPL: Math.trunc(Number(cols[COL.SPL_RATING] ?? "0")),
+      },
       lamps: {
-        SPN: parseLamp(item.lamps.SPN),
-        SPH: parseLamp(item.lamps.SPH),
-        SPA: parseLamp(item.lamps.SPA),
-        SPL: parseLamp(item.lamps.SPL),
+        SPN: parseLamp(cols[COL.SPN_LAMP]),
+        SPH: parseLamp(cols[COL.SPH_LAMP]),
+        SPA: parseLamp(cols[COL.SPA_LAMP]),
+        SPL: parseLamp(cols[COL.SPL_LAMP]),
       },
     });
+  }
+
+  console.log(`Mojibake fixed: ${mojibakeFixed}`);
+
+  // Verify no remaining mojibake
+  const remaining = [...entries.values()].filter(
+    (e) =>
+      e.title.includes("?") && !LEGITIMATE_QUESTION_MARKS.has(e.title),
+  );
+  if (remaining.length > 0) {
+    console.warn(`WARNING: ${remaining.length} titles still contain '?':`);
+    for (const e of remaining) {
+      console.warn(`  - ${e.title}`);
+    }
   }
 
   return entries;
@@ -290,6 +394,28 @@ async function resolveInteractively(
   return undefined;
 }
 
+// --- Persistent resolution cache ---
+
+interface SavedResolution {
+  trackerTitle: string;
+  songId: number;
+}
+
+type ResolutionMap = Record<string, SavedResolution | null>;
+
+async function loadResolutions(): Promise<ResolutionMap> {
+  try {
+    const content = await fs.readFile(RESOLUTIONS_PATH, "utf-8");
+    return JSON.parse(content) as ResolutionMap;
+  } catch {
+    return {};
+  }
+}
+
+async function saveResolutions(resolutions: ResolutionMap): Promise<void> {
+  await fs.writeFile(RESOLUTIONS_PATH, JSON.stringify(resolutions, null, 2) + "\n");
+}
+
 // --- Fetch endpoints ---
 
 async function fetchEndpoint(url: string): Promise<IidxApiEntry[]> {
@@ -303,9 +429,34 @@ async function fetchEndpoint(url: string): Promise<IidxApiEntry[]> {
 // --- Main ---
 
 export async function normalize(): Promise<void> {
-  console.log("Loading tracker.json...");
-  const tracker = await loadTracker();
-  console.log(`Loaded ${tracker.size} songs from tracker.json`);
+  const tsvPath =
+    process.argv[2] ?? process.env.INFST_TRACKER_TSV ?? DEFAULT_TSV_PATH;
+  console.log(`Loading tracker TSV from ${tsvPath}...`);
+  const tracker = await loadTrackerFromTsv(tsvPath);
+  console.log(`Loaded ${tracker.size} songs`);
+
+  // Fetch INFINITAS music list to filter out non-INFINITAS songs
+  console.log("Fetching INFINITAS music list...");
+  const infinitasMusic = await fetchEndpoint(INFINITAS_MUSIC_URL) as unknown as Array<{ title: string }>;
+  const infinitasTitles = new Set<string>();
+  const infinitasNormalized = new Set<string>();
+  for (const m of infinitasMusic) {
+    infinitasTitles.add(m.title);
+    infinitasNormalized.add(normalizeText(m.title));
+  }
+  console.log(`INFINITAS has ${infinitasTitles.size} songs`);
+
+  // Filter tracker to only INFINITAS songs
+  let removedCount = 0;
+  for (const [title, entry] of tracker) {
+    if (!infinitasTitles.has(title) && !infinitasNormalized.has(normalizeText(title))) {
+      tracker.delete(title);
+      removedCount++;
+    }
+  }
+  if (removedCount > 0) {
+    console.log(`Filtered out ${removedCount} non-INFINITAS songs (${tracker.size} remaining)`);
+  }
 
   // Build normalized index for fast lookup
   const normalizedIndex = new Map<string, TrackerEntry>();
@@ -452,20 +603,66 @@ export async function normalize(): Promise<void> {
     }
   }
 
+  // Load persistent resolution cache from file
+  const savedResolutions = await loadResolutions();
+  // In-memory cache for this run (includes saved + new resolutions)
+  const resolutionCache = new Map<string, MatchResult | undefined>();
+  let savedHits = 0;
+
+  // Pre-populate from saved resolutions
+  for (const [key, value] of Object.entries(savedResolutions)) {
+    if (value === null) {
+      resolutionCache.set(key, undefined);
+    } else {
+      resolutionCache.set(key, {
+        trackerTitle: value.trackerTitle,
+        songId: value.songId,
+        rating: 0, // not used after resolution
+      });
+    }
+  }
+
   try {
     for (const p of pending) {
-      const resolved = await resolveInteractively(
-        p.apiEntry.title,
-        p.difficulty,
-        p.expectedRating,
-        tracker,
-        rl,
-      );
+      const cacheKey = `${p.apiEntry.title}:${p.difficulty}`;
+      let resolved: MatchResult | undefined;
+
+      if (resolutionCache.has(cacheKey)) {
+        resolved = resolutionCache.get(cacheKey);
+        if (resolved !== undefined) {
+          console.log(
+            `\x1b[36m\u21bb\x1b[0m Cached: ${p.apiEntry.title} \u2192 ${resolved.trackerTitle} [${p.key}]`,
+          );
+        } else {
+          console.log(`\x1b[33m-\x1b[0m Skipped (cached): ${p.apiEntry.title} [${p.key}]`);
+        }
+        savedHits++;
+      } else {
+        resolved = await resolveInteractively(
+          p.apiEntry.title,
+          p.difficulty,
+          p.expectedRating,
+          tracker,
+          rl,
+        );
+        resolutionCache.set(cacheKey, resolved);
+
+        // Save to persistent cache
+        if (resolved !== undefined) {
+          savedResolutions[cacheKey] = {
+            trackerTitle: resolved.trackerTitle,
+            songId: resolved.songId,
+          };
+          console.log(
+            `\x1b[32m\u2713\x1b[0m Resolved: ${p.apiEntry.title} \u2192 ${resolved.trackerTitle}`,
+          );
+        } else {
+          savedResolutions[cacheKey] = null;
+          console.log(`\x1b[33m-\x1b[0m Skipped: ${p.apiEntry.title}`);
+        }
+      }
 
       if (resolved !== undefined) {
-        console.log(
-          `\x1b[32m\u2713\x1b[0m Resolved: ${p.apiEntry.title} \u2192 ${resolved.trackerTitle}`,
-        );
         result[p.key].push({
           songId: resolved.songId,
           title: p.apiEntry.title,
@@ -475,12 +672,16 @@ export async function normalize(): Promise<void> {
           attributes: p.apiEntry.attributes,
           sortOrder: p.apiIndex,
         });
-      } else {
-        console.log(`\x1b[33m-\x1b[0m Skipped: ${p.apiEntry.title}`);
       }
     }
   } finally {
     rl.close();
+  }
+
+  // Save updated resolutions
+  await saveResolutions(savedResolutions);
+  if (savedHits > 0) {
+    console.log(`Used ${savedHits} cached resolutions from ${RESOLUTIONS_PATH}`);
   }
 
   // Write output

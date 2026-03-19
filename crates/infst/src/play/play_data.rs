@@ -36,7 +36,7 @@ impl PlayData {
         if total_notes == 0 {
             return Grade::F;
         }
-        let max_ex = total_notes * 2;
+        let max_ex = total_notes as u64 * 2;
         let ratio = ex_score as f64 / max_ex as f64;
         Grade::from_score_ratio(ratio)
     }

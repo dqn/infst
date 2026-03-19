@@ -1,0 +1,34 @@
+[
+  {
+    "songId": 255,
+    "title": "Bits",
+    "ratings": {
+      "SPN": null,
+      "SPH": null,
+      "SPA": null,
+      "SPL": null
+    },
+    "lamps": {
+      "SPN": "NO PLAY",
+      "SPH": "NO PLAY",
+      "SPA": "NO PLAY",
+      "SPL": "NO PLAY"
+    }
+  },
+  {
+    "songId": 1116,
+    "title": "Sub",
+    "ratings": {
+      "SPN": null,
+      "SPH": null,
+      "SPA": null,
+      "SPL": null
+    },
+    "lamps": {
+      "SPN": "NO PLAY",
+      "SPH": "NO PLAY",
+      "SPA": "NO PLAY",
+      "SPL": "NO PLAY"
+    }
+  }
+]

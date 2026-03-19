@@ -22,13 +22,12 @@ pub fn run(output: Option<&str>, format: ExportFormat, pid: Option<u32>) -> Resu
     );
 
     let reader = MemoryReader::new(&process);
-    // Search only required offsets (song list/data map/unlock data)
     let mut searcher = OffsetSearcher::new(&reader);
     let offsets = searcher.search_data_offsets()?;
 
     eprintln!("Offsets detected");
 
-    // Load song database
+    // Load song database (includes embedded EX scores and lamps)
     eprintln!("Loading song database...");
     let song_db = fetch_song_database(&reader, offsets.song_db_address(), offsets.entry_stride())?;
     eprintln!("Loaded {} songs", song_db.len());

@@ -41,12 +41,12 @@ export const UnifiedTableView: FC<UnifiedTableViewProps> = ({
           }
 
           return Array.from(levelGroups.entries()).map(([levelKey, group]) => {
-            // Deduplicate by songId:difficulty
+            // Deduplicate by infinitasTitle:difficulty
             const seen = new Map<string, typeof group[0]["tiers"][0]["entries"][0]>();
             for (const t of group) {
               for (const tier of t.tiers) {
                 for (const entry of tier.entries) {
-                  const key = `${entry.songId}:${entry.difficulty}`;
+                  const key = `${entry.infinitasTitle}:${entry.difficulty}`;
                   if (!seen.has(key)) {
                     seen.set(key, entry);
                   }
@@ -201,7 +201,7 @@ export const UnifiedTableView: FC<UnifiedTableViewProps> = ({
                     <div class="tier-entries">
                       {tier.entries.map((entry) => (
                         <LampCell
-                          songId={entry.songId}
+                          infinitasTitle={entry.infinitasTitle}
                           title={entry.title}
                           difficulty={entry.difficulty}
                           lamp={entry.lamp}

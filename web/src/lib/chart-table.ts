@@ -2,6 +2,7 @@ interface ChartRow {
   id: number;
   songId: number;
   title: string;
+  infinitasTitle: string;
   difficulty: string;
   tier: string;
   attributes: string | null;
@@ -18,6 +19,7 @@ export interface TableEntry {
   id: number;
   songId: number;
   title: string;
+  infinitasTitle: string;
   difficulty: string;
   attributes: string | null;
   lamp: string;
@@ -32,7 +34,7 @@ export interface TierGroup {
 
 export function buildLampMap(
   userLamps: Array<{
-    songId: number;
+    title: string;
     difficulty: string;
     lamp: string;
     exScore: number | null;
@@ -41,7 +43,7 @@ export function buildLampMap(
 ): Map<string, LampData> {
   const lampMap = new Map<string, LampData>();
   for (const l of userLamps) {
-    lampMap.set(`${l.songId}:${l.difficulty}`, {
+    lampMap.set(`${l.title}:${l.difficulty}`, {
       lamp: l.lamp,
       exScore: l.exScore,
       missCount: l.missCount,
@@ -103,13 +105,14 @@ export function groupChartsByTier(
   const tierMap = new Map<string, TableEntry[]>();
 
   for (const chart of chartRows) {
-    const key = `${chart.songId}:${chart.difficulty}`;
+    const key = `${chart.infinitasTitle}:${chart.difficulty}`;
     const lampData = lampMap.get(key);
 
     const entry: TableEntry = {
       id: chart.id,
       songId: chart.songId,
       title: chart.title,
+      infinitasTitle: chart.infinitasTitle,
       difficulty: chart.difficulty,
       attributes: chart.attributes,
       lamp: lampData?.lamp ?? "NO PLAY",

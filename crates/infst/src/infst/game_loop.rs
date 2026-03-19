@@ -366,7 +366,7 @@ impl Infst {
     }
 
     /// Export full score data to JSON and git commit/push in a background thread
-    fn export_and_git_push(&self, play_data: &PlayData) {
+    fn export_and_git_push(&mut self, play_data: &PlayData) {
         let Some(ref git_config) = self.config.git_config else {
             return;
         };
@@ -479,10 +479,11 @@ impl Infst {
         self.reload_score_map(reader);
 
         // Export tracker file if auto-export is enabled
-        if self.config.auto_export
-            && let Err(e) = self.export_tracker_tsv(&self.config.tracker_path)
-        {
-            error!("Failed to export tracker file: {}", e);
+        if self.config.auto_export {
+            let tracker_path = self.config.tracker_path.clone();
+            if let Err(e) = self.export_tracker_tsv(&tracker_path) {
+                error!("Failed to export tracker file: {}", e);
+            }
         }
     }
 
@@ -626,7 +627,7 @@ impl Infst {
         let data_available =
             !settings.h_ran && !settings.battle && settings.assist == AssistType::Off;
 
-        let chart = self.create_chart_info_dynamic(reader, song_id, difficulty);
+        let mut chart = self.create_chart_info_dynamic(reader, song_id, difficulty);
 
         debug!(
             "Chart: song_id={} diff={:?} total_notes={} all_notes={:?}",
@@ -645,13 +646,23 @@ impl Infst {
         let judge_notes = judge.pgreat + judge.great + judge.good + judge.bad + judge.poor;
         let effective_notes = if chart_notes > 0 {
             chart_notes
-        } else if chart.total_notes > 0 && ex_score <= chart.total_notes * 2 {
+        } else if chart.total_notes > 0 && (ex_score as u64) <= (chart.total_notes as u64) * 2 {
             chart.total_notes
         } else if judge_notes > 0 {
             judge_notes
         } else {
             0
         };
+
+        // Update chart and song_db with correct total_notes learned from memory
+        if effective_notes > 0 {
+            chart.total_notes = effective_notes;
+            if let Some(song) = self.game_data.song_db.get_mut(&song_id) {
+                let diff_index = difficulty as usize;
+                song.total_notes[diff_index] = effective_notes;
+            }
+        }
+
         let grade = if effective_notes > 0 {
             PlayData::calculate_grade(ex_score, effective_notes)
         } else {

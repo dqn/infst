@@ -22,7 +22,6 @@ web/node_modules/
 scripts/normalize/node_modules/
 
 # Generated files
-scripts/normalize/tracker.json
 
 # Debug output files
 dump_output.json

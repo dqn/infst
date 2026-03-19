@@ -352,6 +352,11 @@ Version 3 のフィールドレイアウト:
 - **`probe-entry` を最初に使う**: 新バージョン調査時は `infst probe-entry --song-id 1001` で構造を把握してから修正に着手する
 - **フィールド解釈はゲーム動作で検証する**: メモリ構造調査で「このオフセットは X だ」と判断したら、ゲームの実際の表示（DJ LEVEL、ノーツ数等）と照合する。全難易度で同一値のフィールドは note count ではなく BPM の可能性が高い
 - **ScoreMap 変更後はパフォーマンス確認**: リンクリスト走査ロジック変更後は初期化時間を計測する。`visited` セット共有、走査範囲拡大がボトルネックになり得る
+- **テキストテーブルと V3 エントリテーブルは別構造**: song_list (テキストテーブル) の 0x000 はローマ字タイトル、V3 日本語タイトルは 0x5B0 にあり 1 エントリずれている。game_id は 0x430。sync はテキストテーブルの game_id + V3 タイトルを使う
+- **song_id ベースの JOIN は信頼できない**: game_id != internal_id のため、Web の charts-lamps 結合は title + difficulty で行う。`build_game_id_index` の EX スコアマッチングは誤マッピングを起こすため sync には使わない
+- **Shift-JIS デコード後は必ず trim**: テキストテーブルのタイトルに末尾スペースが含まれることがあり、title ベース JOIN が失敗する
+- **INFINITAS 未収録曲のフィルタリング**: エントリテーブルにはアーケード専用曲も含まれる。`iidxapi/infinitas/music.json` で INFINITAS 収録曲リストを取得し、normalize 時にフィルタする
+- **Reflux (C# 参照実装) を先に確認する**: メモリ構造の調査で行き詰まったら、`.agent/Reflux/` の実装を確認する。旧バージョンのレイアウト情報が新バージョンの手がかりになる
 
 ### IIDX ポインタ構造体
 
@@ -373,6 +378,17 @@ Version 3 のフィールドレイアウト:
 ### V3 ゲーム状態検出
 
 V3 では `STATE_MARKER_1` (judge_data + 0xD8) がプレイ中に 1 にならないことがある。SongSelect のスティック・ロジックは `song_select_marker == 1` の間のみ有効にし、0 になったら ResultScreen への遷移を許可する。SongSelect → ResultScreen の直接遷移ではデータが stale なのでスキップする。
+
+### Web Sync アーキテクチャ
+
+charts テーブルと lamps テーブルの結合は **title + difficulty** ベース（song_id は使わない）。
+
+| データ | ソース | title フィールド |
+|--------|--------|-----------------|
+| charts.infinitas_title | export → tracker.tsv → normalize → title-mapping.json | V3 エントリテーブルの Shift-JIS タイトル (encoding_fixes 適用済み) |
+| lamps.title | sync → テキストテーブル 0x5B0 | 同上 (fix_title_encoding + trim 適用) |
+
+`just update-charts` で export → normalize → charts sync → lamps sync の全パイプラインを実行。
 
 ### TSV フォーマット
 

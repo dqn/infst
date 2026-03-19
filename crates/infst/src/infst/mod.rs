@@ -261,6 +261,7 @@ impl Infst {
     }
 
     /// Export tracker data to TSV file
+    ///
     pub fn export_tracker_tsv<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         crate::export::export_tracker_tsv(
             path,

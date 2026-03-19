@@ -35,8 +35,10 @@ for (const [tableKey, entries] of Object.entries(mapping)) {
       : "NULL";
     const sortOrder = entry.sortOrder !== undefined ? entry.sortOrder : "NULL";
 
+    const infinitasTitle = entry.infinitasTitle || entry.title;
+
     rows.push(
-      `('${escapeSql(tableKey)}',${entry.songId},'${escapeSql(entry.title)}','${escapeSql(entry.difficulty)}','${escapeSql(entry.tier)}',${attributes},${sortOrder})`,
+      `('${escapeSql(tableKey)}',${entry.songId},'${escapeSql(entry.title)}','${escapeSql(infinitasTitle)}','${escapeSql(entry.difficulty)}','${escapeSql(entry.tier)}',${attributes},${sortOrder})`,
     );
   }
 }
@@ -52,9 +54,10 @@ const statements = [];
 for (let i = 0; i < rows.length; i += chunkSize) {
   const chunk = rows.slice(i, i + chunkSize);
   statements.push([
-    "INSERT INTO charts (table_key, song_id, title, difficulty, tier, attributes, sort_order) VALUES",
+    "INSERT INTO charts (table_key, song_id, title, infinitas_title, difficulty, tier, attributes, sort_order) VALUES",
     chunk.join(",\n"),
-    "ON CONFLICT(table_key, song_id, difficulty) DO UPDATE SET",
+    "ON CONFLICT(table_key, infinitas_title, difficulty) DO UPDATE SET",
+    "  song_id=excluded.song_id,",
     "  title=excluded.title,",
     "  tier=excluded.tier,",
     "  attributes=excluded.attributes,",
@@ -70,10 +73,12 @@ console.log(`Sync target: ${target}`);
 console.log(`Mapping rows: ${rows.length}`);
 console.log(`Statements: ${statements.length}`);
 
+const wranglerBin = path.resolve(webDir, "node_modules", "wrangler", "bin", "wrangler.js");
+
 const result = spawnSync(
-  "npx",
+  process.execPath,
   [
-    "wrangler",
+    wranglerBin,
     "d1",
     "execute",
     "infst-db",
@@ -87,10 +92,15 @@ const result = spawnSync(
   },
 );
 
-fs.rmSync(tempDir, { recursive: true, force: true });
-
 if (result.status !== 0) {
+  console.error(`wrangler exited with status ${result.status}, signal ${result.signal}`);
+  if (result.error) {
+    console.error("spawn error:", result.error);
+  }
+  console.error(`SQL file preserved at: ${sqlPath}`);
   process.exit(result.status ?? 1);
 }
+
+fs.rmSync(tempDir, { recursive: true, force: true });
 
 console.log("charts sync completed.");

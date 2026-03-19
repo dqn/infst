@@ -219,6 +219,10 @@ impl ScoreMap {
         self.scores.get_mut(&song_id)
     }
 
+    pub fn remove(&mut self, song_id: u32) -> Option<ScoreData> {
+        self.scores.remove(&song_id)
+    }
+
     pub fn insert(&mut self, song_id: u32, data: ScoreData) {
         self.scores.insert(song_id, data);
     }

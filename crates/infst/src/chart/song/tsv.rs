@@ -104,6 +104,8 @@ pub fn load_song_database_from_tsv<P: AsRef<Path>>(
             folder: 0,
             levels,
             total_notes,
+            embedded_ex_scores: [0u32; 10],
+            embedded_lamps: [0u32; 10],
             unlock_type: UnlockType::default(),
         };
 

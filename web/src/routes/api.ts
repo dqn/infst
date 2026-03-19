@@ -14,6 +14,7 @@ import { BULK_MAX_ENTRIES } from "../lib/constants";
 
 interface LampInput {
   songId: number;
+  title: string;
   difficulty: string;
   lamp: string;
   exScore?: number;
@@ -100,7 +101,7 @@ apiRoutes.post("/lamps", bearerAuth, async (c) => {
     .where(
       and(
         eq(lamps.userId, user.id),
-        eq(lamps.songId, body.songId),
+        eq(lamps.title, body.title),
         eq(lamps.difficulty, body.difficulty),
       ),
     )
@@ -148,6 +149,7 @@ apiRoutes.post("/lamps", bearerAuth, async (c) => {
   await db.insert(lamps).values({
     userId: user.id,
     songId: body.songId,
+    title: body.title,
     difficulty: body.difficulty,
     lamp: body.lamp,
     exScore: body.exScore ?? null,
@@ -205,13 +207,14 @@ apiRoutes.post("/lamps/bulk", bearerAuth, async (c) => {
 
   const existingMap = new Map<string, typeof existingLamps[number]>();
   for (const l of existingLamps) {
-    existingMap.set(`${l.songId}:${l.difficulty}`, l);
+    existingMap.set(`${l.title}:${l.difficulty}`, l);
   }
 
   // Process entries and collect batch operations
   const inserts: Array<{
     userId: number;
     songId: number;
+    title: string;
     difficulty: string;
     lamp: string;
     exScore: number | null;
@@ -234,7 +237,7 @@ apiRoutes.post("/lamps/bulk", bearerAuth, async (c) => {
       continue;
     }
 
-    const key = `${entry.songId}:${entry.difficulty}`;
+    const key = `${entry.title}:${entry.difficulty}`;
     const existingLamp = existingMap.get(key);
 
     if (existingLamp) {
@@ -269,6 +272,7 @@ apiRoutes.post("/lamps/bulk", bearerAuth, async (c) => {
       inserts.push({
         userId: user.id,
         songId: entry.songId,
+        title: entry.title,
         difficulty: entry.difficulty,
         lamp: entry.lamp,
         exScore: entry.exScore ?? null,
@@ -285,10 +289,11 @@ apiRoutes.post("/lamps/bulk", bearerAuth, async (c) => {
   for (const ins of inserts) {
     statements.push(
       c.env.DB.prepare(
-        "INSERT INTO lamps (user_id, song_id, difficulty, lamp, ex_score, miss_count, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO lamps (user_id, song_id, title, difficulty, lamp, ex_score, miss_count, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       ).bind(
         ins.userId,
         ins.songId,
+        ins.title,
         ins.difficulty,
         ins.lamp,
         ins.exScore,
@@ -322,8 +327,15 @@ apiRoutes.post("/lamps/bulk", bearerAuth, async (c) => {
     );
   }
 
-  if (statements.length > 0) {
-    await c.env.DB.batch(statements);
+  // D1 batch API limits to 500 statements per call
+  const BATCH_SIZE = 500;
+  try {
+    for (let i = 0; i < statements.length; i += BATCH_SIZE) {
+      await c.env.DB.batch(statements.slice(i, i + BATCH_SIZE));
+    }
+  } catch (e) {
+    console.error("D1 batch error:", e);
+    return c.json({ error: "D1 batch failed", detail: String(e) }, 500);
   }
 
   return c.json({
@@ -371,6 +383,7 @@ apiRoutes.get(
     return c.json({
       lamps: updatedLamps.map((l) => ({
         songId: l.songId,
+        title: l.title,
         difficulty: l.difficulty,
         lamp: l.lamp,
         exScore: l.exScore,
@@ -407,6 +420,7 @@ apiRoutes.post("/charts/sync", async (c) => {
       Array<{
         songId: number;
         title: string;
+        infinitasTitle?: string;
         difficulty: string;
         tier: string;
         attributes?: string;
@@ -422,7 +436,7 @@ apiRoutes.post("/charts/sync", async (c) => {
   const existingCharts = await db.select().from(charts);
   const existingMap = new Map<string, typeof existingCharts[number]>();
   for (const ch of existingCharts) {
-    existingMap.set(`${ch.tableKey}:${ch.songId}:${ch.difficulty}`, ch);
+    existingMap.set(`${ch.tableKey}:${ch.infinitasTitle}:${ch.difficulty}`, ch);
   }
 
   const insertStatements: D1PreparedStatement[] = [];
@@ -430,16 +444,18 @@ apiRoutes.post("/charts/sync", async (c) => {
 
   for (const [tableKey, tableEntries] of Object.entries(body)) {
     for (const entry of tableEntries) {
-      const key = `${tableKey}:${entry.songId}:${entry.difficulty}`;
+      const infinitasTitle = entry.infinitasTitle ?? entry.title;
+      const key = `${tableKey}:${infinitasTitle}:${entry.difficulty}`;
       const existing = existingMap.get(key);
 
       if (existing) {
         updateStatements.push(
           c.env.DB.prepare(
-            "UPDATE charts SET song_id = ?, title = ?, difficulty = ?, tier = ?, attributes = ?, sort_order = ? WHERE id = ?",
+            "UPDATE charts SET song_id = ?, title = ?, infinitas_title = ?, difficulty = ?, tier = ?, attributes = ?, sort_order = ? WHERE id = ?",
           ).bind(
             entry.songId,
             entry.title,
+            infinitasTitle,
             entry.difficulty,
             entry.tier,
             entry.attributes ?? null,
@@ -450,11 +466,12 @@ apiRoutes.post("/charts/sync", async (c) => {
       } else {
         insertStatements.push(
           c.env.DB.prepare(
-            "INSERT INTO charts (table_key, song_id, title, difficulty, tier, attributes, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO charts (table_key, song_id, title, infinitas_title, difficulty, tier, attributes, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
           ).bind(
             tableKey,
             entry.songId,
             entry.title,
+            infinitasTitle,
             entry.difficulty,
             entry.tier,
             entry.attributes ?? null,

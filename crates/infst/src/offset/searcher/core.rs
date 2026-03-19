@@ -272,6 +272,86 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         Ok(offsets)
     }
 
+    /// Search offsets required for export operations (song list + unlock data, no data_map).
+    ///
+    /// Scores are read from the entry table's embedded fields, so DataMap is not needed.
+    pub fn search_export_offsets(&mut self) -> Result<OffsetsCollection> {
+        debug!("Starting export-offset detection...");
+
+        let mut offsets = OffsetsCollection {
+            version: "unknown".to_string(),
+            ..Default::default()
+        };
+
+        let base = self.reader.base_address();
+        let song_list_hint = self
+            .song_list_hint
+            .unwrap_or(base + EXPECTED_SONG_LIST_OFFSET);
+
+        offsets.song_list = self.search_song_list_offset(song_list_hint)?;
+        debug!("  SongList: 0x{:X}", offsets.song_list);
+
+        if let Some(stride) = self.detect_entry_stride(offsets.song_list) {
+            offsets.song_entry_size = stride;
+        } else if let Ok(entry_table) = self.search_song_list_by_song_id(offsets.song_list) {
+            offsets.song_entry_table = entry_table;
+            offsets.song_entry_size = self
+                .detect_entry_stride(entry_table)
+                .unwrap_or(crate::chart::SongInfo::MEMORY_SIZE);
+        }
+
+        offsets.unlock_data = self.search_unlock_data_offset(offsets.song_list)?;
+        debug!("  UnlockData: 0x{:X}", offsets.unlock_data);
+
+        if offsets.song_list == 0 || offsets.unlock_data == 0 {
+            return Err(Error::offset_search_failed(
+                "Validation failed: required export offsets are zero".to_string(),
+            ));
+        }
+
+        debug!("Export-offset detection completed successfully");
+        Ok(offsets)
+    }
+
+    /// Search only the song list offset (no data_map or unlock_data).
+    ///
+    /// This is the lightest variant, used when scores come from
+    /// the entry table's embedded fields and no unlock data is needed.
+    pub fn search_song_list_only(&mut self) -> Result<OffsetsCollection> {
+        debug!("Starting song-list-only offset detection...");
+
+        let mut offsets = OffsetsCollection {
+            version: "unknown".to_string(),
+            ..Default::default()
+        };
+
+        let base = self.reader.base_address();
+        let song_list_hint = self
+            .song_list_hint
+            .unwrap_or(base + EXPECTED_SONG_LIST_OFFSET);
+
+        offsets.song_list = self.search_song_list_offset(song_list_hint)?;
+        debug!("  SongList: 0x{:X}", offsets.song_list);
+
+        if let Some(stride) = self.detect_entry_stride(offsets.song_list) {
+            offsets.song_entry_size = stride;
+        } else if let Ok(entry_table) = self.search_song_list_by_song_id(offsets.song_list) {
+            offsets.song_entry_table = entry_table;
+            offsets.song_entry_size = self
+                .detect_entry_stride(entry_table)
+                .unwrap_or(crate::chart::SongInfo::MEMORY_SIZE);
+        }
+
+        if offsets.song_list == 0 {
+            return Err(Error::offset_search_failed(
+                "Validation failed: song_list offset is zero".to_string(),
+            ));
+        }
+
+        debug!("Song-list-only offset detection completed successfully");
+        Ok(offsets)
+    }
+
     /// Validate all offsets in a collection (delegates to validation module)
     #[inline]
     pub fn validate_signature_offsets(&self, offsets: &OffsetsCollection) -> bool {

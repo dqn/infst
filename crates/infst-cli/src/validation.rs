@@ -57,6 +57,8 @@ mod tests {
             folder: 1,
             levels: [0; 10],
             total_notes: notes,
+            embedded_ex_scores: [0u32; 10],
+            embedded_lamps: [0u32; 10],
             unlock_type: UnlockType::Base,
         }
     }

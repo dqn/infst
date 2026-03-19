@@ -2,7 +2,7 @@ import type { FC } from "hono/jsx";
 import { getLampStyle } from "../lib/lamp";
 
 interface LampCellProps {
-  songId: number;
+  infinitasTitle: string;
   title: string;
   difficulty: string;
   lamp: string;
@@ -10,14 +10,14 @@ interface LampCellProps {
 }
 
 export const LampCell: FC<LampCellProps> = ({
-  songId,
+  infinitasTitle,
   title,
   difficulty,
   lamp,
   attributes,
 }) => {
   const style = getLampStyle(lamp);
-  const lookupKey = `${songId}:${difficulty}`;
+  const lookupKey = `${infinitasTitle}:${difficulty}`;
 
   const cellStyle: Record<string, string> = {
     padding: "4px 8px",

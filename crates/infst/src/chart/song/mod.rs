@@ -39,6 +39,10 @@ pub struct SongInfo {
     pub levels: [u8; 10],
     /// Total notes for each difficulty
     pub total_notes: [u32; 10],
+    /// Embedded EX scores from entry table (10 x u32: SPB,SPN,SPH,SPA,SPL,DPB,DPN,DPH,DPA,DPL)
+    pub embedded_ex_scores: [u32; 10],
+    /// Embedded clear lamps from entry table (10 x u32: 0=NO PLAY..7=FC)
+    pub embedded_lamps: [u32; 10],
     pub unlock_type: UnlockType,
 }
 
@@ -87,6 +91,8 @@ impl SongInfo {
     const LEVELS_OFFSET: usize = 0x360; // 864
     const NOTES_OFFSET: usize = 0x378; // 888
     const NOTES_STRIDE: usize = 8; // 8 bytes per note entry (u32 + 4 bytes padding)
+    const EX_SCORE_OFFSET: usize = 0x3F0; // 10 x u32 (40 bytes)
+    const LAMP_OFFSET: usize = 0x430; // 10 x u32 (40 bytes)
 
     /// Get level for a specific difficulty index
     pub fn get_level(&self, difficulty_index: usize) -> u8 {
@@ -149,6 +155,18 @@ impl SongInfo {
             *note_count = buf.read_u32_at(Self::NOTES_OFFSET + i * Self::NOTES_STRIDE)?;
         }
 
+        // Read embedded EX scores (10 x u32 at offset 0x3F0)
+        let mut embedded_ex_scores = [0u32; 10];
+        for (i, score) in embedded_ex_scores.iter_mut().enumerate() {
+            *score = buf.read_u32_at(Self::EX_SCORE_OFFSET + i * 4)?;
+        }
+
+        // Read embedded clear lamps (10 x u32 at offset 0x430)
+        let mut embedded_lamps = [0u32; 10];
+        for (i, lamp) in embedded_lamps.iter_mut().enumerate() {
+            *lamp = buf.read_u32_at(Self::LAMP_OFFSET + i * 4)?;
+        }
+
         Ok(Some(SongInfo {
             id: song_id as u32,
             title,
@@ -159,6 +177,8 @@ impl SongInfo {
             folder,
             levels,
             total_notes,
+            embedded_ex_scores,
+            embedded_lamps,
             unlock_type: UnlockType::default(),
         }))
     }

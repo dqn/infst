@@ -32,7 +32,7 @@
       .then(function(data) {
         if (data.lamps && data.lamps.length > 0) {
           data.lamps.forEach(function(l) {
-            updateCell(l.songId + ":" + l.difficulty, l.lamp);
+            updateCell(l.title + ":" + l.difficulty, l.lamp);
           });
           lastPoll = new Date().toISOString();
           if (typeof window.__tableFilterApply === 'function') {
