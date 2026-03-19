@@ -213,6 +213,7 @@ impl Infst {
         thread::sleep(Duration::from_millis(polling::RESULT_INITIAL_DELAY_MS));
 
         // Poll until play data becomes available (exponential backoff)
+        let mut ever_saw_valid_lamp = false;
         for (attempt, &delay) in polling::POLL_DELAYS_MS.iter().enumerate() {
             thread::sleep(Duration::from_millis(delay));
 
@@ -236,6 +237,9 @@ impl Infst {
 
                     // Lamp must be at least Failed when notes exist (NoPlay means data not yet written)
                     let lamp_valid = play_data.lamp >= Lamp::Failed;
+                    if lamp_valid {
+                        ever_saw_valid_lamp = true;
+                    }
 
                     debug!(
                         "Attempt {}: song_id={}, total_notes={}, chart_valid={}, lamp={}, lamp_valid={}, judge: P={} G={} Go={} B={} Po={}",
@@ -286,7 +290,7 @@ impl Infst {
                 }
                 Err(e) => {
                     if attempt == polling::POLL_DELAYS_MS.len() - 1 {
-                        error!(
+                        debug!(
                             "Failed to fetch play data after {} attempts: {}",
                             polling::POLL_DELAYS_MS.len(),
                             e
@@ -296,11 +300,17 @@ impl Infst {
             }
         }
 
-        // Initial polling failed; fall back to continuous polling in the main loop
-        warn!("Initial result polling failed, enabling continuous polling");
-        self.result_poll_pending = true;
-        self.result_poll_ticks = 0;
-        self.pending_result_fingerprint = None;
+        // Only fall back to continuous polling if we saw valid lamp at some point.
+        // If lamp was always NoPlay, this is a false Playing->ResultScreen transition
+        // caused by state marker jitter, not a real play result.
+        if ever_saw_valid_lamp {
+            debug!("Initial polling incomplete, enabling continuous polling");
+            self.result_poll_pending = true;
+            self.result_poll_ticks = 0;
+            self.pending_result_fingerprint = None;
+        } else {
+            debug!("No valid lamp during initial polling (false transition), skipping");
+        }
         self.current_playing = None;
     }
 
