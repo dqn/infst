@@ -515,24 +515,19 @@ impl Infst {
             return;
         }
 
-        let endpoint = api_config.endpoint.clone();
-        let token = api_config.token.clone();
-        let song_id = play_data.chart.song_id;
-        let difficulty = play_data.chart.difficulty.short_name().to_string();
-        let lamp = play_data.lamp.short_name().to_string();
-        let ex_score = play_data.ex_score;
-        let miss_count = play_data.miss_count();
+        let req = LampRequest {
+            endpoint: api_config.endpoint.clone(),
+            token: api_config.token.clone(),
+            song_id: play_data.chart.song_id,
+            title: play_data.chart.title.trim().to_string(),
+            difficulty: play_data.chart.difficulty.short_name().to_string(),
+            lamp: play_data.lamp.short_name().to_string(),
+            ex_score: play_data.ex_score,
+            miss_count: play_data.miss_count(),
+        };
 
         thread::spawn(move || {
-            if let Err(e) = send_lamp_request(
-                &endpoint,
-                &token,
-                song_id,
-                &difficulty,
-                &lamp,
-                ex_score,
-                miss_count,
-            ) {
+            if let Err(e) = send_lamp_request(&req) {
                 warn!("Failed to send lamp to API: {}", e);
             }
         });
@@ -982,22 +977,27 @@ impl Infst {
 }
 
 #[cfg(feature = "api")]
-fn send_lamp_request(
-    endpoint: &str,
-    token: &str,
+struct LampRequest {
+    endpoint: String,
+    token: String,
     song_id: u32,
-    difficulty: &str,
-    lamp: &str,
+    title: String,
+    difficulty: String,
+    lamp: String,
     ex_score: u32,
     miss_count: u32,
-) -> anyhow::Result<()> {
-    let url = format!("{}/api/lamps", endpoint.trim_end_matches('/'));
+}
+
+#[cfg(feature = "api")]
+fn send_lamp_request(req: &LampRequest) -> anyhow::Result<()> {
+    let url = format!("{}/api/lamps", req.endpoint.trim_end_matches('/'));
     let body = serde_json::json!({
-        "songId": song_id,
-        "difficulty": difficulty,
-        "lamp": lamp,
-        "exScore": ex_score,
-        "missCount": miss_count,
+        "songId": req.song_id,
+        "title": req.title,
+        "difficulty": req.difficulty,
+        "lamp": req.lamp,
+        "exScore": req.ex_score,
+        "missCount": req.miss_count,
     });
 
     let config = ureq::Agent::config_builder()
@@ -1006,7 +1006,7 @@ fn send_lamp_request(
     let agent: ureq::Agent = config.into();
     let response = agent
         .post(&url)
-        .header("Authorization", &format!("Bearer {}", token))
+        .header("Authorization", &format!("Bearer {}", req.token))
         .send_json(&body)?;
 
     tracing::debug!("API response: {}", response.status());
