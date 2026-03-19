@@ -163,6 +163,11 @@ impl ScoreMap {
             if !(0..5).contains(&diff) || !(0..2).contains(&playtype) {
                 continue;
             }
+            // Validate lamp value as i32 before casting to u8 to prevent truncation
+            // (e.g., 0x107 would silently become 7/FullCombo via `as u8`)
+            if !(0..=7).contains(&node.lamp) {
+                continue;
+            }
             // Calculate difficulty index: diff + playtype * 5
             let difficulty_index = (diff + playtype * 5) as usize;
 
@@ -529,5 +534,81 @@ mod tests {
         assert_eq!(node.miss_count, 15);
         assert_eq!(node.lamp, 5);
         assert_eq!(node.key(), (1000, 3, 0));
+    }
+
+    /// Helper: build a mock memory reader with a custom lamp value.
+    /// Returns (reader, data_map_addr).
+    fn build_single_node_reader_with_lamp(lamp: i32) -> (MockMemoryReader, u64) {
+        let base = 0x1000u64;
+        let data_map_addr = base + 16;
+        let table_start = base + 32;
+        let table_end = table_start + 8;
+        let null_obj = 0xDEADu64;
+        let node_addr = base + 40;
+
+        let mut node_bytes = [0u8; 64];
+        node_bytes[0..8].copy_from_slice(&0u64.to_le_bytes()); // next = 0
+        node_bytes[8..16].copy_from_slice(&0u64.to_le_bytes()); // prev = 0
+        node_bytes[16..20].copy_from_slice(&0i32.to_le_bytes()); // diff = 0 (SPB)
+        node_bytes[20..24].copy_from_slice(&1001i32.to_le_bytes()); // song
+        node_bytes[24..28].copy_from_slice(&0i32.to_le_bytes()); // playtype = 0 (SP)
+        node_bytes[32..36].copy_from_slice(&1500u32.to_le_bytes()); // score
+        node_bytes[36..40].copy_from_slice(&5u32.to_le_bytes()); // miss_count
+        node_bytes[48..52].copy_from_slice(&lamp.to_le_bytes()); // lamp (custom)
+
+        let reader = MockMemoryBuilder::new()
+            .base(base)
+            .with_size(104)
+            .write_u64(0, null_obj)
+            .write_u64(16, table_start)
+            .write_u64(24, table_end)
+            .write_u64(32, node_addr)
+            .write_bytes(40, &node_bytes)
+            .build();
+
+        (reader, data_map_addr)
+    }
+
+    #[test]
+    fn test_load_from_memory_rejects_truncated_lamp_0x107() {
+        // 0x107 = 263; `as u8` would truncate to 7 (FullCombo) -- must be rejected
+        let (reader, data_map_addr) = build_single_node_reader_with_lamp(0x107);
+        let song_db: HashMap<u32, SongInfo> = HashMap::new();
+        let result = ScoreMap::load_from_memory(&reader, data_map_addr, &song_db).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_load_from_memory_rejects_negative_lamp() {
+        let (reader, data_map_addr) = build_single_node_reader_with_lamp(-1);
+        let song_db: HashMap<u32, SongInfo> = HashMap::new();
+        let result = ScoreMap::load_from_memory(&reader, data_map_addr, &song_db).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_load_from_memory_rejects_lamp_8() {
+        // lamp=8 is one past FullCombo(7), must be rejected
+        let (reader, data_map_addr) = build_single_node_reader_with_lamp(8);
+        let song_db: HashMap<u32, SongInfo> = HashMap::new();
+        let result = ScoreMap::load_from_memory(&reader, data_map_addr, &song_db).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_load_from_memory_accepts_valid_lamp_values() {
+        // All valid lamp values (0..=7) should be accepted
+        for lamp_val in 0..=7i32 {
+            let (reader, data_map_addr) = build_single_node_reader_with_lamp(lamp_val);
+            let song_db: HashMap<u32, SongInfo> = HashMap::new();
+            let result = ScoreMap::load_from_memory(&reader, data_map_addr, &song_db).unwrap();
+            assert_eq!(result.len(), 1, "lamp={lamp_val} should be accepted");
+            let score_data = result.get(1001).unwrap();
+            let expected_lamp = Lamp::from_u8(lamp_val as u8).unwrap();
+            assert_eq!(
+                score_data.lamp[0], expected_lamp,
+                "lamp={lamp_val} mismatch"
+            );
+        }
     }
 }
