@@ -188,10 +188,10 @@ fn find_difficulty_columns(columns: &[&str]) -> Vec<(String, DifficultyColumns)>
     let mut result = Vec::new();
 
     for diff in &difficulties {
-        let rating_name = format!("{}_Rating", diff);
-        let lamp_name = format!("{}_Lamp", diff);
-        let ex_score_name = format!("{}_EXScore", diff);
-        let miss_count_name = format!("{}_MissCount", diff);
+        let rating_name = format!("{} Rating", diff);
+        let lamp_name = format!("{} Lamp", diff);
+        let ex_score_name = format!("{} EX Score", diff);
+        let miss_count_name = format!("{} Miss Count", diff);
 
         let rating_idx = columns.iter().position(|c| *c == rating_name);
         let lamp_idx = columns.iter().position(|c| *c == lamp_name);
@@ -214,4 +214,39 @@ fn find_difficulty_columns(columns: &[&str]) -> Vec<(String, DifficultyColumns)>
     }
 
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_find_difficulty_columns_matches_tracker_header() {
+        let header = infst::format_tracker_tsv_header();
+        let columns: Vec<&str> = header.split('\t').collect();
+
+        let difficulty_columns = find_difficulty_columns(&columns);
+
+        // Should find all 8 difficulties (SPB is in the header but not searched by upload)
+        let expected_diffs = ["SPN", "SPH", "SPA", "SPL", "DPN", "DPH", "DPA", "DPL"];
+        assert_eq!(
+            difficulty_columns.len(),
+            expected_diffs.len(),
+            "Expected {} difficulties but found {}",
+            expected_diffs.len(),
+            difficulty_columns.len()
+        );
+
+        for (i, (diff_name, cols)) in difficulty_columns.iter().enumerate() {
+            assert_eq!(diff_name, expected_diffs[i]);
+            // Verify the column indices point to correct headers
+            assert_eq!(columns[cols.rating], format!("{} Rating", diff_name));
+            assert_eq!(columns[cols.lamp], format!("{} Lamp", diff_name));
+            assert_eq!(columns[cols.ex_score], format!("{} EX Score", diff_name));
+            assert_eq!(
+                columns[cols.miss_count],
+                format!("{} Miss Count", diff_name)
+            );
+        }
+    }
 }
