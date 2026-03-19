@@ -77,7 +77,11 @@ impl SongInfo {
     //
     // Metadata:
     //   0x360: Difficulty levels (10 bytes)
-    //   0x378: Total notes (10 x u32, 8-byte stride)
+    //   0x378: BPM (10 x u32, 8-byte stride; same value for all difficulties)
+    //          In V3 this field contains BPM, NOT per-difficulty total_notes.
+    //          When all 10 values are identical we treat them as BPM and zero
+    //          out total_notes (unreliable). Actual per-chart total_notes is
+    //          obtained at runtime from CurrentSong + 0x10.
     //
     // Score data (player-specific):
     //   0x3F0: EX scores (10 x u32)
@@ -89,8 +93,8 @@ impl SongInfo {
     const GENRE_OFFSET: usize = 0x240; // 576
     const ARTIST_OFFSET: usize = 0x2C0; // 704
     const LEVELS_OFFSET: usize = 0x360; // 864
-    const NOTES_OFFSET: usize = 0x378; // 888
-    const NOTES_STRIDE: usize = 8; // 8 bytes per note entry (u32 + 4 bytes padding)
+    const BPM_NOTES_OFFSET: usize = 0x378; // 888: BPM in V3 (all identical), possibly notes in older versions
+    const BPM_NOTES_STRIDE: usize = 8; // 8 bytes per entry (u32 + 4 bytes padding)
     const EX_SCORE_OFFSET: usize = 0x3F0; // 10 x u32 (40 bytes)
     const LAMP_OFFSET: usize = 0x430; // 10 x u32 (40 bytes)
 
@@ -146,14 +150,27 @@ impl SongInfo {
         let mut levels = [0u8; 10];
         levels.copy_from_slice(buf.slice_at(Self::LEVELS_OFFSET, 10)?);
 
-        // BPM is not stored in this structure version (2016051600+)
-        let bpm: Arc<str> = Arc::from("");
-
-        // Parse note counts (10 entries, 8-byte stride: u32 value + 4 bytes padding)
-        let mut total_notes = [0u32; 10];
-        for (i, note_count) in total_notes.iter_mut().enumerate() {
-            *note_count = buf.read_u32_at(Self::NOTES_OFFSET + i * Self::NOTES_STRIDE)?;
+        // Read 10 x u32 at 0x378 (8-byte stride). In V3 this contains BPM
+        // (same value for all difficulties), not per-difficulty total_notes.
+        let mut raw_values = [0u32; 10];
+        for (i, val) in raw_values.iter_mut().enumerate() {
+            *val = buf.read_u32_at(Self::BPM_NOTES_OFFSET + i * Self::BPM_NOTES_STRIDE)?;
         }
+
+        // Detect BPM vs total_notes: when all non-zero values are identical,
+        // this is BPM data, not per-chart note counts.
+        let non_zero: Vec<u32> = raw_values.iter().copied().filter(|&v| v > 0).collect();
+        let all_identical = !non_zero.is_empty() && non_zero.iter().all(|&v| v == non_zero[0]);
+
+        let (bpm, total_notes) = if all_identical {
+            // BPM detected: populate bpm field, zero out total_notes (unreliable)
+            let bpm: Arc<str> = Arc::from(non_zero[0].to_string());
+            (bpm, [0u32; 10])
+        } else {
+            // Treat as per-difficulty note counts (older layout or mixed values)
+            let bpm: Arc<str> = Arc::from("");
+            (bpm, raw_values)
+        };
 
         // Read embedded EX scores (10 x u32 at offset 0x3F0)
         let mut embedded_ex_scores = [0u32; 10];
@@ -267,10 +284,14 @@ mod tests {
         let len = title_bytes.len().min(SongInfo::SLAB);
         entry[SongInfo::TITLE_OFFSET..SongInfo::TITLE_OFFSET + len]
             .copy_from_slice(&title_bytes[..len]);
-        // Write at least one non-zero level and note count for the entry to be meaningful
+        // Write at least one non-zero level for the entry to be meaningful
         entry[SongInfo::LEVELS_OFFSET] = 12; // SPB level = 12
-        entry[SongInfo::NOTES_OFFSET..SongInfo::NOTES_OFFSET + 4]
+        // Write distinct note counts so all-identical BPM detection does NOT trigger
+        entry[SongInfo::BPM_NOTES_OFFSET..SongInfo::BPM_NOTES_OFFSET + 4]
             .copy_from_slice(&100u32.to_le_bytes()); // SPB notes = 100
+        entry[SongInfo::BPM_NOTES_OFFSET + SongInfo::BPM_NOTES_STRIDE
+            ..SongInfo::BPM_NOTES_OFFSET + SongInfo::BPM_NOTES_STRIDE + 4]
+            .copy_from_slice(&200u32.to_le_bytes()); // SPN notes = 200
         entry
     }
 
@@ -459,5 +480,81 @@ mod tests {
         assert_eq!(normalize_title_for_matching("A!B@C#D"), "abcd");
         assert_eq!(normalize_title_for_matching("テスト曲名"), "テスト曲名");
         assert_eq!(normalize_title_for_matching(""), "");
+    }
+
+    /// Helper to build a song entry with the same BPM value across all 10 slots
+    /// (simulating V3 layout where 0x378 holds BPM, not total_notes)
+    fn build_song_entry_with_bpm(title: &str, song_id: u32, bpm: u32) -> Vec<u8> {
+        let mut entry = vec![0u8; SongInfo::MEMORY_SIZE];
+        entry[SongInfo::SONG_ID_OFFSET..SongInfo::SONG_ID_OFFSET + 4]
+            .copy_from_slice(&(song_id as i32).to_le_bytes());
+        let (encoded, _, _) = encoding_rs::SHIFT_JIS.encode(title);
+        let title_bytes = encoded.as_ref();
+        let len = title_bytes.len().min(SongInfo::SLAB);
+        entry[SongInfo::TITLE_OFFSET..SongInfo::TITLE_OFFSET + len]
+            .copy_from_slice(&title_bytes[..len]);
+        entry[SongInfo::LEVELS_OFFSET] = 12;
+        // Write same BPM value to all 10 slots
+        for i in 0..10 {
+            let off = SongInfo::BPM_NOTES_OFFSET + i * SongInfo::BPM_NOTES_STRIDE;
+            entry[off..off + 4].copy_from_slice(&bpm.to_le_bytes());
+        }
+        entry
+    }
+
+    #[test]
+    fn test_bpm_detection_all_identical_values() {
+        let entry = build_song_entry_with_bpm("BPM Song", 1001, 150);
+        let song = SongInfo::parse_from_buffer(&entry, 0).unwrap().unwrap();
+
+        // All 10 values identical -> detected as BPM
+        assert_eq!(&*song.bpm, "150");
+        // total_notes should be zeroed out (unreliable)
+        assert_eq!(song.total_notes, [0u32; 10]);
+    }
+
+    #[test]
+    fn test_bpm_detection_mixed_values_treated_as_notes() {
+        // build_song_entry writes 100 and 200 for SPB/SPN -> distinct values
+        let entry = build_song_entry("Notes Song", 1002);
+        let song = SongInfo::parse_from_buffer(&entry, 0).unwrap().unwrap();
+
+        // Mixed values -> not BPM, treated as note counts
+        assert_eq!(&*song.bpm, "");
+        assert_eq!(song.total_notes[0], 100); // SPB
+        assert_eq!(song.total_notes[1], 200); // SPN
+    }
+
+    #[test]
+    fn test_bpm_detection_all_zeros_no_bpm() {
+        let mut entry = vec![0u8; SongInfo::MEMORY_SIZE];
+        entry[SongInfo::SONG_ID_OFFSET..SongInfo::SONG_ID_OFFSET + 4]
+            .copy_from_slice(&1001i32.to_le_bytes());
+        // All 10 values at 0x378 are 0 (no non-zero values)
+        let song = SongInfo::parse_from_buffer(&entry, 0).unwrap().unwrap();
+
+        // All zeros -> non_zero vec is empty -> not treated as BPM
+        assert_eq!(&*song.bpm, "");
+        assert_eq!(song.total_notes, [0u32; 10]);
+    }
+
+    #[test]
+    fn test_bpm_detection_partial_zeros_all_nonzero_identical() {
+        // Some slots have levels (notes), some are 0 (no chart).
+        // In V3 BPM: only difficulties with charts have a value, but all
+        // non-zero values are the same BPM.
+        let mut entry = vec![0u8; SongInfo::MEMORY_SIZE];
+        entry[SongInfo::SONG_ID_OFFSET..SongInfo::SONG_ID_OFFSET + 4]
+            .copy_from_slice(&1001i32.to_le_bytes());
+        // Write BPM=170 to slots 1,2,3 only (SPN,SPH,SPA); rest are 0
+        for i in [1, 2, 3] {
+            let off = SongInfo::BPM_NOTES_OFFSET + i * SongInfo::BPM_NOTES_STRIDE;
+            entry[off..off + 4].copy_from_slice(&170u32.to_le_bytes());
+        }
+        let song = SongInfo::parse_from_buffer(&entry, 0).unwrap().unwrap();
+
+        // All non-zero values identical -> BPM detected
+        assert_eq!(&*song.bpm, "170");
+        assert_eq!(song.total_notes, [0u32; 10]);
     }
 }
