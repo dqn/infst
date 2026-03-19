@@ -11,6 +11,14 @@ use crate::score::Lamp;
 /// The table is typically a few hundred KB; anything larger suggests corrupt memory.
 const MAX_DATA_MAP_BUFFER_SIZE: usize = 16 * 1024 * 1024;
 
+/// Sentinel value found in INFINITAS data map hash table buckets.
+///
+/// Buckets containing this value do not point to a valid linked list and must be
+/// skipped during traversal. The value originates from the game engine's hash table
+/// implementation and is distinct from both null (0x0) and the null_obj pointer.
+/// Also defined in `offset::searcher::constants::DATA_MAP_SENTINEL`.
+const DATA_MAP_HASH_BUCKET_SENTINEL: u64 = 0x494fdce0;
+
 /// Score data for a single song (all difficulties)
 #[derive(Debug, Clone, Default)]
 pub struct ScoreData {
@@ -143,8 +151,8 @@ impl ScoreMap {
         for i in 0..(buffer_size / 8) {
             let addr = buf.read_u64_at(i * 8).unwrap_or(0);
 
-            // Skip null entries and magic number entries
-            if addr != 0 && addr != null_obj && addr != 0x494fdce0 {
+            // Skip null, null_obj, and sentinel bucket entries
+            if addr != 0 && addr != null_obj && addr != DATA_MAP_HASH_BUCKET_SENTINEL {
                 entry_points.push(addr);
             }
         }
