@@ -34,7 +34,7 @@ impl PlayData {
     /// Calculate grade from EX score
     pub fn calculate_grade(ex_score: u32, total_notes: u32) -> Grade {
         if total_notes == 0 {
-            return Grade::F;
+            return Grade::NoPlay;
         }
         let max_ex = total_notes as u64 * 2;
         let ratio = ex_score as f64 / max_ex as f64;
@@ -97,6 +97,20 @@ pub fn calculate_dj_points_from_score(ex_score: u32, total_notes: u32, lamp: Lam
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_calculate_grade_zero_total_notes_returns_no_play() {
+        assert_eq!(PlayData::calculate_grade(0, 0), Grade::NoPlay);
+        assert_eq!(PlayData::calculate_grade(100, 0), Grade::NoPlay);
+    }
+
+    #[test]
+    fn test_calculate_grade_normal() {
+        // AAA: ratio >= 8/9
+        assert_eq!(PlayData::calculate_grade(1800, 1000), Grade::Aaa);
+        // F: ratio < 2/9
+        assert_eq!(PlayData::calculate_grade(100, 1000), Grade::F);
+    }
 
     #[test]
     fn test_calculate_dj_points() {
