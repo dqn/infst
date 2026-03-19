@@ -203,14 +203,11 @@ impl ScoreMap {
                 break;
             };
             let node = ListNode::from_bytes(&buffer);
-            let song_id = node.song as u32;
             let next_addr = node.next;
 
-            // Skip songs not in our database but continue traversal.
-            // In V3, game_id != internal_id, so many valid DataMap entries
-            // won't be in the song_db. We still collect them for score data.
-            // Only break on clearly invalid song_ids (data corruption).
-            if !(1000..=90000).contains(&(song_id as i32)) {
+            // Validate song_id (i32) directly before casting to u32.
+            // Break on clearly invalid values (data corruption).
+            if !(1000..=90000).contains(&node.song) {
                 break;
             }
 

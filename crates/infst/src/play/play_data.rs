@@ -55,7 +55,7 @@ const DJ_POINTS_DIVISOR: f64 = 10000.0;
 ///
 /// Formula:
 /// - C = (grade >= A ? 10 : 0) + max(0, grade - A) * 5
-/// - L = max(0, lamp - AC) * 5 + (lamp >= HC ? 5 : 0)
+/// - L = max(0, lamp - AC) * 5 + (lamp >= HC ? 5 : 0)  // EC=5, Clear=10, HC=20, ExHard=25, FC=30
 /// - DJ Points = score * (100 + C + L) / 10000
 pub fn calculate_dj_points(ex_score: u32, grade: Grade, lamp: Lamp) -> f64 {
     // Grade bonus: A=10, AA=15, AAA=20
@@ -68,7 +68,7 @@ pub fn calculate_dj_points(ex_score: u32, grade: Grade, lamp: Lamp) -> f64 {
         0
     };
 
-    // Lamp bonus: NC/EC=5, HC=15, EX=20, FC=25
+    // Lamp bonus: EC=5, Clear=10, HC=20, ExHard=25, FC=30
     let lamp_val = lamp as i32;
     let lamp_ac_val = Lamp::AssistClear as i32;
     let lamp_hc_val = Lamp::HardClear as i32;
