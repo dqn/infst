@@ -157,7 +157,9 @@ impl<'a, R: ReadMemory> PatternSearcher<'a, R> {
             )));
         }
 
-        let last_match = *last_matches.last().expect("matches is non-empty");
+        let last_match = *last_matches
+            .last()
+            .ok_or_else(|| Error::offset_search_failed("matches unexpectedly empty"))?;
         let address = last_match.wrapping_add_signed(offset_from_match);
         Ok(address)
     }
