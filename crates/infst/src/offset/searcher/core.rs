@@ -424,8 +424,9 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         let base = self.reader.base_address();
         // Don't go below base address (unmapped memory region)
         let start = center.saturating_sub(distance as u64).max(base);
+        let data = self.reader.read_bytes(start, distance * 2)?;
         self.buffer_base = start;
-        self.buffer = self.reader.read_bytes(start, distance * 2)?;
+        self.buffer = data;
         Ok(())
     }
 }

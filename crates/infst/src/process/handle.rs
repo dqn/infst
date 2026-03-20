@@ -64,17 +64,22 @@ impl ProcessHandle {
             })?
         };
 
-        let (base_address, module_size) = get_module_info(handle).map_err(|e| {
-            tracing::debug!("get_module_info failed: {}", e);
-            e
-        })?;
-
-        Ok(Self {
-            handle,
-            pid,
-            base_address,
-            module_size,
-        })
+        let result = get_module_info(handle);
+        match result {
+            Ok((base_address, module_size)) => Ok(Self {
+                handle,
+                pid,
+                base_address,
+                module_size,
+            }),
+            Err(e) => {
+                tracing::debug!("get_module_info failed: {}", e);
+                // SAFETY: handle is a valid HANDLE from OpenProcess. Since ProcessHandle
+                // was never constructed, its Drop won't run, so we must close it here.
+                let _ = unsafe { CloseHandle(handle) };
+                Err(e)
+            }
+        }
     }
 
     pub fn handle(&self) -> HANDLE {

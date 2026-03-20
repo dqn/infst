@@ -11,23 +11,18 @@ use windows::Win32::Foundation::HWND;
 /// process matches `target_pid`.
 #[cfg(target_os = "windows")]
 pub fn find_window_by_pid(target_pid: u32) -> anyhow::Result<HWND> {
-    use std::sync::Mutex;
     use windows::Win32::Foundation::LPARAM;
     use windows::Win32::UI::WindowsAndMessaging::EnumWindows;
 
-    // Shared state for the enum callback
-    let found: Mutex<Option<HWND>> = Mutex::new(None);
-    let _found_ref = &found;
     let pid = target_pid;
 
     // SAFETY: EnumWindows calls the callback for each top-level window.
-    // The callback checks the owning PID and visibility.
+    // The callback checks the owning PID and visibility, writing the result
+    // into a thread-local cell.
     unsafe {
-        // We pass pid via the LPARAM so the callback can access it.
         EnumWindows(Some(enum_callback), LPARAM(&pid as *const u32 as isize)).ok();
     }
 
-    // The static callback below writes into a thread-local; we read it here.
     let hwnd = FOUND_HWND.with(|cell| cell.take());
 
     hwnd.ok_or_else(|| anyhow::anyhow!("No visible window found for PID {}", target_pid))
