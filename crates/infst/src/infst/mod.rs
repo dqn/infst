@@ -183,14 +183,14 @@ pub struct Infst {
     pub(crate) current_playing: Option<(u32, Difficulty)>,
     /// Last observed marker values (for diagnostic change logging)
     pub(crate) last_markers: (i32, i32, i32),
-    /// Last captured result fingerprint (song_id, difficulty, ex_score) for dedup
-    pub(crate) last_result_fingerprint: Option<(u32, u8, u32)>,
+    /// Last captured result fingerprint (song_id, difficulty, ex_score, lamp) for dedup
+    pub(crate) last_result_fingerprint: Option<(u32, u8, u32, u8)>,
     /// Whether to poll for result data in the main loop (V3: Playing may not be detected)
     pub(crate) result_poll_pending: bool,
     /// Tick counter for throttling result polling (~1 second intervals)
     pub(crate) result_poll_ticks: u32,
     /// Fingerprint from previous poll (stability check: must match twice to confirm data is final)
-    pub(crate) pending_result_fingerprint: Option<(u32, u8, u32)>,
+    pub(crate) pending_result_fingerprint: Option<(u32, u8, u32, u8)>,
     /// Handle for the background git thread to prevent concurrent git operations
     pub(crate) git_thread: Option<JoinHandle<()>>,
     /// game_id -> internal_id mapping for IIDX pointer aliases.

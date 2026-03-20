@@ -289,6 +289,7 @@ impl Infst {
                             play_data.chart.song_id,
                             play_data.chart.difficulty as u8,
                             play_data.ex_score,
+                            play_data.lamp as u8,
                         );
                         if self.last_result_fingerprint == Some(fingerprint) {
                             debug!("Skipping duplicate result: {:?}", fingerprint);
@@ -357,7 +358,7 @@ impl Infst {
     /// consecutive checks (~1 second apart) to confirm the result is final
     /// and not mid-play accumulating judge counts.
     fn poll_pending_result(&mut self, reader: &MemoryReader) {
-        self.result_poll_ticks += 1;
+        self.result_poll_ticks = self.result_poll_ticks.wrapping_add(1);
 
         // Throttle: check every 10 ticks (~1 second at 100ms polling)
         if !self.result_poll_ticks.is_multiple_of(10) {
@@ -391,6 +392,7 @@ impl Infst {
             play_data.chart.song_id,
             play_data.chart.difficulty as u8,
             play_data.ex_score,
+            play_data.lamp as u8,
         );
 
         // Dedup: skip if this is the same result we already captured
