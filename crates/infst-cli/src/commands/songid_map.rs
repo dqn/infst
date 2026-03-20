@@ -799,10 +799,6 @@ fn dump_full_entry<R: ReadMemory>(
             let mut in_nonzero = false;
             let mut region_start = 0;
             for off in (0..data.len()).step_by(4) {
-                let is_nonzero = data[off..off.min(data.len()).max(off).min(off + 4).max(off)]
-                    .iter()
-                    .chain(data.get(off..off + 4).unwrap_or(&[]).iter())
-                    .any(|&b| b != 0);
                 let chunk = &data[off..(off + 4).min(data.len())];
                 let is_nz = chunk.iter().any(|&b| b != 0);
                 if is_nz && !in_nonzero {
@@ -818,7 +814,6 @@ fn dump_full_entry<R: ReadMemory>(
                     );
                     in_nonzero = false;
                 }
-                let _ = is_nonzero; // suppress warning
             }
             if in_nonzero {
                 hexdump_region_inline(
