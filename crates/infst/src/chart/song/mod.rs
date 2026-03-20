@@ -26,7 +26,8 @@ pub use scan::{
     fetch_song_database_from_memory_scan,
 };
 pub use tsv::{
-    build_song_database_from_tsv_with_memory, load_song_database_from_tsv, merge_song_databases,
+    build_song_database_from_tsv_with_memory, build_song_database_from_tsv_with_memory_layout,
+    load_song_database_from_tsv, merge_song_databases,
 };
 
 /// Song metadata
@@ -114,22 +115,30 @@ impl SongInfo {
         // Parse folder (i32)
         let folder = buf.read_i32_at(layout.folder).unwrap_or(0);
 
+        // Helper: decode Shift-JIS and trim whitespace.
+        // Entry table fields may contain trailing spaces before the null
+        // terminator (or fill the entire 64-byte buffer without one).
+        // Trimming here -- the most upstream location -- ensures all
+        // consumers get clean data and title-based JOINs succeed.
+        let decode_and_trim =
+            |bytes: &[u8]| -> Arc<str> { Arc::from(decode_shift_jis(bytes).trim()) };
+
         // Parse title (always present)
-        let mut title = decode_shift_jis(buf.slice_at(layout.title, Self::SLAB)?);
+        let mut title = decode_and_trim(buf.slice_at(layout.title, Self::SLAB)?);
 
         // Parse optional text fields
         let title_english = if let Some(off) = layout.title_english {
-            decode_shift_jis(buf.slice_at(off, Self::SLAB)?)
+            decode_and_trim(buf.slice_at(off, Self::SLAB)?)
         } else {
             Arc::from("")
         };
         let genre = if let Some(off) = layout.genre {
-            decode_shift_jis(buf.slice_at(off, Self::SLAB)?)
+            decode_and_trim(buf.slice_at(off, Self::SLAB)?)
         } else {
             Arc::from("")
         };
         let mut artist = if let Some(off) = layout.artist {
-            decode_shift_jis(buf.slice_at(off, Self::SLAB)?)
+            decode_and_trim(buf.slice_at(off, Self::SLAB)?)
         } else {
             Arc::from("")
         };
@@ -581,5 +590,76 @@ mod tests {
         // All non-zero values identical -> BPM detected
         assert_eq!(&*song.bpm, "170");
         assert_eq!(song.total_notes, [0u32; 10]);
+    }
+
+    /// Build a song entry with trailing spaces in text fields to test trimming.
+    fn build_song_entry_with_trailing_spaces(title: &str, artist: &str, song_id: u32) -> Vec<u8> {
+        let layout = EntryLayout::v3_default();
+        let mut entry = vec![0u8; SongInfo::MEMORY_SIZE];
+        // Write song_id
+        entry[layout.song_id..layout.song_id + 4].copy_from_slice(&(song_id as i32).to_le_bytes());
+
+        // Write title with trailing spaces as Shift-JIS
+        let (encoded, _, _) = encoding_rs::SHIFT_JIS.encode(title);
+        let title_bytes = encoded.as_ref();
+        let len = title_bytes.len().min(SongInfo::SLAB);
+        entry[layout.title..layout.title + len].copy_from_slice(&title_bytes[..len]);
+
+        // Write artist with trailing spaces
+        if let Some(artist_off) = layout.artist {
+            let (encoded, _, _) = encoding_rs::SHIFT_JIS.encode(artist);
+            let artist_bytes = encoded.as_ref();
+            let len = artist_bytes.len().min(SongInfo::SLAB);
+            entry[artist_off..artist_off + len].copy_from_slice(&artist_bytes[..len]);
+        }
+
+        // Write distinct note counts to avoid BPM detection
+        let bpm_off = layout.bpm_notes.unwrap();
+        entry[bpm_off..bpm_off + 4].copy_from_slice(&100u32.to_le_bytes());
+        entry[bpm_off + layout.bpm_notes_stride..bpm_off + layout.bpm_notes_stride + 4]
+            .copy_from_slice(&200u32.to_le_bytes());
+        entry
+    }
+
+    #[test]
+    fn test_parse_entry_trims_trailing_spaces_from_text_fields() {
+        let entry =
+            build_song_entry_with_trailing_spaces("Trailing Spaces   ", "Some Artist   ", 1001);
+        let layout = EntryLayout::v3_default();
+        let song = SongInfo::parse_entry_with_layout(&entry, &layout)
+            .unwrap()
+            .unwrap();
+
+        // Title and artist must be trimmed; trailing spaces must not survive.
+        assert_eq!(&*song.title, "Trailing Spaces");
+        assert_eq!(&*song.artist, "Some Artist");
+    }
+
+    #[test]
+    fn test_parse_entry_trims_field_filling_entire_buffer() {
+        // Simulate a title that fills all 64 bytes with no null terminator,
+        // ending in spaces.
+        let layout = EntryLayout::v3_default();
+        let mut entry = vec![0u8; SongInfo::MEMORY_SIZE];
+        entry[layout.song_id..layout.song_id + 4].copy_from_slice(&1001i32.to_le_bytes());
+
+        // Fill entire 64-byte title field: "A" repeated then trailing spaces
+        let prefix = b"FullBuffer";
+        let mut title_field = vec![0x20u8; SongInfo::SLAB]; // all spaces
+        title_field[..prefix.len()].copy_from_slice(prefix);
+        entry[layout.title..layout.title + SongInfo::SLAB].copy_from_slice(&title_field);
+
+        // Distinct notes to avoid BPM detection
+        let bpm_off = layout.bpm_notes.unwrap();
+        entry[bpm_off..bpm_off + 4].copy_from_slice(&100u32.to_le_bytes());
+        entry[bpm_off + layout.bpm_notes_stride..bpm_off + layout.bpm_notes_stride + 4]
+            .copy_from_slice(&200u32.to_le_bytes());
+
+        let song = SongInfo::parse_entry_with_layout(&entry, &layout)
+            .unwrap()
+            .unwrap();
+
+        // No null terminator, but trailing spaces must still be trimmed
+        assert_eq!(&*song.title, "FullBuffer");
     }
 }
