@@ -48,7 +48,13 @@ pub fn build_game_id_index_with_layout<R: ReadMemory>(
     _song_db: &HashMap<u32, SongInfo>,
     layout: &EntryLayout,
 ) -> HashMap<u32, u32> {
-    let ex_score_offset = layout.ex_scores.unwrap_or(0x3F0) as u64;
+    let ex_score_offset = match layout.ex_scores {
+        Some(offset) => offset as u64,
+        None => {
+            debug!("No ex_scores offset in layout, skipping game_id index build");
+            return HashMap::new();
+        }
+    };
     let song_id_offset = layout.song_id as u64;
 
     // Read all entry table EX scores: internal_id -> [10 x u32]
