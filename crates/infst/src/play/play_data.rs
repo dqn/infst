@@ -15,7 +15,12 @@ pub struct PlayData {
     pub lamp: Lamp,
     pub judge: Judge,
     pub settings: Settings,
-    /// False if play data isn't available (H-RAN, BATTLE or assist options enabled)
+    /// Whether play data is available based on settings validation.
+    ///
+    /// Set to `false` when H-RAN, BATTLE, or assist options are enabled, which
+    /// makes score data unreliable. This only reflects settings-level checks.
+    /// For miss count reliability, use [`PlayData::miss_count_valid()`] which
+    /// additionally checks for premature end (stage failed mid-play).
     pub data_available: bool,
 }
 

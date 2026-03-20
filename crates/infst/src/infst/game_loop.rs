@@ -652,7 +652,13 @@ impl Infst {
         } else {
             SongInfo::MEMORY_SIZE
         };
-        let scan_size = entry_stride.saturating_mul(5000);
+        let Some(scan_size) = entry_stride.checked_mul(5000) else {
+            warn!(
+                "Entry stride overflow: {} * 5000, skipping rescan",
+                entry_stride
+            );
+            return;
+        };
         let layout = self.offsets.effective_layout();
         let scan_result = fetch_song_database_from_memory_scan(
             reader,
@@ -956,7 +962,24 @@ impl Infst {
         } else {
             SongInfo::MEMORY_SIZE
         };
-        let scan_size = entry_stride.saturating_mul(5000);
+        let Some(scan_size) = entry_stride.checked_mul(5000) else {
+            warn!(
+                "Entry stride overflow: {} * 5000, skipping dynamic load",
+                entry_stride
+            );
+            return ChartInfo {
+                song_id,
+                title: format!("Song {:05}", song_id).into(),
+                title_english: format!("Song {:05}", song_id).into(),
+                artist: "".into(),
+                genre: "".into(),
+                bpm: "".into(),
+                difficulty,
+                level: 0,
+                total_notes: 0,
+                unlocked: true,
+            };
+        };
         let layout = self.offsets.effective_layout();
         if let Some(song) = fetch_song_by_id(
             reader,
