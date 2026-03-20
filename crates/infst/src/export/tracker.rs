@@ -6,6 +6,8 @@ use std::path::Path;
 
 use serde::Serialize;
 
+use tracing::warn;
+
 use crate::chart::{Difficulty, SongInfo, UnlockData, get_unlock_state_for_difficulty};
 use crate::error::Result;
 use crate::play::{PlayData, UnlockType, calculate_dj_points};
@@ -59,7 +61,19 @@ fn collect_song_export_data(
     score_map: &ScoreMap,
 ) -> Option<SongExportData> {
     let song = song_db.get(&song_id)?;
-    let unlock = unlock_db.get(&song_id)?;
+    let unlock = match unlock_db.get(&song_id) {
+        Some(u) => u,
+        None => {
+            if score_map.get(song_id).is_some() {
+                warn!(
+                    song_id,
+                    title = %song.title,
+                    "Song with score data excluded from export: no unlock data found (may be aliased)"
+                );
+            }
+            return None;
+        }
+    };
     let scores = score_map.get(song_id);
 
     let mut sp_dj_points = 0.0f64;

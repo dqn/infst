@@ -19,6 +19,7 @@ use infst::{
     score::Lamp,
 };
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 
 use super::upload::resolve_credentials;
 use crate::cli_utils;
@@ -141,7 +142,8 @@ fn read_text_table(reader: &MemoryReader, song_list_addr: u64) -> Result<Vec<Tex
         // Read V3 title from the PREVIOUS entry's 0x5B0 offset.
         // Entry i's game_id corresponds to the V3 title at entry (i-1) + 0x5B0.
         let title = if i == 0 {
-            // First entry has no previous entry; skip or use fallback
+            // First entry has no previous entry for V3 title lookup; will be skipped
+            debug!("Text table entry 0 skipped: no previous entry for V3 title lookup");
             String::new()
         } else {
             let prev_base = (i - 1) * TEXT_TABLE_STRIDE;
