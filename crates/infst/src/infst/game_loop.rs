@@ -223,7 +223,7 @@ impl Infst {
             thread::sleep(Duration::from_millis(delay));
 
             match self.fetch_play_data(reader) {
-                Ok(play_data) => {
+                Ok((play_data, notes_from_current_song)) => {
                     // Verify data looks valid (non-zero total notes)
                     let total_notes = play_data
                         .judge
@@ -273,6 +273,12 @@ impl Infst {
                         if self.last_result_fingerprint == Some(fingerprint) {
                             debug!("Skipping duplicate result: {:?}", fingerprint);
                             return;
+                        }
+
+                        // Write back authoritative notes to song_db only after
+                        // confirming this is not a duplicate result.
+                        if notes_from_current_song {
+                            self.write_back_notes(&play_data);
                         }
 
                         info!(
@@ -338,7 +344,7 @@ impl Infst {
             return;
         }
 
-        let play_data = match self.fetch_play_data(reader) {
+        let (play_data, notes_from_current_song) = match self.fetch_play_data(reader) {
             Ok(data) => data,
             Err(_) => {
                 self.pending_result_fingerprint = None;
@@ -377,6 +383,12 @@ impl Infst {
         // On the actual result screen, data is stable.
         match self.pending_result_fingerprint {
             Some(prev) if prev == fingerprint => {
+                // Write back authoritative notes to song_db only after
+                // confirming this is not a duplicate result.
+                if notes_from_current_song {
+                    self.write_back_notes(&play_data);
+                }
+
                 // Stable for 2 consecutive checks - capture the result
                 info!(
                     "Play result captured (polling): {} ({}) - EX: {}",
@@ -744,7 +756,12 @@ impl Infst {
         Ok((song_id as u32, difficulty))
     }
 
-    fn fetch_play_data(&mut self, reader: &MemoryReader) -> Result<PlayData> {
+    /// Fetch play data from memory.
+    ///
+    /// Returns `(PlayData, notes_from_current_song)`. When the second element is
+    /// `true`, the caller should call `write_back_notes` after confirming the
+    /// result is not a duplicate.
+    fn fetch_play_data(&mut self, reader: &MemoryReader) -> Result<(PlayData, bool)> {
         // Read data in same order as C# implementation:
         // 1. Judge data first (updates earliest on result screen)
         // 2. Settings
@@ -862,30 +879,37 @@ impl Infst {
             chart.total_notes = effective_notes;
         }
 
-        // Only write back to song_db when the source is chart_notes (from
-        // CurrentSong memory read), which is the game's authoritative value.
-        // judge_notes would pollute song_db with partial play data.
-        if notes_from_current_song && let Some(song) = self.game_data.song_db.get_mut(&song_id) {
-            let diff_index = difficulty as usize;
-            song.total_notes[diff_index] = effective_notes;
-        }
-
         let grade = if effective_notes > 0 {
             PlayData::calculate_grade(ex_score, effective_notes)
         } else {
             Grade::NoPlay
         };
 
-        Ok(PlayData {
-            timestamp: Utc::now(),
-            chart,
-            ex_score,
-            grade,
-            lamp,
-            judge,
-            settings,
-            data_available,
-        })
+        Ok((
+            PlayData {
+                timestamp: Utc::now(),
+                chart,
+                ex_score,
+                grade,
+                lamp,
+                judge,
+                settings,
+                data_available,
+            },
+            notes_from_current_song,
+        ))
+    }
+
+    /// Write back authoritative total_notes from CurrentSong to song_db.
+    ///
+    /// Only call this after confirming the play result is NOT a duplicate,
+    /// so that song_db is not mutated for discarded results.
+    fn write_back_notes(&mut self, play_data: &PlayData) {
+        let song_id = play_data.chart.song_id;
+        let diff_index = play_data.chart.difficulty as usize;
+        if let Some(song) = self.game_data.song_db.get_mut(&song_id) {
+            song.total_notes[diff_index] = play_data.chart.total_notes;
+        }
     }
 
     /// Create chart info from song database, dynamically loading from memory if not found.
