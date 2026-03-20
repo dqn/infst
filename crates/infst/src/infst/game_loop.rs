@@ -94,6 +94,13 @@ impl Infst {
             Err(e) => warn!("Failed to start TSV session: {}", e),
         }
 
+        // Reset polling state from previous run to prevent stale data carry-over
+        self.result_poll_pending = false;
+        self.result_poll_ticks = 0;
+        self.pending_result_fingerprint = None;
+        self.last_result_fingerprint = None;
+        self.current_playing = None;
+
         loop {
             // Check for shutdown signal
             if shutdown_requested.load(Ordering::SeqCst) {
@@ -445,16 +452,21 @@ impl Infst {
         let old_miss = entry.miss_count[diff_index];
         let mut updated = false;
 
-        // Update lamp (keep best)
-        if play_data.lamp > old_lamp {
-            entry.set_lamp(diff, play_data.lamp);
-            updated = true;
-        }
+        // Only update lamp and EX score when data_available is true.
+        // Assist plays (AUTO SCRATCH, etc.), H-RAN, and Battle results
+        // are not saved as personal bests by the game itself.
+        if play_data.data_available {
+            // Update lamp (keep best)
+            if play_data.lamp > old_lamp {
+                entry.set_lamp(diff, play_data.lamp);
+                updated = true;
+            }
 
-        // Update EX score (keep best)
-        if play_data.ex_score > old_score {
-            entry.set_score(diff, play_data.ex_score);
-            updated = true;
+            // Update EX score (keep best)
+            if play_data.ex_score > old_score {
+                entry.set_score(diff, play_data.ex_score);
+                updated = true;
+            }
         }
 
         // Update miss count (keep lowest)
@@ -859,7 +871,7 @@ impl Infst {
                     .copied()
                     .filter(|&n| n > 0)
                     .collect();
-                non_zero.len() >= 2 && non_zero.iter().all(|&n| n == non_zero[0])
+                !non_zero.is_empty() && non_zero.iter().all(|&n| n == non_zero[0])
             })
             .unwrap_or(false);
 
