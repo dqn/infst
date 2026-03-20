@@ -790,6 +790,96 @@ mod tests {
         assert_eq!(song.levels[3], 12); // SPA
     }
 
+    // -----------------------------------------------------------------------
+    // Tests: assign_text_roles
+    // -----------------------------------------------------------------------
+
+    /// Helper to build a contiguous block offset array starting at `base`.
+    fn contiguous_blocks(base: usize, count: usize) -> Vec<usize> {
+        (0..count)
+            .map(|i| base + i * EntryLayout::TEXT_BLOCK_SIZE)
+            .collect()
+    }
+
+    #[test]
+    fn test_assign_text_roles_empty() {
+        let result = assign_text_roles(&[]);
+        assert_eq!(result, (None, None, None));
+    }
+
+    #[test]
+    fn test_assign_text_roles_single_block() {
+        let blocks = contiguous_blocks(0x100, 1);
+        let result = assign_text_roles(&blocks);
+        assert_eq!(result, (None, None, None));
+    }
+
+    #[test]
+    fn test_assign_text_roles_two_blocks() {
+        let blocks = contiguous_blocks(0x100, 2);
+        // cluster[1] = title_english, no genre, no artist
+        assert_eq!(assign_text_roles(&blocks), (Some(0x100 + 64), None, None));
+    }
+
+    #[test]
+    fn test_assign_text_roles_three_blocks() {
+        let blocks = contiguous_blocks(0x100, 3);
+        // cluster[1] = title_english, cluster[2] = genre, no artist
+        assert_eq!(
+            assign_text_roles(&blocks),
+            (Some(0x100 + 64), Some(0x100 + 128), None)
+        );
+    }
+
+    #[test]
+    fn test_assign_text_roles_four_blocks() {
+        let blocks = contiguous_blocks(0x100, 4);
+        // cluster[1] = title_english, cluster[2] = genre, cluster[3] = artist
+        assert_eq!(
+            assign_text_roles(&blocks),
+            (Some(0x100 + 64), Some(0x100 + 128), Some(0x100 + 192))
+        );
+    }
+
+    #[test]
+    fn test_assign_text_roles_five_blocks() {
+        let blocks = contiguous_blocks(0x100, 5);
+        // cluster[1] = title_english, cluster[2] = genre, cluster[4] = artist (skip index 3)
+        assert_eq!(
+            assign_text_roles(&blocks),
+            (Some(0x100 + 64), Some(0x100 + 128), Some(0x100 + 256))
+        );
+    }
+
+    #[test]
+    fn test_assign_text_roles_six_blocks() {
+        let blocks = contiguous_blocks(0x100, 6);
+        // V3 layout: skip unknowns at positions 1 and 4
+        // cluster[2] = title_english, cluster[3] = genre, cluster[5] = artist
+        assert_eq!(
+            assign_text_roles(&blocks),
+            (Some(0x100 + 128), Some(0x100 + 192), Some(0x100 + 320))
+        );
+    }
+
+    #[test]
+    fn test_assign_text_roles_seven_blocks() {
+        // 7+ blocks should behave same as 6 (wildcard arm)
+        let blocks = contiguous_blocks(0x100, 7);
+        assert_eq!(
+            assign_text_roles(&blocks),
+            (Some(0x100 + 128), Some(0x100 + 192), Some(0x100 + 320))
+        );
+    }
+
+    #[test]
+    fn test_assign_text_roles_non_contiguous_filtered() {
+        // Blocks with a non-aligned gap: 0x155 is not a multiple of 64 from 0x100
+        let blocks = vec![0x100, 0x140, 0x155];
+        // cluster = [0x100, 0x140], size 2 -> (Some(0x140), None, None)
+        assert_eq!(assign_text_roles(&blocks), (Some(0x140), None, None));
+    }
+
     #[test]
     fn test_detect_v3_bpm_and_scores() {
         let mut entries = vec![

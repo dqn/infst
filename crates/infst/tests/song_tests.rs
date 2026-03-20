@@ -5,65 +5,6 @@
 use infst::chart::{EntryLayout, SongInfo, fetch_song_by_id, fetch_song_database_from_memory_scan};
 use infst::process::MockMemoryReader;
 
-/// Test normalize_title_for_matching behavior through round-trip matching
-mod normalize_title {
-
-    fn normalize_title_for_matching(title: &str) -> String {
-        title
-            .chars()
-            .filter(|c| !c.is_whitespace())
-            .flat_map(|c| c.to_lowercase())
-            .filter(|c| c.is_alphanumeric() || *c > '\u{007F}')
-            .collect()
-    }
-
-    #[test]
-    fn test_normalize_basic_ascii() {
-        assert_eq!(normalize_title_for_matching("Hello World"), "helloworld");
-    }
-
-    #[test]
-    fn test_normalize_removes_whitespace() {
-        assert_eq!(normalize_title_for_matching("  A  B  C  "), "abc");
-    }
-
-    #[test]
-    fn test_normalize_lowercase() {
-        assert_eq!(normalize_title_for_matching("ABC"), "abc");
-        assert_eq!(normalize_title_for_matching("AbC"), "abc");
-    }
-
-    #[test]
-    fn test_normalize_preserves_japanese() {
-        assert_eq!(normalize_title_for_matching("テスト曲名"), "テスト曲名");
-    }
-
-    #[test]
-    fn test_normalize_mixed_japanese_ascii() {
-        assert_eq!(normalize_title_for_matching("Song A テスト"), "songaテスト");
-    }
-
-    #[test]
-    fn test_normalize_removes_punctuation() {
-        assert_eq!(normalize_title_for_matching("A!B@C#D"), "abcd");
-    }
-
-    #[test]
-    fn test_normalize_preserves_numbers() {
-        assert_eq!(normalize_title_for_matching("Song123"), "song123");
-    }
-
-    #[test]
-    fn test_normalize_empty_string() {
-        assert_eq!(normalize_title_for_matching(""), "");
-    }
-
-    #[test]
-    fn test_normalize_only_punctuation() {
-        assert_eq!(normalize_title_for_matching("!@#$%^&*()"), "");
-    }
-}
-
 /// Tests for SongInfo memory reading
 mod song_info_read {
     use super::*;
