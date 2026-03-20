@@ -203,6 +203,7 @@ API はべき等のため、何度実行しても安全。
 - `Settings`, `RawSettings` - プレイ設定（生データ構造含む）
 - `GameStateDetector` - ゲーム状態検出
 - `ScoreMap`, `ScoreData` - ゲーム内スコアデータ
+- `EntryLayout` - エントリフィールドレイアウト（自動検出）
 - `OffsetsCollection` - メモリオフセット集
 - `OffsetSearcher`, `OffsetSearcherBuilder` - オフセット検索（Builder パターン対応）
 - `SessionManager` - セッション管理
@@ -265,7 +266,27 @@ API はべき等のため、何度実行しても安全。
 5. 検出失敗時は `SongInfo::MEMORY_SIZE` にフォールバック
 
 これにより、エントリサイズが変わっても SongList の検出とイテレーションは自動的に動作する。
-フィールドオフセット（title, levels 等）の変更は手動更新が必要。
+
+### Entry Field Layout 自動検出
+
+`EntryLayout::detect()` がエントリ内のフィールド位置を自動検出する。`OffsetsCollection.entry_layout` に保存。
+
+検出アルゴリズム（複数エントリのクロスバリデーション）:
+
+1. **song_id + folder**: `[i32(1000-50000), i32(1-200)]` ペアを4バイト境界で走査。全エントリで一致するオフセットを採用
+2. **テキストブロック**: 64バイト単位で有効な Shift-JIS 文字列を走査。最初の非空ブロックが title
+3. **levels**: テキスト領域後方で、10連続バイトが全て [0,12] のパターンを走査
+4. **BPM/notes, EX scores, lamps**: levels 以降の u32 配列を走査（オプション）
+
+検出済みバージョン:
+
+| Version | song_id | title | levels | 検出結果 |
+|---------|---------|-------|--------|---------|
+| 1 (0x3F0) | 0x270 | 0x000 | 0x120 | OK |
+| 2 (0x4B0) | 0x330 | 0x000 | 0x1E0 | OK |
+| 3 (0x630) | 0x000 | 0x180 | 0x360 | OK |
+
+検出失敗時は `EntryLayout::v3_default()` にフォールバック（従来のハードコード値と同等）。
 
 ### シグネチャ検索の無効化
 
