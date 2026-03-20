@@ -66,7 +66,9 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
 
             let matches = self.find_all_matches(&pattern);
             for match_addr in matches {
-                let candidate = match_addr.wrapping_add_signed(-24);
+                let Some(candidate) = match_addr.checked_sub(24) else {
+                    continue;
+                };
                 if fallback.is_none() {
                     fallback = Some(candidate);
                 }

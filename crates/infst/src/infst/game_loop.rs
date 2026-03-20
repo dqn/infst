@@ -165,16 +165,20 @@ impl Infst {
             0,
             "state_marker_2",
         );
-        let song_select_marker = read_with_default(
-            || {
-                self.offsets
-                    .play_settings
-                    .checked_sub(settings::SONG_SELECT_MARKER)
-                    .map_or(Ok(0), |addr| reader.read_i32(addr))
-            },
-            0,
-            "song_select_marker",
-        );
+        let song_select_marker = match self
+            .offsets
+            .play_settings
+            .checked_sub(settings::SONG_SELECT_MARKER)
+        {
+            Some(addr) => read_with_default(|| reader.read_i32(addr), 0, "song_select_marker"),
+            None => {
+                warn!(
+                    "play_settings (0x{:X}) too low for song_select_marker read",
+                    self.offsets.play_settings
+                );
+                0
+            }
+        };
 
         // Temporary diagnostic: log raw markers when they change
         let last = self.state_detector.last_state();
