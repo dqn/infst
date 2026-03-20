@@ -28,8 +28,13 @@ mod game_state_tests {
         // First transition from Unknown
         detector.detect(0, 0, 0);
 
-        // Marker2 > 0 with marker1 = 0 indicates result screen
+        // marker1 = 0 and song_select_marker = 0 falls through to ResultScreen.
+        // judge_marker_55 (marker2) is intentionally ignored for V3 compatibility.
         let state = detector.detect(0, 100, 0);
+        assert_eq!(state, GameState::ResultScreen);
+
+        // Same result with marker2 = 0: marker2 has no effect on detection
+        let state = detector.detect(0, 0, 0);
         assert_eq!(state, GameState::ResultScreen);
     }
 
@@ -53,7 +58,8 @@ mod game_state_tests {
         let state = detector.detect(100, 0, 0);
         assert_eq!(state, GameState::Playing);
 
-        // Playing -> Result Screen
+        // Playing -> Result Screen (marker1=0, song_select_marker=0 → falls through)
+        // marker2 value is irrelevant (ignored for V3 compatibility)
         let state = detector.detect(0, 100, 0);
         assert_eq!(state, GameState::ResultScreen);
 
