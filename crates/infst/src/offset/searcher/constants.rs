@@ -144,11 +144,8 @@ pub const JUDGE_DATA_SEARCH_RANGE: usize = 0x10000;
 // DataMap entry filtering
 // ============================================================================
 
-/// Sentinel value in INFINITAS data map that should be treated as null.
-///
-/// This specific value (0x494fdce0) appears in the data map hash table as a
-/// special marker and should be filtered out when counting valid entries.
-pub const DATA_MAP_SENTINEL: u64 = 0x494fdce0;
+/// Re-export of the canonical sentinel constant from `score::DATA_MAP_HASH_BUCKET_SENTINEL`.
+pub use crate::score::DATA_MAP_HASH_BUCKET_SENTINEL as DATA_MAP_SENTINEL;
 
 // ============================================================================
 // Address validation

@@ -1,5 +1,6 @@
 use crate::offset::OffsetsCollection;
 use crate::process::ReadMemory;
+use crate::score::DATA_MAP_HASH_BUCKET_SENTINEL;
 use anyhow::Result;
 use serde::Serialize;
 use std::fs;
@@ -225,7 +226,7 @@ impl OffsetDump {
                 buffer[i * 8 + 7],
             ]);
 
-            if addr != 0 && addr != null_obj && addr != 0x494fdce0 {
+            if addr != 0 && addr != null_obj && addr != DATA_MAP_HASH_BUCKET_SENTINEL {
                 non_null_entries += 1;
                 entry_points.push(addr);
             }

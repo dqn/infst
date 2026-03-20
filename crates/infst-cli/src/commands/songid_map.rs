@@ -10,6 +10,7 @@
 use anyhow::Result;
 use infst::offset::{OffsetSearcher, OffsetsCollection, builtin_signatures};
 use infst::process::decode_shift_jis_to_string;
+use infst::score::DATA_MAP_HASH_BUCKET_SENTINEL;
 use infst::{MemoryReader, ProcessHandle, ReadMemory};
 
 /// Run the song ID mapping investigation
@@ -632,7 +633,7 @@ fn investigate_datamap_nodes<R: ReadMemory>(
     let mut entry_points = Vec::new();
     for i in 0..(buf_size / 8) {
         let addr = buf.read_u64_at(i * 8).unwrap_or(0);
-        if addr != 0 && addr != null_obj && addr != 0x494fdce0 {
+        if addr != 0 && addr != null_obj && addr != DATA_MAP_HASH_BUCKET_SENTINEL {
             entry_points.push(addr);
         }
     }

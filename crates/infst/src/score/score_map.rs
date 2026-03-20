@@ -16,8 +16,7 @@ const MAX_DATA_MAP_BUFFER_SIZE: usize = 16 * 1024 * 1024;
 /// Buckets containing this value do not point to a valid linked list and must be
 /// skipped during traversal. The value originates from the game engine's hash table
 /// implementation and is distinct from both null (0x0) and the null_obj pointer.
-/// Also defined in `offset::searcher::constants::DATA_MAP_SENTINEL`.
-const DATA_MAP_HASH_BUCKET_SENTINEL: u64 = 0x494fdce0;
+pub const DATA_MAP_HASH_BUCKET_SENTINEL: u64 = 0x494fdce0;
 
 /// Score data for a single song (all difficulties)
 #[derive(Debug, Clone, Default)]
