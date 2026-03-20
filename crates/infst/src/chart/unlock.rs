@@ -49,6 +49,10 @@ impl UnlockData {
     }
 }
 
+/// Maximum number of unlock entries to read before giving up.
+/// Prevents unbounded loops when many entries have unknown song_ids.
+const MAX_UNLOCK_ENTRIES: usize = 10_000;
+
 /// Load unlock states from memory for all songs
 pub fn get_unlock_states<R: ReadMemory>(
     reader: &R,
@@ -66,6 +70,10 @@ pub fn get_unlock_states<R: ReadMemory>(
     let mut batch_entries = song_count;
 
     loop {
+        if position_entries + batch_entries > MAX_UNLOCK_ENTRIES {
+            break;
+        }
+
         let buffer_size = UnlockData::MEMORY_SIZE * batch_entries;
         let buffer = reader.read_bytes(
             unlock_data_addr + (position_entries * UnlockData::MEMORY_SIZE) as u64,

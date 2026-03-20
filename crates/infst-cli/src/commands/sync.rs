@@ -101,7 +101,9 @@ impl SyncCache {
         let Ok(content) = serde_json::to_string(self) else {
             return;
         };
-        let _ = fs::write(path, content);
+        if let Err(e) = fs::write(&path, &content) {
+            eprintln!("Warning: failed to save sync cache: {}", e);
+        }
     }
 
     fn make_key(title: &str, difficulty: &str) -> String {
