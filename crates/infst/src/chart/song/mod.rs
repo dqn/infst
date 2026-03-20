@@ -1,5 +1,6 @@
 mod database;
 mod game_id;
+pub mod layout;
 mod scan;
 mod tsv;
 
@@ -15,8 +16,11 @@ use crate::process::{ByteBuffer, ReadMemory, decode_shift_jis};
 use super::encoding_fixes::{fix_artist_encoding, fix_title_encoding};
 
 // Re-export submodule public items
-pub use database::{fetch_song_database, fetch_song_database_bulk};
-pub use game_id::{apply_game_id_mapping, build_game_id_index};
+pub use database::{
+    fetch_song_database, fetch_song_database_bulk, fetch_song_database_bulk_with_layout,
+};
+pub use game_id::{apply_game_id_mapping, build_game_id_index, build_game_id_index_with_layout};
+pub use layout::EntryLayout;
 pub use scan::{
     analyze_metadata_table, build_song_id_title_map, fetch_song_by_id,
     fetch_song_database_from_memory_scan,
@@ -55,48 +59,8 @@ impl SongInfo {
     /// Offset from text table to metadata table (legacy, kept for compatibility)
     pub const METADATA_TABLE_OFFSET: usize = 0x7E0;
 
-    // Memory layout constants
-    const SLAB: usize = 64; // String block size (64 bytes per Shift-JIS string field)
-
-    // Memory offsets (relative to song entry start)
-    // Version 2016051600+ layout:
-    //
-    // Header:
-    //   0x000: Song ID (i32)
-    //   0x004: Folder (i32)
-    //   0x008: Identifier string (~22 bytes, includes 0xFF88 marker)
-    //   0x020-0x17F: Reserved/padding
-    //
-    // String fields (each 64 bytes, Shift-JIS encoded):
-    //   0x180: Title
-    //   0x1C0: (unknown, often empty)
-    //   0x200: Title (English)
-    //   0x240: Genre
-    //   0x280: (unknown, often empty)
-    //   0x2C0: Artist
-    //
-    // Metadata:
-    //   0x360: Difficulty levels (10 bytes)
-    //   0x378: BPM (10 x u32, 8-byte stride; same value for all difficulties)
-    //          In V3 this field contains BPM, NOT per-difficulty total_notes.
-    //          When all 10 values are identical we treat them as BPM and zero
-    //          out total_notes (unreliable). Actual per-chart total_notes is
-    //          obtained at runtime from CurrentSong + 0x10.
-    //
-    // Score data (player-specific):
-    //   0x3F0: EX scores (10 x u32)
-    //   0x430+: Clear lamps, DJ points, etc.
-    const SONG_ID_OFFSET: usize = 0;
-    const FOLDER_OFFSET: usize = 4;
-    const TITLE_OFFSET: usize = 0x180; // 384
-    const TITLE_ENGLISH_OFFSET: usize = 0x200; // 512
-    const GENRE_OFFSET: usize = 0x240; // 576
-    const ARTIST_OFFSET: usize = 0x2C0; // 704
-    const LEVELS_OFFSET: usize = 0x360; // 864
-    const BPM_NOTES_OFFSET: usize = 0x378; // 888: BPM in V3 (all identical), possibly notes in older versions
-    const BPM_NOTES_STRIDE: usize = 8; // 8 bytes per entry (u32 + 4 bytes padding)
-    const EX_SCORE_OFFSET: usize = 0x3F0; // 10 x u32 (40 bytes)
-    const LAMP_OFFSET: usize = 0x430; // 10 x u32 (40 bytes)
+    // String block size (64 bytes per Shift-JIS string field)
+    const SLAB: usize = 64;
 
     /// Get level for a specific difficulty index
     pub fn get_level(&self, difficulty_index: usize) -> u8 {
@@ -113,31 +77,60 @@ impl SongInfo {
     /// This is the buffer-based variant of `read_from_memory` that avoids
     /// individual ReadProcessMemory calls when the buffer has been bulk-loaded.
     pub fn parse_from_buffer(buffer: &[u8], offset: usize) -> Result<Option<Self>> {
-        if offset + Self::MEMORY_SIZE > buffer.len() {
-            return Ok(None);
-        }
-        let entry = &buffer[offset..offset + Self::MEMORY_SIZE];
-        Self::parse_entry(entry)
+        Self::parse_from_buffer_with_layout(buffer, offset, &EntryLayout::v3_default())
     }
 
-    /// Parse a single song entry from a MEMORY_SIZE-length slice
+    /// Parse song info from a pre-loaded buffer using a detected layout.
+    pub fn parse_from_buffer_with_layout(
+        buffer: &[u8],
+        offset: usize,
+        layout: &EntryLayout,
+    ) -> Result<Option<Self>> {
+        let entry_size = layout.entry_size;
+        if offset + entry_size > buffer.len() {
+            return Ok(None);
+        }
+        let entry = &buffer[offset..offset + entry_size];
+        Self::parse_entry_with_layout(entry, layout)
+    }
+
+    /// Parse a single song entry from a MEMORY_SIZE-length slice (V3 default layout).
     fn parse_entry(entry: &[u8]) -> Result<Option<Self>> {
+        Self::parse_entry_with_layout(entry, &EntryLayout::v3_default())
+    }
+
+    /// Parse a single song entry using a detected layout.
+    pub fn parse_entry_with_layout(entry: &[u8], layout: &EntryLayout) -> Result<Option<Self>> {
         let buf = ByteBuffer::new(entry);
 
-        // Check if entry is valid (song_id at offset 0 should not be 0)
-        let song_id = buf.read_i32_at(Self::SONG_ID_OFFSET).unwrap_or(0);
+        // Check if entry is valid (song_id should not be 0)
+        let song_id = buf.read_i32_at(layout.song_id).unwrap_or(0);
         if song_id == 0 {
             return Ok(None);
         }
 
         // Parse folder (i32)
-        let folder = buf.read_i32_at(Self::FOLDER_OFFSET).unwrap_or(0);
+        let folder = buf.read_i32_at(layout.folder).unwrap_or(0);
 
-        // Parse strings (Shift-JIS encoded, with encoding fixes for non-Shift-JIS characters)
-        let mut title = decode_shift_jis(buf.slice_at(Self::TITLE_OFFSET, Self::SLAB)?);
-        let title_english = decode_shift_jis(buf.slice_at(Self::TITLE_ENGLISH_OFFSET, Self::SLAB)?);
-        let genre = decode_shift_jis(buf.slice_at(Self::GENRE_OFFSET, Self::SLAB)?);
-        let mut artist = decode_shift_jis(buf.slice_at(Self::ARTIST_OFFSET, Self::SLAB)?);
+        // Parse title (always present)
+        let mut title = decode_shift_jis(buf.slice_at(layout.title, Self::SLAB)?);
+
+        // Parse optional text fields
+        let title_english = if let Some(off) = layout.title_english {
+            decode_shift_jis(buf.slice_at(off, Self::SLAB)?)
+        } else {
+            Arc::from("")
+        };
+        let genre = if let Some(off) = layout.genre {
+            decode_shift_jis(buf.slice_at(off, Self::SLAB)?)
+        } else {
+            Arc::from("")
+        };
+        let mut artist = if let Some(off) = layout.artist {
+            decode_shift_jis(buf.slice_at(off, Self::SLAB)?)
+        } else {
+            Arc::from("")
+        };
 
         if let Some(fixed) = fix_title_encoding(&title) {
             title = fixed;
@@ -148,13 +141,14 @@ impl SongInfo {
 
         // Parse difficulty levels (10 bytes)
         let mut levels = [0u8; 10];
-        levels.copy_from_slice(buf.slice_at(Self::LEVELS_OFFSET, 10)?);
+        levels.copy_from_slice(buf.slice_at(layout.levels, 10)?);
 
-        // Read 10 x u32 at 0x378 (8-byte stride). In V3 this contains BPM
-        // (same value for all difficulties), not per-difficulty total_notes.
+        // Read BPM/notes array if offset is known
         let mut raw_values = [0u32; 10];
-        for (i, val) in raw_values.iter_mut().enumerate() {
-            *val = buf.read_u32_at(Self::BPM_NOTES_OFFSET + i * Self::BPM_NOTES_STRIDE)?;
+        if let Some(bpm_off) = layout.bpm_notes {
+            for (i, val) in raw_values.iter_mut().enumerate() {
+                *val = buf.read_u32_at(bpm_off + i * layout.bpm_notes_stride)?;
+            }
         }
 
         // Detect BPM vs total_notes: when all non-zero values are identical,
@@ -163,25 +157,27 @@ impl SongInfo {
         let all_identical = !non_zero.is_empty() && non_zero.iter().all(|&v| v == non_zero[0]);
 
         let (bpm, total_notes) = if all_identical {
-            // BPM detected: populate bpm field, zero out total_notes (unreliable)
             let bpm: Arc<str> = Arc::from(non_zero[0].to_string());
             (bpm, [0u32; 10])
         } else {
-            // Treat as per-difficulty note counts (older layout or mixed values)
             let bpm: Arc<str> = Arc::from("");
             (bpm, raw_values)
         };
 
-        // Read embedded EX scores (10 x u32 at offset 0x3F0)
+        // Read embedded EX scores
         let mut embedded_ex_scores = [0u32; 10];
-        for (i, score) in embedded_ex_scores.iter_mut().enumerate() {
-            *score = buf.read_u32_at(Self::EX_SCORE_OFFSET + i * 4)?;
+        if let Some(ex_off) = layout.ex_scores {
+            for (i, score) in embedded_ex_scores.iter_mut().enumerate() {
+                *score = buf.read_u32_at(ex_off + i * 4)?;
+            }
         }
 
-        // Read embedded clear lamps (10 x u32 at offset 0x430)
+        // Read embedded clear lamps
         let mut embedded_lamps = [0u32; 10];
-        for (i, lamp) in embedded_lamps.iter_mut().enumerate() {
-            *lamp = buf.read_u32_at(Self::LAMP_OFFSET + i * 4)?;
+        if let Some(lamp_off) = layout.lamps {
+            for (i, lamp) in embedded_lamps.iter_mut().enumerate() {
+                *lamp = buf.read_u32_at(lamp_off + i * 4)?;
+            }
         }
 
         Ok(Some(SongInfo {
@@ -204,6 +200,16 @@ impl SongInfo {
     pub fn read_from_memory<R: ReadMemory>(reader: &R, address: u64) -> Result<Option<Self>> {
         let buffer = reader.read_bytes(address, Self::MEMORY_SIZE)?;
         Self::parse_entry(&buffer)
+    }
+
+    /// Read song info from memory using a detected layout.
+    pub fn read_from_memory_with_layout<R: ReadMemory>(
+        reader: &R,
+        address: u64,
+        layout: &EntryLayout,
+    ) -> Result<Option<Self>> {
+        let buffer = reader.read_bytes(address, layout.entry_size)?;
+        Self::parse_entry_with_layout(&buffer, layout)
     }
 
     /// Read song info with fallback to metadata table for new INFINITAS versions.
@@ -272,25 +278,23 @@ mod tests {
     use super::*;
     use crate::process::MockMemoryBuilder;
 
-    /// Build a mock song entry buffer with a title and song_id
+    /// Build a mock song entry buffer with a title and song_id (V3 layout)
     fn build_song_entry(title: &str, song_id: u32) -> Vec<u8> {
+        let layout = EntryLayout::v3_default();
         let mut entry = vec![0u8; SongInfo::MEMORY_SIZE];
-        // Write song_id at offset 0
-        entry[SongInfo::SONG_ID_OFFSET..SongInfo::SONG_ID_OFFSET + 4]
-            .copy_from_slice(&(song_id as i32).to_le_bytes());
-        // Write title as Shift-JIS at TITLE_OFFSET (0x180)
+        // Write song_id
+        entry[layout.song_id..layout.song_id + 4].copy_from_slice(&(song_id as i32).to_le_bytes());
+        // Write title as Shift-JIS
         let (encoded, _, _) = encoding_rs::SHIFT_JIS.encode(title);
         let title_bytes = encoded.as_ref();
         let len = title_bytes.len().min(SongInfo::SLAB);
-        entry[SongInfo::TITLE_OFFSET..SongInfo::TITLE_OFFSET + len]
-            .copy_from_slice(&title_bytes[..len]);
+        entry[layout.title..layout.title + len].copy_from_slice(&title_bytes[..len]);
         // Write at least one non-zero level for the entry to be meaningful
-        entry[SongInfo::LEVELS_OFFSET] = 12; // SPB level = 12
+        entry[layout.levels] = 12; // SPB level = 12
         // Write distinct note counts so all-identical BPM detection does NOT trigger
-        entry[SongInfo::BPM_NOTES_OFFSET..SongInfo::BPM_NOTES_OFFSET + 4]
-            .copy_from_slice(&100u32.to_le_bytes()); // SPB notes = 100
-        entry[SongInfo::BPM_NOTES_OFFSET + SongInfo::BPM_NOTES_STRIDE
-            ..SongInfo::BPM_NOTES_OFFSET + SongInfo::BPM_NOTES_STRIDE + 4]
+        let bpm_off = layout.bpm_notes.unwrap();
+        entry[bpm_off..bpm_off + 4].copy_from_slice(&100u32.to_le_bytes()); // SPB notes = 100
+        entry[bpm_off + layout.bpm_notes_stride..bpm_off + layout.bpm_notes_stride + 4]
             .copy_from_slice(&200u32.to_le_bytes()); // SPN notes = 200
         entry
     }
@@ -485,18 +489,18 @@ mod tests {
     /// Helper to build a song entry with the same BPM value across all 10 slots
     /// (simulating V3 layout where 0x378 holds BPM, not total_notes)
     fn build_song_entry_with_bpm(title: &str, song_id: u32, bpm: u32) -> Vec<u8> {
+        let layout = EntryLayout::v3_default();
         let mut entry = vec![0u8; SongInfo::MEMORY_SIZE];
-        entry[SongInfo::SONG_ID_OFFSET..SongInfo::SONG_ID_OFFSET + 4]
-            .copy_from_slice(&(song_id as i32).to_le_bytes());
+        entry[layout.song_id..layout.song_id + 4].copy_from_slice(&(song_id as i32).to_le_bytes());
         let (encoded, _, _) = encoding_rs::SHIFT_JIS.encode(title);
         let title_bytes = encoded.as_ref();
         let len = title_bytes.len().min(SongInfo::SLAB);
-        entry[SongInfo::TITLE_OFFSET..SongInfo::TITLE_OFFSET + len]
-            .copy_from_slice(&title_bytes[..len]);
-        entry[SongInfo::LEVELS_OFFSET] = 12;
+        entry[layout.title..layout.title + len].copy_from_slice(&title_bytes[..len]);
+        entry[layout.levels] = 12;
+        let bpm_off = layout.bpm_notes.unwrap();
         // Write same BPM value to all 10 slots
         for i in 0..10 {
-            let off = SongInfo::BPM_NOTES_OFFSET + i * SongInfo::BPM_NOTES_STRIDE;
+            let off = bpm_off + i * layout.bpm_notes_stride;
             entry[off..off + 4].copy_from_slice(&bpm.to_le_bytes());
         }
         entry
@@ -527,10 +531,10 @@ mod tests {
 
     #[test]
     fn test_bpm_detection_all_zeros_no_bpm() {
+        let layout = EntryLayout::v3_default();
         let mut entry = vec![0u8; SongInfo::MEMORY_SIZE];
-        entry[SongInfo::SONG_ID_OFFSET..SongInfo::SONG_ID_OFFSET + 4]
-            .copy_from_slice(&1001i32.to_le_bytes());
-        // All 10 values at 0x378 are 0 (no non-zero values)
+        entry[layout.song_id..layout.song_id + 4].copy_from_slice(&1001i32.to_le_bytes());
+        // All 10 values at BPM offset are 0 (no non-zero values)
         let song = SongInfo::parse_from_buffer(&entry, 0).unwrap().unwrap();
 
         // All zeros -> non_zero vec is empty -> not treated as BPM
@@ -543,12 +547,13 @@ mod tests {
         // Some slots have levels (notes), some are 0 (no chart).
         // In V3 BPM: only difficulties with charts have a value, but all
         // non-zero values are the same BPM.
+        let layout = EntryLayout::v3_default();
+        let bpm_off = layout.bpm_notes.unwrap();
         let mut entry = vec![0u8; SongInfo::MEMORY_SIZE];
-        entry[SongInfo::SONG_ID_OFFSET..SongInfo::SONG_ID_OFFSET + 4]
-            .copy_from_slice(&1001i32.to_le_bytes());
+        entry[layout.song_id..layout.song_id + 4].copy_from_slice(&1001i32.to_le_bytes());
         // Write BPM=170 to slots 1,2,3 only (SPN,SPH,SPA); rest are 0
         for i in [1, 2, 3] {
-            let off = SongInfo::BPM_NOTES_OFFSET + i * SongInfo::BPM_NOTES_STRIDE;
+            let off = bpm_off + i * layout.bpm_notes_stride;
             entry[off..off + 4].copy_from_slice(&170u32.to_le_bytes());
         }
         let song = SongInfo::parse_from_buffer(&entry, 0).unwrap().unwrap();

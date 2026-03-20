@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
+use crate::chart::EntryLayout;
 use crate::process::ReadMemory;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -27,6 +28,10 @@ pub struct OffsetsCollection {
     /// The pointer at iidx_header - 0x40 points to the current song's entry title field.
     #[serde(default)]
     pub iidx_header: u64,
+    /// Auto-detected entry field layout.
+    /// When `None`, callers should use `EntryLayout::v3_default()`.
+    #[serde(default)]
+    pub entry_layout: Option<EntryLayout>,
 }
 
 impl OffsetsCollection {
@@ -64,6 +69,13 @@ impl OffsetsCollection {
         } else {
             crate::chart::SongInfo::MEMORY_SIZE
         }
+    }
+
+    /// Get the effective entry layout (detected or V3 default).
+    pub fn effective_layout(&self) -> EntryLayout {
+        self.entry_layout
+            .clone()
+            .unwrap_or_else(EntryLayout::v3_default)
     }
 
     /// Resolve the current song's internal_id via the IIDX pointer structure.
@@ -104,8 +116,9 @@ impl OffsetsCollection {
             return None;
         }
 
-        // Entry start = title_ptr - 0x180 (title is at offset 0x180 in the entry)
-        let entry_start = title_ptr.checked_sub(0x180)?;
+        // Entry start = title_ptr - title_offset
+        let title_offset = self.effective_layout().title as u64;
+        let entry_start = title_ptr.checked_sub(title_offset)?;
 
         // Validate: entry_start should be within the entry table range
         let table_start = self.song_entry_table;

@@ -174,6 +174,7 @@ mod tests {
             song_entry_table: 0,
             song_entry_size: 0,
             iidx_header: 0,
+            entry_layout: None,
         };
 
         let cache = OffsetCache::new("P2D:J:B:A:2026012800".to_string(), offsets.clone());
@@ -198,6 +199,7 @@ mod tests {
             song_entry_table: 0,
             song_entry_size: 0,
             iidx_header: 0,
+            entry_layout: None,
         };
 
         let cache = OffsetCache::new("P2D:J:B:A:2026012800".to_string(), offsets);

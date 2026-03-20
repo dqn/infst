@@ -5,9 +5,8 @@ use tracing::{debug, info};
 use crate::process::ReadMemory;
 
 use super::SongInfo;
+use super::layout::EntryLayout;
 
-/// EX score offset within each entry (10 x u32, 4 bytes each)
-const ENTRY_EX_SCORE_OFFSET: u64 = 0x3F0;
 const ENTRY_EX_SCORE_COUNT: usize = 10;
 
 /// Build game_id -> internal_id mapping by comparing EX scores.
@@ -30,17 +29,39 @@ pub fn build_game_id_index<R: ReadMemory>(
     score_map: &crate::score::ScoreMap,
     _song_db: &HashMap<u32, SongInfo>,
 ) -> HashMap<u32, u32> {
+    build_game_id_index_with_layout(
+        reader,
+        entry_table_addr,
+        entry_stride,
+        score_map,
+        _song_db,
+        &EntryLayout::v3_default(),
+    )
+}
+
+/// Build game_id -> internal_id mapping using a detected entry layout.
+pub fn build_game_id_index_with_layout<R: ReadMemory>(
+    reader: &R,
+    entry_table_addr: u64,
+    entry_stride: usize,
+    score_map: &crate::score::ScoreMap,
+    _song_db: &HashMap<u32, SongInfo>,
+    layout: &EntryLayout,
+) -> HashMap<u32, u32> {
+    let ex_score_offset = layout.ex_scores.unwrap_or(0x3F0) as u64;
+    let song_id_offset = layout.song_id as u64;
+
     // Read all entry table EX scores: internal_id -> [10 x u32]
     let mut entry_scores: HashMap<u32, [u32; ENTRY_EX_SCORE_COUNT]> = HashMap::new();
     for i in 0..5000u64 {
         let addr = entry_table_addr + i * entry_stride as u64;
-        let id = match reader.read_i32(addr) {
+        let id = match reader.read_i32(addr + song_id_offset) {
             Ok(id) if (1000..=90000).contains(&id) => id as u32,
             Ok(0) => continue,
             _ => break,
         };
 
-        if let Ok(bytes) = reader.read_bytes(addr + ENTRY_EX_SCORE_OFFSET, 40) {
+        if let Ok(bytes) = reader.read_bytes(addr + ex_score_offset, 40) {
             let mut scores = [0u32; ENTRY_EX_SCORE_COUNT];
             for (j, score) in scores.iter_mut().enumerate() {
                 *score = u32::from_le_bytes(bytes[j * 4..j * 4 + 4].try_into().unwrap());

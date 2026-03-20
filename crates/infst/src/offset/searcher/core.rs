@@ -2,6 +2,7 @@
 
 use tracing::{debug, info};
 
+use crate::chart::EntryLayout;
 use crate::error::{Error, Result};
 use crate::offset::{OffsetSignatureSet, OffsetsCollection};
 use crate::process::ReadMemory;
@@ -127,6 +128,9 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             }
         }
 
+        // Detect entry field layout
+        self.detect_entry_layout_for(&mut offsets);
+
         // Phase 2: JudgeData (relative search from SongList)
         info!("Phase 2: Searching JudgeData via relative offset from SongList...");
         offsets.judge_data = self.search_judge_data_near_song_list(offsets.song_list)?;
@@ -202,6 +206,9 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                 .unwrap_or(crate::chart::SongInfo::MEMORY_SIZE);
         }
 
+        // Detect entry field layout
+        self.detect_entry_layout_for(&mut offsets);
+
         offsets.data_map = self.search_data_map_offset(base).or_else(|e| {
             debug!(
                 "  DataMap search from base failed: {}, trying from SongList",
@@ -253,6 +260,9 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                 .unwrap_or(crate::chart::SongInfo::MEMORY_SIZE);
         }
 
+        // Detect entry field layout
+        self.detect_entry_layout_for(&mut offsets);
+
         offsets.data_map = self.search_data_map_offset(base).or_else(|e| {
             debug!(
                 "  DataMap search from base failed: {}, trying from SongList",
@@ -300,6 +310,9 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                 .unwrap_or(crate::chart::SongInfo::MEMORY_SIZE);
         }
 
+        // Detect entry field layout
+        self.detect_entry_layout_for(&mut offsets);
+
         offsets.unlock_data = self.search_unlock_data_offset(offsets.song_list)?;
         debug!("  UnlockData: 0x{:X}", offsets.unlock_data);
 
@@ -342,6 +355,9 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                 .unwrap_or(crate::chart::SongInfo::MEMORY_SIZE);
         }
 
+        // Detect entry field layout
+        self.detect_entry_layout_for(&mut offsets);
+
         if offsets.song_list == 0 {
             return Err(Error::offset_search_failed(
                 "Validation failed: song_list offset is zero".to_string(),
@@ -362,6 +378,35 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
     #[inline]
     pub fn validate_basic_memory_access(&self, offsets: &OffsetsCollection) -> bool {
         validate_basic_memory_access(self.reader, offsets)
+    }
+
+    /// Detect entry field layout from the entry table.
+    ///
+    /// Reads several entries from the entry table and runs `EntryLayout::detect`
+    /// to determine field offsets. Stores the result in `offsets.entry_layout`.
+    fn detect_entry_layout_for(&self, offsets: &mut OffsetsCollection) {
+        let entry_addr = offsets.song_db_address();
+        let stride = offsets.entry_stride();
+
+        if entry_addr == 0 || stride == 0 {
+            return;
+        }
+
+        let num_entries = 5;
+        let buf = match self.reader.read_bytes(entry_addr, stride * num_entries) {
+            Ok(b) => b,
+            Err(_) => return,
+        };
+
+        offsets.entry_layout = EntryLayout::detect(&buf, stride);
+        if let Some(ref layout) = offsets.entry_layout {
+            info!(
+                "  Entry layout detected: song_id=0x{:X}, title=0x{:X}, levels=0x{:X}",
+                layout.song_id, layout.title, layout.levels
+            );
+        } else {
+            debug!("  Entry layout detection failed, will use V3 default");
+        }
     }
 
     /// Find all matches of a pattern in the current buffer

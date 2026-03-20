@@ -6,15 +6,38 @@ use crate::error::Result;
 use crate::process::{ByteBuffer, ReadMemory};
 
 use super::SongInfo;
+use super::layout::EntryLayout;
 
 /// Fetch entire song database from memory using bulk read.
 ///
 /// Reads all entries in a single ReadProcessMemory call (~5.7MB) instead of
 /// ~5000 individual calls. Falls back to `fetch_song_database` on failure.
+///
+/// When `layout` is `None`, the V3 default layout is used.
 pub fn fetch_song_database_bulk<R: ReadMemory>(
     reader: &R,
     song_list_addr: u64,
     entry_stride: usize,
+) -> Result<HashMap<u32, SongInfo>> {
+    fetch_song_database_bulk_with_layout(reader, song_list_addr, entry_stride, None)
+}
+
+/// Fetch entire song database from memory using bulk read with an optional layout.
+pub fn fetch_song_database_bulk_with_layout<R: ReadMemory>(
+    reader: &R,
+    song_list_addr: u64,
+    entry_stride: usize,
+    layout: Option<&EntryLayout>,
+) -> Result<HashMap<u32, SongInfo>> {
+    let effective_layout = layout.cloned().unwrap_or_else(EntryLayout::v3_default);
+    _fetch_song_database_bulk(reader, song_list_addr, entry_stride, &effective_layout)
+}
+
+fn _fetch_song_database_bulk<R: ReadMemory>(
+    reader: &R,
+    song_list_addr: u64,
+    entry_stride: usize,
+    layout: &EntryLayout,
 ) -> Result<HashMap<u32, SongInfo>> {
     const MAX_ENTRIES: usize = 5000;
     let bulk_size = MAX_ENTRIES * entry_stride;
@@ -24,7 +47,7 @@ pub fn fetch_song_database_bulk<R: ReadMemory>(
         Ok(buf) => buf,
         Err(e) => {
             warn!("Bulk read failed ({}), falling back to per-entry read", e);
-            return fetch_song_database(reader, song_list_addr, entry_stride);
+            return _fetch_song_database(reader, song_list_addr, entry_stride, layout);
         }
     };
 
@@ -42,11 +65,11 @@ pub fn fetch_song_database_bulk<R: ReadMemory>(
 
     for entry_index in 0..MAX_ENTRIES {
         let offset = entry_index * entry_stride;
-        if offset + SongInfo::MEMORY_SIZE > buffer.len() {
+        if offset + layout.entry_size > buffer.len() {
             break;
         }
 
-        match SongInfo::parse_from_buffer(&buffer, offset) {
+        match SongInfo::parse_from_buffer_with_layout(&buffer, offset, layout) {
             Ok(Some(song)) if !song.title.is_empty() && song.id > 0 => {
                 result.entry(song.id).or_insert(song);
                 consecutive_failures = 0;
@@ -94,6 +117,20 @@ pub fn fetch_song_database<R: ReadMemory>(
     reader: &R,
     song_list_addr: u64,
     entry_stride: usize,
+) -> Result<HashMap<u32, SongInfo>> {
+    _fetch_song_database(
+        reader,
+        song_list_addr,
+        entry_stride,
+        &EntryLayout::v3_default(),
+    )
+}
+
+fn _fetch_song_database<R: ReadMemory>(
+    reader: &R,
+    song_list_addr: u64,
+    entry_stride: usize,
+    _layout: &EntryLayout,
 ) -> Result<HashMap<u32, SongInfo>> {
     let mut result = HashMap::new();
     let mut entry_index: u64 = 0;
