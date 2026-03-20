@@ -304,14 +304,56 @@ mod tests {
 
     #[test]
     fn test_list_node_difficulty_index_calculation() {
-        // Test that diff + playtype * 5 gives correct indices
-        // SP difficulties: diff 0-4 + playtype 0 = indices 0-4
-        // DP difficulties: diff 0-4 + playtype 1 = indices 5-9
-        assert_eq!(0, 0); // SPB: 0 + 0 * 5
-        assert_eq!(1, 1); // SPN: 1 + 0 * 5
-        assert_eq!(3, 3); // SPA: 3 + 0 * 5
-        assert_eq!(5, 5); // DPB: 0 + 1 * 5
-        assert_eq!(8, 8); // DPA: 3 + 1 * 5
+        // Verify that diff + playtype * 5 places score data at the correct index
+        // by exercising load_from_memory with known diff/playtype combinations.
+        // build_single_node_reader writes score=1500, miss_count=5, lamp=Clear(4).
+        let cases: &[(i32, i32, usize, &str)] = &[
+            (0, 0, 0, "SPB"),
+            (4, 0, 4, "SPL"),
+            (0, 1, 5, "DPB"),
+            (4, 1, 9, "DPL"),
+        ];
+        let song_db: HashMap<u32, SongInfo> = HashMap::new();
+
+        for &(diff, playtype, expected_index, label) in cases {
+            let (reader, data_map_addr) = build_single_node_reader(diff, playtype, 1001);
+            let result = ScoreMap::load_from_memory(&reader, data_map_addr, &song_db).unwrap();
+
+            assert_eq!(result.len(), 1, "{label}: expected 1 song entry");
+            let score_data = result.get(1001).unwrap();
+
+            // The target index should have the node's values
+            assert_eq!(
+                score_data.score[expected_index], 1500,
+                "{label}: score at index {expected_index}"
+            );
+            assert_eq!(
+                score_data.miss_count[expected_index],
+                Some(5),
+                "{label}: miss_count at index {expected_index}"
+            );
+            assert_eq!(
+                score_data.lamp[expected_index],
+                Lamp::Clear,
+                "{label}: lamp at index {expected_index}"
+            );
+
+            // All other indices should remain at defaults
+            for i in 0..10 {
+                if i == expected_index {
+                    continue;
+                }
+                assert_eq!(
+                    score_data.score[i], 0,
+                    "{label}: score at non-target index {i} should be 0"
+                );
+                assert_eq!(
+                    score_data.lamp[i],
+                    Lamp::NoPlay,
+                    "{label}: lamp at non-target index {i} should be NoPlay"
+                );
+            }
+        }
     }
 
     /// Test ScoreMap::load_from_memory with a simple mock setup
