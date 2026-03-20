@@ -6,7 +6,7 @@ use anyhow::{Result, bail};
 use infst::config::database;
 use infst::{
     MemoryReader, OffsetSearcher, OffsetsCollection, SongInfo, builtin_signatures,
-    fetch_song_database,
+    chart::{EntryLayout, fetch_song_database_bulk_with_layout},
 };
 use tracing::{debug, warn};
 
@@ -20,6 +20,8 @@ use crate::validation::{ValidationResult, validate_song_database};
 pub fn load_song_database_with_retry(
     reader: &MemoryReader,
     song_list: u64,
+    entry_stride: usize,
+    layout: Option<&EntryLayout>,
     shutdown: &ShutdownSignal,
 ) -> Result<Option<HashMap<u32, SongInfo>>> {
     let mut attempts = 0u32;
@@ -44,7 +46,7 @@ pub fn load_song_database_with_retry(
             return Ok(None);
         }
 
-        match fetch_song_database(reader, song_list, SongInfo::MEMORY_SIZE) {
+        match fetch_song_database_bulk_with_layout(reader, song_list, entry_stride, layout) {
             Ok(db) => match validate_song_database(&db) {
                 ValidationResult::Valid => return Ok(Some(db)),
                 ValidationResult::TooFewSongs(count) => {

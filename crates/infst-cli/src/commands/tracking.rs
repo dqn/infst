@@ -278,7 +278,13 @@ fn load_song_database(
 
         if db.is_empty() {
             debug!("TSV+memory approach returned empty, trying legacy...");
-            return load_song_database_with_retry(reader, song_list, shutdown);
+            return load_song_database_with_retry(
+                reader,
+                song_list,
+                entry_stride,
+                Some(layout),
+                shutdown,
+            );
         }
         return Ok(Some(db));
     }
@@ -295,7 +301,13 @@ fn load_song_database(
 
     if song_db.is_empty() {
         debug!("Memory scan found no songs, trying legacy approach...");
-        return load_song_database_with_retry(reader, song_list, shutdown);
+        return load_song_database_with_retry(
+            reader,
+            song_list,
+            entry_stride,
+            Some(layout),
+            shutdown,
+        );
     }
 
     info!("Loaded {} songs from memory scan", song_db.len());
