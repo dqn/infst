@@ -152,11 +152,10 @@ impl Infst {
         );
         let song_select_marker = read_with_default(
             || {
-                reader.read_i32(
-                    self.offsets
-                        .play_settings
-                        .wrapping_sub(settings::SONG_SELECT_MARKER),
-                )
+                self.offsets
+                    .play_settings
+                    .checked_sub(settings::SONG_SELECT_MARKER)
+                    .map_or(Ok(0), |addr| reader.read_i32(addr))
             },
             0,
             "song_select_marker",
@@ -226,11 +225,13 @@ impl Infst {
             match self.fetch_play_data(reader) {
                 Ok(play_data) => {
                     // Verify data looks valid (non-zero total notes)
-                    let total_notes = play_data.judge.pgreat
-                        + play_data.judge.great
-                        + play_data.judge.good
-                        + play_data.judge.bad
-                        + play_data.judge.poor;
+                    let total_notes = play_data
+                        .judge
+                        .pgreat
+                        .saturating_add(play_data.judge.great)
+                        .saturating_add(play_data.judge.good)
+                        .saturating_add(play_data.judge.bad)
+                        .saturating_add(play_data.judge.poor);
 
                     // Validate song_id and difficulty match current_playing (if available)
                     let chart_valid = match self.current_playing {
@@ -345,11 +346,13 @@ impl Infst {
             }
         };
 
-        let total_notes = play_data.judge.pgreat
-            + play_data.judge.great
-            + play_data.judge.good
-            + play_data.judge.bad
-            + play_data.judge.poor;
+        let total_notes = play_data
+            .judge
+            .pgreat
+            .saturating_add(play_data.judge.great)
+            .saturating_add(play_data.judge.good)
+            .saturating_add(play_data.judge.bad)
+            .saturating_add(play_data.judge.poor);
 
         let lamp_valid = play_data.lamp >= Lamp::Failed;
 
@@ -812,7 +815,12 @@ impl Infst {
         // Fall back to entry data if available, then to judge note count
         // as last resort.
         let chart_notes = self.read_current_chart_notes(reader);
-        let judge_notes = judge.pgreat + judge.great + judge.good + judge.bad + judge.poor;
+        let judge_notes = judge
+            .pgreat
+            .saturating_add(judge.great)
+            .saturating_add(judge.good)
+            .saturating_add(judge.bad)
+            .saturating_add(judge.poor);
 
         // V3: entry offset 0x378 contains BPM, not total_notes. Detect this
         // by checking if all non-zero values in the song's total_notes array
