@@ -13,6 +13,13 @@ use super::SongInfo;
 use super::scan::fetch_song_database_from_memory_scan;
 use crate::chart::encoding_fixes::fix_title_encoding;
 
+// Column indices are 0-based. Column 0 = Song ID, Column 1 = Title.
+// Per difficulty: +0=Unlocked, +1=Rating, +2=Lamp, +3=Letter, +4=EX Score,
+//                 +5=Miss Count, +6=Note Count, +7=DJ Points
+// SPB starts at column 10, each difficulty block is 8 columns.
+const RATING_COLS: [usize; 10] = [10, 18, 26, 34, 42, 0, 50, 58, 66, 74]; // 0 for DPB (not in file)
+const NOTE_COLS: [usize; 10] = [15, 23, 31, 39, 47, 0, 55, 63, 71, 79]; // 0 for DPB
+
 /// Load song database from a TSV file (tracker export format)
 ///
 /// The TSV file should have columns:
@@ -29,13 +36,6 @@ pub fn load_song_database_from_tsv<P: AsRef<Path>>(
     let file = File::open(path)?;
     let reader = BufReader::new(file);
     let mut result = HashMap::new();
-
-    // Column indices are 0-based. Column 0 = Song ID, Column 1 = Title.
-    // Per difficulty: +0=Unlocked, +1=Rating, +2=Lamp, +3=Letter, +4=EX Score,
-    //                 +5=Miss Count, +6=Note Count, +7=DJ Points
-    // SPB starts at column 10, each difficulty block is 8 columns.
-    const RATING_COLS: [usize; 10] = [10, 18, 26, 34, 42, 0, 50, 58, 66, 74]; // 0 for DPB (not in file)
-    const NOTE_COLS: [usize; 10] = [15, 23, 31, 39, 47, 0, 55, 63, 71, 79]; // 0 for DPB
 
     let mut line_num = 0;
     for line_result in reader.lines() {
@@ -311,4 +311,67 @@ pub(crate) fn normalize_title_for_matching(title: &str) -> String {
         .flat_map(|c| c.to_lowercase())
         .filter(|c| c.is_alphanumeric() || *c > '\u{007F}') // Keep non-ASCII (Japanese)
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{NOTE_COLS, RATING_COLS};
+    use crate::export::format_tracker_tsv_header;
+
+    /// Verify that RATING_COLS and NOTE_COLS indices match the actual header
+    /// produced by format_tracker_tsv_header(). If the TSV format changes,
+    /// this test will catch the mismatch instead of silently reading wrong columns.
+    #[test]
+    fn test_tsv_column_indices_match_header() {
+        let header = format_tracker_tsv_header();
+        let columns: Vec<&str> = header.split('\t').collect();
+
+        // Difficulty names in the order matching the 10-element arrays
+        // (SPB=0, SPN=1, SPH=2, SPA=3, SPL=4, DPB=5, DPN=6, DPH=7, DPA=8, DPL=9)
+        let diff_names = [
+            "SPB", "SPN", "SPH", "SPA", "SPL", "DPB", "DPN", "DPH", "DPA", "DPL",
+        ];
+
+        for (i, diff_name) in diff_names.iter().enumerate() {
+            let rating_idx = RATING_COLS[i];
+            let note_idx = NOTE_COLS[i];
+
+            if *diff_name == "DPB" {
+                // DPB is not present in the TSV; index 0 means skip
+                assert_eq!(rating_idx, 0, "DPB RATING_COLS should be 0 (skip)");
+                assert_eq!(note_idx, 0, "DPB NOTE_COLS should be 0 (skip)");
+                continue;
+            }
+
+            let expected_rating = format!("{} Rating", diff_name);
+            assert!(
+                rating_idx < columns.len(),
+                "RATING_COLS[{}] ({}) = {} is out of bounds (header has {} columns)",
+                i,
+                diff_name,
+                rating_idx,
+                columns.len()
+            );
+            assert_eq!(
+                columns[rating_idx], expected_rating,
+                "RATING_COLS[{}] ({}) = {} points to {:?}, expected {:?}",
+                i, diff_name, rating_idx, columns[rating_idx], expected_rating
+            );
+
+            let expected_note = format!("{} Note Count", diff_name);
+            assert!(
+                note_idx < columns.len(),
+                "NOTE_COLS[{}] ({}) = {} is out of bounds (header has {} columns)",
+                i,
+                diff_name,
+                note_idx,
+                columns.len()
+            );
+            assert_eq!(
+                columns[note_idx], expected_note,
+                "NOTE_COLS[{}] ({}) = {} points to {:?}, expected {:?}",
+                i, diff_name, note_idx, columns[note_idx], expected_note
+            );
+        }
+    }
 }
