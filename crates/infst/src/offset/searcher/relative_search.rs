@@ -39,7 +39,9 @@ impl<R: ReadMemory> OffsetSearcher<'_, R> {
                     }
                 }
 
-                let addr = expected + delta;
+                let Some(addr) = expected.checked_add(delta) else {
+                    continue;
+                };
                 if addr.is_multiple_of(4) && validate(self, addr) {
                     return Some(addr);
                 }

@@ -87,6 +87,13 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                 }
             }
 
+            if best
+                .as_ref()
+                .is_some_and(|p| p.valid_nodes >= DATA_MAP_NODE_SAMPLES / 2)
+            {
+                break;
+            }
+
             search_size *= 2;
         }
 

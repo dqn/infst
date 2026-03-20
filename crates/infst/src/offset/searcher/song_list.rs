@@ -1,5 +1,7 @@
 //! SongList offset search functionality
 
+use std::collections::HashSet;
+
 use tracing::{debug, info, warn};
 
 use crate::chart::SongInfo;
@@ -204,59 +206,58 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
             matches_1002.len()
         );
 
+        let set_1002: HashSet<u64> = matches_1002.iter().copied().collect();
+
         for addr_1001 in &matches_1001 {
-            for addr_1002 in &matches_1002 {
-                if *addr_1002 > *addr_1001 {
-                    let delta = addr_1002 - addr_1001;
-                    if delta == struct_size {
-                        debug!(
-                            "  Found new structure: song_id=1001 at 0x{:X}, delta={}",
-                            addr_1001, delta
-                        );
+            let expected_1002 = addr_1001 + struct_size;
+            if !set_1002.contains(&expected_1002) {
+                continue;
+            }
 
-                        // Dump full structure for analysis
-                        if let Ok(bytes) = self.reader.read_bytes(*addr_1001, struct_size as usize)
+            debug!(
+                "  Found new structure: song_id=1001 at 0x{:X}, delta={}",
+                addr_1001, struct_size
+            );
+
+            // Dump full structure for analysis
+            if let Ok(bytes) = self.reader.read_bytes(*addr_1001, struct_size as usize) {
+                let struct_buf = ByteBuffer::new(&bytes);
+                debug!("    Full structure dump ({} bytes):", struct_size);
+                debug!("      Bytes 0-31:   {:02X?}", &bytes[0..32]);
+                debug!("      Bytes 32-63:  {:02X?}", &bytes[32..64]);
+                debug!("      Bytes 64-95:  {:02X?}", &bytes[64..96]);
+                debug!("      Bytes 96-127: {:02X?}", &bytes[96..128]);
+
+                // Try different pointer offsets
+                for ptr_offset in [8usize, 12, 16, 20, 24, 28, 32] {
+                    if ptr_offset + 8 <= bytes.len() {
+                        let ptr = struct_buf.read_u64_at(ptr_offset).unwrap_or(0);
+                        if ptr > 0x140000000
+                            && ptr < 0x150000000
+                            && let Ok(str_bytes) = self.reader.read_bytes(ptr, 32)
                         {
-                            let struct_buf = ByteBuffer::new(&bytes);
-                            debug!("    Full structure dump ({} bytes):", struct_size);
-                            debug!("      Bytes 0-31:   {:02X?}", &bytes[0..32]);
-                            debug!("      Bytes 32-63:  {:02X?}", &bytes[32..64]);
-                            debug!("      Bytes 64-95:  {:02X?}", &bytes[64..96]);
-                            debug!("      Bytes 96-127: {:02X?}", &bytes[96..128]);
-
-                            // Try different pointer offsets
-                            for ptr_offset in [8usize, 12, 16, 20, 24, 28, 32] {
-                                if ptr_offset + 8 <= bytes.len() {
-                                    let ptr = struct_buf.read_u64_at(ptr_offset).unwrap_or(0);
-                                    if ptr > 0x140000000
-                                        && ptr < 0x150000000
-                                        && let Ok(str_bytes) = self.reader.read_bytes(ptr, 32)
-                                    {
-                                        let s = decode_shift_jis_to_string(&str_bytes);
-                                        if !s.is_empty() {
-                                            debug!(
-                                                "      Ptr at offset {}: 0x{:X} -> {:?}",
-                                                ptr_offset, ptr, s
-                                            );
-                                        }
-                                    }
-                                }
+                            let s = decode_shift_jis_to_string(&str_bytes);
+                            if !s.is_empty() {
+                                debug!(
+                                    "      Ptr at offset {}: 0x{:X} -> {:?}",
+                                    ptr_offset, ptr, s
+                                );
                             }
-                        }
-
-                        // Count songs to verify
-                        let song_count = self.count_songs_new_structure(*addr_1001);
-                        debug!("    Song count (new structure): {}", song_count);
-
-                        if song_count >= MIN_EXPECTED_SONGS {
-                            info!(
-                                "  SongList (new structure): 0x{:X} ({} songs)",
-                                addr_1001, song_count
-                            );
-                            return Some(*addr_1001);
                         }
                     }
                 }
+            }
+
+            // Count songs to verify
+            let song_count = self.count_songs_new_structure(*addr_1001);
+            debug!("    Song count (new structure): {}", song_count);
+
+            if song_count >= MIN_EXPECTED_SONGS {
+                info!(
+                    "  SongList (new structure): 0x{:X} ({} songs)",
+                    addr_1001, song_count
+                );
+                return Some(*addr_1001);
             }
         }
 
@@ -524,17 +525,19 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                 // Check if it's just zero (uninitialized) vs invalid
                 if song_id == 0 && count > 0 {
                     // Try a few more entries in case of gaps
-                    let mut found_more = false;
-                    for skip in 1..10 {
+                    let mut found_skip = None;
+                    for skip in 1u64..10 {
                         let next_addr = addr + (skip * STRUCT_SIZE);
                         if let Ok(next_id) = self.reader.read_i32(next_addr)
                             && (1000..=50000).contains(&next_id)
                         {
-                            found_more = true;
+                            found_skip = Some(skip);
                             break;
                         }
                     }
-                    if !found_more {
+                    if let Some(skip) = found_skip {
+                        addr += skip * STRUCT_SIZE;
+                    } else {
                         break;
                     }
                 } else {
@@ -542,9 +545,8 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                 }
             } else {
                 count += 1;
+                addr += STRUCT_SIZE;
             }
-
-            addr += STRUCT_SIZE;
         }
 
         count
