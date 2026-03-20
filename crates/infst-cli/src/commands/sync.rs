@@ -13,8 +13,10 @@ use anyhow::{Context, Result};
 use flate2::Compression;
 use flate2::write::GzEncoder;
 use infst::{
-    MemoryReader, OffsetSearcher, ReadMemory, ScoreMap, chart::Difficulty,
-    decode_shift_jis_to_string, fetch_song_database_bulk, score::Lamp,
+    MemoryReader, OffsetSearcher, ReadMemory, ScoreMap,
+    chart::{Difficulty, fetch_song_database_bulk_with_layout},
+    decode_shift_jis_to_string,
+    score::Lamp,
 };
 use serde::{Deserialize, Serialize};
 
@@ -224,8 +226,12 @@ pub fn run(endpoint: Option<&str>, token: Option<&str>, pid: Option<u32>) -> Res
 
     // Load ScoreMap from DataMap (keyed by game_id)
     eprintln!("Loading score data...");
-    let song_db =
-        fetch_song_database_bulk(&reader, offsets.song_db_address(), offsets.entry_stride())?;
+    let song_db = fetch_song_database_bulk_with_layout(
+        &reader,
+        offsets.song_db_address(),
+        offsets.entry_stride(),
+        offsets.entry_layout.as_ref(),
+    )?;
     let score_map = ScoreMap::load_from_memory(&reader, offsets.data_map, &song_db)?;
     eprintln!("Loaded {} score entries", score_map.len());
 
