@@ -27,7 +27,7 @@ pub fn analyze_metadata_table<R: ReadMemory>(reader: &R, text_base: u64) {
     // Scan for valid song_ids (pattern: 1000-50000 followed by reasonable folder 1-50)
     let mut found_ids: Vec<(usize, i32, i32)> = Vec::new();
 
-    for offset in (0..buffer.len() - 8).step_by(4) {
+    for offset in (0..buffer.len().saturating_sub(8)).step_by(4) {
         let song_id = buf.read_i32_at(offset).unwrap_or(0);
         let folder = buf.read_i32_at(offset + 4).unwrap_or(0);
 

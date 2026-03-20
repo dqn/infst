@@ -99,6 +99,13 @@ fn _fetch_song_database_bulk<R: ReadMemory>(
                     }
                 }
                 consecutive_failures += 1;
+                if consecutive_failures >= MAX_CONSECUTIVE_FAILURES {
+                    debug!(
+                        "Stopping bulk song fetch after {} consecutive failures at entry {}",
+                        consecutive_failures, entry_index
+                    );
+                    break;
+                }
             }
             _ => {
                 consecutive_failures += 1;
