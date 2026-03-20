@@ -213,14 +213,12 @@ impl Infst {
             );
         }
 
-        let session_dir = config.session_dir.to_string_lossy().to_string();
-
         Self {
             offsets,
+            session_manager: SessionManager::new(&config.session_dir),
             config,
             game_data: GameData::new(),
             state_detector: GameStateDetector::new(),
-            session_manager: SessionManager::new(&session_dir),
             current_playing: None,
             last_markers: (0, 0, 0),
             last_result_fingerprint: None,
