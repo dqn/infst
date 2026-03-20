@@ -7,7 +7,6 @@ mod tsv;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use tracing::debug;
 
 use crate::error::Result;
 use crate::play::UnlockType;
@@ -221,66 +220,6 @@ impl SongInfo {
     ) -> Result<Option<Self>> {
         let buffer = reader.read_bytes(address, layout.entry_size)?;
         Self::parse_entry_with_layout(&buffer, layout)
-    }
-
-    /// Read song info with fallback to metadata table for new INFINITAS versions.
-    ///
-    /// In version 2026012800+, the song_id may be stored in a separate metadata table.
-    /// This method tries the standard read first, and if song_id is 0 but title exists,
-    /// it attempts to read song_id from the metadata table.
-    ///
-    /// # Arguments
-    /// * `reader` - Memory reader
-    /// * `text_address` - Address of the text entry
-    /// * `text_base` - Base address of the text table
-    /// * `entry_index` - Index of this entry in the table
-    pub fn read_from_memory_with_fallback<R: ReadMemory>(
-        reader: &R,
-        text_address: u64,
-        text_base: u64,
-        entry_index: u64,
-    ) -> Result<Option<Self>> {
-        // First, try standard read
-        let result = Self::read_from_memory(reader, text_address)?;
-
-        match result {
-            Some(mut song) if song.id == 0 && !song.title.is_empty() => {
-                // Try to read song_id from metadata table
-                let metadata_addr = text_base
-                    + Self::METADATA_TABLE_OFFSET as u64
-                    + entry_index * Self::MEMORY_SIZE as u64;
-
-                if let Ok(metadata) = reader.read_bytes(metadata_addr, 32) {
-                    let buf = ByteBuffer::new(&metadata);
-                    let alt_song_id = buf.read_i32_at(0).unwrap_or(0);
-                    let alt_folder = buf.read_i32_at(4).unwrap_or(0);
-
-                    // Validate: song_id should be 1000-50000, folder 1-50
-                    if (1000..=50000).contains(&alt_song_id) {
-                        debug!(
-                            "Using metadata table for song '{}': id={}, folder={}",
-                            song.title, alt_song_id, alt_folder
-                        );
-                        song.id = alt_song_id as u32;
-                        if (1..=50).contains(&alt_folder) {
-                            song.folder = alt_folder;
-                        }
-                    }
-                }
-
-                if song.id == 0 {
-                    // Still no valid song_id, skip this entry
-                    debug!(
-                        "Skipping entry with title '{}' - no valid song_id found",
-                        song.title
-                    );
-                    return Ok(None);
-                }
-
-                Ok(Some(song))
-            }
-            other => Ok(other),
-        }
     }
 }
 
