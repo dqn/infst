@@ -31,9 +31,8 @@ pub fn validate_play_settings_at<R: ReadMemory + ?Sized>(reader: &R, addr: u64) 
     }
 
     // Additional validation: song_select_marker should be 0 or 1
-    let song_select_marker = reader
-        .read_i32(addr.wrapping_sub(settings::SONG_SELECT_MARKER))
-        .ok()?;
+    let marker_addr = addr.checked_sub(settings::SONG_SELECT_MARKER)?;
+    let song_select_marker = reader.read_i32(marker_addr).ok()?;
     if !(0..=1).contains(&song_select_marker) {
         return None;
     }
@@ -69,4 +68,53 @@ pub fn validate_play_data_address<R: ReadMemory + ?Sized>(reader: &R, addr: u64)
     (MIN_SONG_ID..=MAX_SONG_ID).contains(&song_id)
         && (0..=9).contains(&difficulty)
         && (0..=7).contains(&lamp)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::process::MockMemoryBuilder;
+
+    #[test]
+    fn test_validate_play_settings_at_small_address() {
+        // Address smaller than SONG_SELECT_MARKER offset should return None
+        // via checked_sub, not wrap around to a huge address.
+        let reader = MockMemoryBuilder::new()
+            .base(0)
+            .with_size(64)
+            // Write valid settings at addr 0x10
+            .write_i32(0x10, 0) // style
+            .write_i32(0x14, 0) // gauge
+            .write_i32(0x18, 0) // assist
+            .write_i32(0x1C, 0) // flip
+            .write_i32(0x20, 0) // range
+            .build();
+
+        // addr=0x10 is smaller than SONG_SELECT_MARKER (24), so
+        // checked_sub should return None instead of wrapping
+        let result = validate_play_settings_at(&reader, 0x10);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_validate_play_settings_at_valid() {
+        // Build a valid PlaySettings layout with song_select_marker at addr - 24
+        let base = 0x1000u64;
+        let settings_addr = base + 24; // enough room for marker before it
+        let reader = MockMemoryBuilder::new()
+            .base(base)
+            .with_size(64)
+            // song_select_marker at settings_addr - 24 = base + 0
+            .write_i32(0, 1)
+            // settings fields at offset 24..
+            .write_i32(24, 0) // style
+            .write_i32(28, 0) // gauge
+            .write_i32(32, 0) // assist
+            .write_i32(36, 0) // flip
+            .write_i32(40, 0) // range
+            .build();
+
+        let result = validate_play_settings_at(&reader, settings_addr);
+        assert_eq!(result, Some(settings_addr));
+    }
 }

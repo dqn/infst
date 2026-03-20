@@ -84,15 +84,15 @@ impl Judge {
 
         Self {
             play_type,
-            pgreat: raw.p1.pgreat + raw.p2.pgreat,
-            great: raw.p1.great + raw.p2.great,
-            good: raw.p1.good + raw.p2.good,
-            bad: raw.p1.bad + raw.p2.bad,
-            poor: raw.p1.poor + raw.p2.poor,
-            fast: raw.p1.fast + raw.p2.fast,
-            slow: raw.p1.slow + raw.p2.slow,
-            combo_break: raw.p1.combo_break + raw.p2.combo_break,
-            premature_end: (raw.p1.measure_end + raw.p2.measure_end) != 0,
+            pgreat: raw.p1.pgreat.saturating_add(raw.p2.pgreat),
+            great: raw.p1.great.saturating_add(raw.p2.great),
+            good: raw.p1.good.saturating_add(raw.p2.good),
+            bad: raw.p1.bad.saturating_add(raw.p2.bad),
+            poor: raw.p1.poor.saturating_add(raw.p2.poor),
+            fast: raw.p1.fast.saturating_add(raw.p2.fast),
+            slow: raw.p1.slow.saturating_add(raw.p2.slow),
+            combo_break: raw.p1.combo_break.saturating_add(raw.p2.combo_break),
+            premature_end: (raw.p1.measure_end | raw.p2.measure_end) != 0,
         }
     }
 }
@@ -242,6 +242,59 @@ mod tests {
         };
         let judge_no_end = Judge::from_raw_data(raw_no_end);
         assert!(!judge_no_end.premature_end);
+    }
+
+    #[test]
+    fn test_from_raw_data_saturates_on_overflow() {
+        let raw = RawJudgeData {
+            p1: PlayerJudge {
+                pgreat: u32::MAX,
+                great: u32::MAX,
+                good: u32::MAX,
+                bad: u32::MAX,
+                poor: u32::MAX,
+                fast: u32::MAX,
+                slow: u32::MAX,
+                combo_break: u32::MAX,
+                ..Default::default()
+            },
+            p2: PlayerJudge {
+                pgreat: 1,
+                great: 1,
+                good: 1,
+                bad: 1,
+                poor: 1,
+                fast: 1,
+                slow: 1,
+                combo_break: 1,
+                ..Default::default()
+            },
+        };
+        let judge = Judge::from_raw_data(raw);
+        assert_eq!(judge.pgreat, u32::MAX);
+        assert_eq!(judge.great, u32::MAX);
+        assert_eq!(judge.good, u32::MAX);
+        assert_eq!(judge.bad, u32::MAX);
+        assert_eq!(judge.poor, u32::MAX);
+        assert_eq!(judge.fast, u32::MAX);
+        assert_eq!(judge.slow, u32::MAX);
+        assert_eq!(judge.combo_break, u32::MAX);
+    }
+
+    #[test]
+    fn test_from_raw_data_both_zero_defaults_to_p1() {
+        let raw = RawJudgeData::default();
+        let judge = Judge::from_raw_data(raw);
+        assert_eq!(judge.play_type, PlayType::P1);
+        assert_eq!(judge.pgreat, 0);
+        assert_eq!(judge.great, 0);
+        assert_eq!(judge.good, 0);
+        assert_eq!(judge.bad, 0);
+        assert_eq!(judge.poor, 0);
+        assert_eq!(judge.fast, 0);
+        assert_eq!(judge.slow, 0);
+        assert_eq!(judge.combo_break, 0);
+        assert!(!judge.premature_end);
     }
 
     #[test]
