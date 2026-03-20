@@ -132,4 +132,41 @@ mod tests {
         // DJ Points = 500 * 100 / 10000 = 5.0
         assert!((djp - 5.0).abs() < 0.01);
     }
+
+    #[test]
+    fn test_dj_points_hard_clear_boundary_bonus() {
+        // The lamp bonus has a non-linear +5 jump at HardClear (DJ_POINTS_LAMP_HARD_CLEAR_BONUS).
+        // Verify HardClear vs ExHardClear differ by exactly one rank step (+5),
+        // NOT by rank+bonus (+10), proving the HC bonus doesn't re-trigger at ExHard.
+        let ex_score = 2000;
+        let grade = Grade::Aaa;
+
+        let djp_hc = calculate_dj_points(ex_score, grade, Lamp::HardClear);
+        let djp_exhc = calculate_dj_points(ex_score, grade, Lamp::ExHardClear);
+
+        // HC:   L = (5-2)*5 + 5 = 20,  C = 20  -> multiplier = 140
+        // ExHC: L = (6-2)*5 + 5 = 25,  C = 20  -> multiplier = 145
+        // Difference = 2000 * (145 - 140) / 10000 = 2000 * 5 / 10000 = 1.0
+        let expected_diff =
+            ex_score as f64 * DJ_POINTS_LAMP_BONUS_PER_RANK as f64 / DJ_POINTS_DIVISOR;
+        assert!(
+            (djp_exhc - djp_hc - expected_diff).abs() < f64::EPSILON,
+            "ExHard - HardClear should be exactly one rank step ({expected_diff}), \
+             got {} (HC={djp_hc}, ExHC={djp_exhc})",
+            djp_exhc - djp_hc,
+        );
+
+        // Also verify the non-linear jump from Clear to HardClear is TWO steps
+        // (one rank + HC bonus), not one.
+        let djp_clear = calculate_dj_points(ex_score, grade, Lamp::Clear);
+        let expected_hc_jump = ex_score as f64
+            * (DJ_POINTS_LAMP_BONUS_PER_RANK + DJ_POINTS_LAMP_HARD_CLEAR_BONUS) as f64
+            / DJ_POINTS_DIVISOR;
+        assert!(
+            (djp_hc - djp_clear - expected_hc_jump).abs() < f64::EPSILON,
+            "HardClear - Clear should include the HC bonus ({expected_hc_jump}), \
+             got {} (Clear={djp_clear}, HC={djp_hc})",
+            djp_hc - djp_clear,
+        );
+    }
 }
