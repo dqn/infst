@@ -41,6 +41,10 @@ pub mod database {
     /// Maximum number of attempts to load the song database.
     pub const MAX_LOAD_ATTEMPTS: u32 = 12;
 
+    /// Maximum number of attempts to search for offsets.
+    /// 30 attempts at 5-second intervals = 2.5 minutes.
+    pub const MAX_SEARCH_ATTEMPTS: u32 = 30;
+
     /// Delay between retry attempts.
     pub const RETRY_DELAY: Duration = Duration::from_secs(5);
 
@@ -68,6 +72,7 @@ mod tests {
     #[test]
     fn test_database_constants() {
         assert_eq!(database::MAX_LOAD_ATTEMPTS, 12);
+        assert_eq!(database::MAX_SEARCH_ATTEMPTS, 30);
         assert_eq!(database::RETRY_DELAY.as_secs(), 5);
         assert_eq!(database::EXTRA_DELAY.as_secs(), 1);
     }

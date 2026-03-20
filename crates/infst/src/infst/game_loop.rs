@@ -143,6 +143,14 @@ impl Infst {
             thread::sleep(Duration::from_millis(timing::GAME_STATE_POLL_INTERVAL_MS));
         }
 
+        // Wait for any in-flight git operation to finish before exiting
+        if let Some(handle) = self.git_thread.take() {
+            debug!("Waiting for in-flight git operation to finish...");
+            if let Err(e) = handle.join() {
+                warn!("Git thread panicked during cleanup: {:?}", e);
+            }
+        }
+
         Ok(())
     }
 
@@ -532,11 +540,19 @@ impl Infst {
         let repo_path = git_config.repo_path.clone();
         let file_name = git_config.file_name.clone();
 
-        thread::spawn(move || {
+        // Wait for any in-flight git operation to finish before starting a new one.
+        // Concurrent git operations can corrupt the index.
+        if let Some(handle) = self.git_thread.take()
+            && let Err(e) = handle.join()
+        {
+            warn!("Previous git thread panicked: {:?}", e);
+        }
+
+        self.git_thread = Some(thread::spawn(move || {
             if let Err(e) = crate::git::add_commit_push(&repo_path, &file_name, &message, &label) {
                 error!("Git commit/push failed: {}", e);
             }
-        });
+        }));
     }
 
     /// Send lamp data to the API endpoint in a background thread

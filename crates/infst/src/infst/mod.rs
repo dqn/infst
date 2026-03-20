@@ -34,6 +34,7 @@ mod game_loop;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::thread::JoinHandle;
 
 use tracing::{debug, info};
 
@@ -190,6 +191,8 @@ pub struct Infst {
     pub(crate) result_poll_ticks: u32,
     /// Fingerprint from previous poll (stability check: must match twice to confirm data is final)
     pub(crate) pending_result_fingerprint: Option<(u32, u8, u32)>,
+    /// Handle for the background git thread to prevent concurrent git operations
+    pub(crate) git_thread: Option<JoinHandle<()>>,
 }
 
 impl Infst {
@@ -225,6 +228,7 @@ impl Infst {
             result_poll_pending: false,
             result_poll_ticks: 0,
             pending_result_fingerprint: None,
+            git_thread: None,
         }
     }
 
