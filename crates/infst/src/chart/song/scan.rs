@@ -125,11 +125,11 @@ pub fn build_song_id_title_map<R: ReadMemory>(
 
         // Read title from text table
         if let Ok(title_bytes) = reader.read_bytes(text_addr, 64) {
-            let mut title_arc = decode_shift_jis(&title_bytes);
-            if let Some(fixed) = fix_title_encoding(&title_arc) {
-                title_arc = fixed;
-            }
-            let title = title_arc.trim();
+            let title_decoded = decode_shift_jis(&title_bytes);
+            let title_trimmed = title_decoded.trim();
+            let title_arc =
+                fix_title_encoding(title_trimmed).unwrap_or_else(|| Arc::from(title_trimmed));
+            let title: &str = &title_arc;
             if !title.is_empty()
                 && title
                     .chars()
