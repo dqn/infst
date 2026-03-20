@@ -107,12 +107,25 @@ pub fn search_offsets_with_retry(
     shutdown: &ShutdownSignal,
 ) -> Result<Option<OffsetsCollection>> {
     let signatures = builtin_signatures();
+    let mut attempts = 0u32;
+    let mut last_error: Option<String> = None;
 
     loop {
         // Check for shutdown signal
         if shutdown.is_shutdown() {
             return Ok(None);
         }
+
+        if attempts >= database::MAX_SEARCH_ATTEMPTS {
+            bail!(
+                "Failed to detect offsets after {} attempts ({}s): {}. \
+                 Ensure INFINITAS is running and fully loaded past the title screen.",
+                database::MAX_SEARCH_ATTEMPTS,
+                database::MAX_SEARCH_ATTEMPTS as u64 * database::RETRY_DELAY.as_secs(),
+                last_error.unwrap_or_else(|| "unknown error".to_string())
+            );
+        }
+        attempts += 1;
 
         let mut searcher = OffsetSearcher::new(reader);
 
@@ -129,16 +142,22 @@ pub fn search_offsets_with_retry(
                     return Ok(Some(offsets));
                 }
 
+                last_error = Some("offset detection incomplete".to_string());
                 warn!(
-                    "Offset detection incomplete, retrying in {}s...",
-                    database::RETRY_DELAY.as_secs()
+                    "Offset detection incomplete, retrying in {}s (attempt {}/{})",
+                    database::RETRY_DELAY.as_secs(),
+                    attempts,
+                    database::MAX_SEARCH_ATTEMPTS
                 );
             }
             Err(e) => {
+                last_error = Some(e.to_string());
                 warn!(
-                    "Offset detection failed ({}), retrying in {}s...",
+                    "Offset detection failed ({}), retrying in {}s (attempt {}/{})",
                     e,
-                    database::RETRY_DELAY.as_secs()
+                    database::RETRY_DELAY.as_secs(),
+                    attempts,
+                    database::MAX_SEARCH_ATTEMPTS
                 );
             }
         }
