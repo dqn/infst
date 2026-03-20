@@ -16,11 +16,11 @@ use crate::chart::encoding_fixes::fix_title_encoding;
 /// Load song database from a TSV file (tracker export format)
 ///
 /// The TSV file should have columns:
-/// Title, Type, Label, Cost Normal, Cost Hyper, Cost Another, SP DJ Points, DP DJ Points,
+/// Song ID, Title, Type, Label, Cost Normal, Cost Hyper, Cost Another, SP DJ Points, DP DJ Points,
 /// SPB Unlocked, SPB Rating, ..., DPL DJ Points
 ///
 /// This function extracts:
-/// - Title (column 0)
+/// - Title (column 1)
 /// - Difficulty levels (SPB Rating, SPN Rating, ... columns)
 /// - Note counts (SPB Note Count, SPN Note Count, ... columns)
 pub fn load_song_database_from_tsv<P: AsRef<Path>>(
@@ -29,18 +29,6 @@ pub fn load_song_database_from_tsv<P: AsRef<Path>>(
     let file = File::open(path)?;
     let reader = BufReader::new(file);
     let mut result = HashMap::new();
-
-    // Column indices (0-based):
-    // 0: Title, 1: Type, 2: Label
-    // SPB: 9=Rating, 14=Note Count
-    // SPN: 17=Rating, 22=Note Count
-    // SPH: 25=Rating, 30=Note Count
-    // SPA: 33=Rating, 38=Note Count
-    // SPL: 41=Rating, 46=Note Count
-    // DPN: 49=Rating, 54=Note Count (note: no DPB in this format)
-    // DPH: 57=Rating, 62=Note Count
-    // DPA: 65=Rating, 70=Note Count
-    // DPL: 73=Rating, 78=Note Count
 
     // Column indices are 0-based. Column 0 = Song ID, Column 1 = Title.
     // Per difficulty: +0=Unlocked, +1=Rating, +2=Lamp, +3=Letter, +4=EX Score,
