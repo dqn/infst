@@ -506,10 +506,13 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
     /// Count songs with new layout: song_id at offset 0
     fn count_songs_new_layout(&self, start_addr: u64) -> usize {
         const STRUCT_SIZE: u64 = SongInfo::MEMORY_SIZE as u64;
+        const MAX_ITERATIONS: usize = 10_000;
         let mut count = 0;
         let mut addr = start_addr;
+        let mut iterations = 0;
 
-        while count < 5000 {
+        while count < 5000 && iterations < MAX_ITERATIONS {
+            iterations += 1;
             // Read song_id at offset 0 (new layout)
             let song_id = match self.reader.read_i32(addr) {
                 Ok(id) => id,

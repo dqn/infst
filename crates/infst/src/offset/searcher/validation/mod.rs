@@ -368,6 +368,44 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_play_settings_nonstandard_flip() {
+        let marker_offset = settings::SONG_SELECT_MARKER as usize;
+
+        // flip=2 should be accepted (any non-negative value is valid,
+        // consistent with Settings::from_raw treating non-zero as true)
+        let reader = MockMemoryBuilder::new()
+            .base(0x1000)
+            .with_size(0x100)
+            .write_i32(0, 1) // song_select_marker
+            .write_i32(marker_offset, 2) // style
+            .write_i32(marker_offset + 4, 3) // gauge
+            .write_i32(marker_offset + 8, 0) // assist
+            .write_i32(marker_offset + 12, 2) // flip (non-standard truthy)
+            .write_i32(marker_offset + 16, 2) // range
+            .build();
+
+        assert!(validate_play_settings_at(&reader, 0x1000 + marker_offset as u64).is_some());
+    }
+
+    #[test]
+    fn test_validate_play_settings_negative_flip_rejected() {
+        let marker_offset = settings::SONG_SELECT_MARKER as usize;
+
+        let reader = MockMemoryBuilder::new()
+            .base(0x1000)
+            .with_size(0x100)
+            .write_i32(0, 1) // song_select_marker
+            .write_i32(marker_offset, 2) // style
+            .write_i32(marker_offset + 4, 3) // gauge
+            .write_i32(marker_offset + 8, 0) // assist
+            .write_i32(marker_offset + 12, -1) // flip (negative = invalid)
+            .write_i32(marker_offset + 16, 2) // range
+            .build();
+
+        assert!(validate_play_settings_at(&reader, 0x1000 + marker_offset as u64).is_none());
+    }
+
+    #[test]
     fn test_validate_play_data() {
         let reader = MockMemoryBuilder::new()
             .base(0x1000)

@@ -212,7 +212,7 @@ mod play_settings {
             .write_i32(marker_offset, 2)
             .write_i32(marker_offset + 4, 2)
             .write_i32(marker_offset + 8, 0)
-            .write_i32(marker_offset + 12, 2) // Invalid: > 1
+            .write_i32(marker_offset + 12, -1) // Invalid: negative
             .write_i32(marker_offset + 16, 1)
             .build();
 

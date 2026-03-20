@@ -11,7 +11,7 @@ use super::super::constants::*;
 /// - 0x00: style (4 bytes, range 0-6)
 /// - 0x04: gauge (4 bytes, range 0-4)
 /// - 0x08: assist (4 bytes, range 0-5)
-/// - 0x0C: flip (4 bytes, 0 or 1)
+/// - 0x0C: flip (4 bytes, boolean: any non-negative value)
 /// - 0x10: range (4 bytes, range 0-5)
 pub fn validate_play_settings_at<R: ReadMemory + ?Sized>(reader: &R, addr: u64) -> Option<u64> {
     let style = reader.read_i32(addr).ok()?;
@@ -24,7 +24,7 @@ pub fn validate_play_settings_at<R: ReadMemory + ?Sized>(reader: &R, addr: u64) 
     if !(0..=6).contains(&style)
         || !(0..=4).contains(&gauge)
         || !(0..=5).contains(&assist)
-        || !(0..=1).contains(&flip)
+        || flip < 0
         || !(0..=5).contains(&range)
     {
         return None;

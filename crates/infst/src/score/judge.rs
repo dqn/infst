@@ -19,7 +19,11 @@ pub struct PlayerJudge {
 impl PlayerJudge {
     /// Calculate total note count for this side
     pub fn total_notes(&self) -> u32 {
-        self.pgreat + self.great + self.good + self.bad + self.poor
+        self.pgreat
+            .saturating_add(self.great)
+            .saturating_add(self.good)
+            .saturating_add(self.bad)
+            .saturating_add(self.poor)
     }
 }
 
@@ -57,12 +61,12 @@ impl Judge {
 
     /// Calculate EX score (pgreat * 2 + great)
     pub fn ex_score(&self) -> u32 {
-        self.pgreat * 2 + self.great
+        self.pgreat.saturating_mul(2).saturating_add(self.great)
     }
 
     /// Calculate miss count (bad + poor)
     pub fn miss_count(&self) -> u32 {
-        self.bad + self.poor
+        self.bad.saturating_add(self.poor)
     }
 
     /// Build judge data from raw memory data
@@ -180,6 +184,39 @@ mod tests {
         assert_eq!(judge.play_type, PlayType::Dp);
         assert_eq!(judge.pgreat, 200);
         assert_eq!(judge.great, 100);
+    }
+
+    #[test]
+    fn test_ex_score_saturates_on_overflow() {
+        let judge = Judge {
+            pgreat: u32::MAX,
+            great: 100,
+            ..Default::default()
+        };
+        assert_eq!(judge.ex_score(), u32::MAX);
+    }
+
+    #[test]
+    fn test_miss_count_saturates_on_overflow() {
+        let judge = Judge {
+            bad: u32::MAX,
+            poor: 1,
+            ..Default::default()
+        };
+        assert_eq!(judge.miss_count(), u32::MAX);
+    }
+
+    #[test]
+    fn test_player_judge_total_notes_saturates_on_overflow() {
+        let pj = PlayerJudge {
+            pgreat: u32::MAX,
+            great: 1,
+            good: 0,
+            bad: 0,
+            poor: 0,
+            ..Default::default()
+        };
+        assert_eq!(pj.total_notes(), u32::MAX);
     }
 
     #[test]
