@@ -272,8 +272,8 @@ fn load_song_database(
 
     if std::path::Path::new(tsv_path).exists() {
         debug!("Building song database from TSV + memory scan...");
-        let db = infst::chart::build_song_database_from_tsv_with_memory(
-            reader, song_list, tsv_path, scan_size,
+        let db = infst::chart::build_song_database_from_tsv_with_memory_layout(
+            reader, song_list, tsv_path, scan_size, layout,
         );
 
         if db.is_empty() {

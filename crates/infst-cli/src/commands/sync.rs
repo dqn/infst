@@ -242,6 +242,9 @@ pub fn run(endpoint: Option<&str>, token: Option<&str>, pid: Option<u32>) -> Res
     let mut seen: std::collections::HashSet<(String, String)> = std::collections::HashSet::new();
 
     for text_entry in &text_entries {
+        // ScoreMap is keyed by game_id (from DataMap linked list), and text_entry.game_id
+        // also comes from the text table. Both use game_id natively, so no
+        // apply_game_id_mapping (game_id -> internal_id remapping) is needed here.
         let score_data = match score_map.get(text_entry.game_id) {
             Some(data) => data,
             None => continue,

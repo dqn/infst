@@ -2,8 +2,8 @@
 
 use anyhow::Result;
 use infst::{
-    MemoryReader, OffsetSearcher, ScoreMap, fetch_song_database, generate_tracker_json,
-    generate_tracker_tsv, get_unlock_states,
+    MemoryReader, OffsetSearcher, ScoreMap, chart::fetch_song_database_bulk_with_layout,
+    generate_tracker_json, generate_tracker_tsv, get_unlock_states,
 };
 
 use crate::cli::ExportFormat;
@@ -29,7 +29,12 @@ pub fn run(output: Option<&str>, format: ExportFormat, pid: Option<u32>) -> Resu
 
     // Load song database (includes embedded EX scores and lamps)
     eprintln!("Loading song database...");
-    let song_db = fetch_song_database(&reader, offsets.song_db_address(), offsets.entry_stride())?;
+    let song_db = fetch_song_database_bulk_with_layout(
+        &reader,
+        offsets.song_db_address(),
+        offsets.entry_stride(),
+        offsets.entry_layout.as_ref(),
+    )?;
     eprintln!("Loaded {} songs", song_db.len());
 
     // Load unlock data

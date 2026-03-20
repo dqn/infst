@@ -130,7 +130,7 @@ fn _fetch_song_database<R: ReadMemory>(
     reader: &R,
     song_list_addr: u64,
     entry_stride: usize,
-    _layout: &EntryLayout,
+    layout: &EntryLayout,
 ) -> Result<HashMap<u32, SongInfo>> {
     let mut result = HashMap::new();
     let mut entry_index: u64 = 0;
@@ -140,13 +140,31 @@ fn _fetch_song_database<R: ReadMemory>(
     loop {
         let address = song_list_addr + entry_index * entry_stride as u64;
 
-        // Use fallback method for new INFINITAS versions where metadata is split
-        match SongInfo::read_from_memory_with_fallback(
-            reader,
-            address,
-            song_list_addr,
-            entry_index,
-        )? {
+        // Read using the detected layout, then fall back to metadata table for song_id
+        let read_result = SongInfo::read_from_memory_with_layout(reader, address, layout)?;
+        let read_result = match read_result {
+            Some(mut song) if song.id == 0 && !song.title.is_empty() => {
+                // song_id may be in a separate metadata table (version 2026012800+)
+                let metadata_addr = song_list_addr
+                    + SongInfo::METADATA_TABLE_OFFSET as u64
+                    + entry_index * entry_stride as u64;
+                if let Ok(metadata) = reader.read_bytes(metadata_addr, 8) {
+                    let buf = ByteBuffer::new(&metadata);
+                    let alt_song_id = buf.read_i32_at(0).unwrap_or(0);
+                    let alt_folder = buf.read_i32_at(4).unwrap_or(0);
+                    if (1000..=50000).contains(&alt_song_id) {
+                        song.id = alt_song_id as u32;
+                        if (1..=50).contains(&alt_folder) {
+                            song.folder = alt_folder;
+                        }
+                    }
+                }
+                if song.id == 0 { None } else { Some(song) }
+            }
+            other => other,
+        };
+
+        match read_result {
             Some(song) if !song.title.is_empty() && song.id > 0 => {
                 // Avoid duplicates
                 result.entry(song.id).or_insert(song);
