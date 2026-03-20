@@ -112,7 +112,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
 
     /// Probe a DataMap candidate address for validity
     pub(crate) fn probe_data_map_candidate(&self, addr: u64) -> Option<DataMapProbe> {
-        let null_obj = self.reader.read_u64(addr.wrapping_sub(16)).ok()?;
+        let null_obj = self.reader.read_u64(addr.checked_sub(16)?).ok()?;
         let table_start = self.reader.read_u64(addr).ok()?;
         let table_end = self.reader.read_u64(addr + 8).ok()?;
 

@@ -604,7 +604,11 @@ fn investigate_datamap_nodes<R: ReadMemory>(
     }
 
     // Read DataMap hash table boundaries
-    let Ok(null_obj) = reader.read_u64(data_map_addr.wrapping_sub(16)) else {
+    let Some(null_obj_addr) = data_map_addr.checked_sub(16) else {
+        println!("  DataMap address too small for null_obj offset");
+        return;
+    };
+    let Ok(null_obj) = reader.read_u64(null_obj_addr) else {
         println!("  Failed to read DataMap null_obj");
         return;
     };

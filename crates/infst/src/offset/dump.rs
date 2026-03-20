@@ -128,7 +128,22 @@ impl OffsetDump {
             return None;
         }
 
-        let null_obj = match reader.read_u64(data_map_addr.wrapping_sub(16)) {
+        let null_obj_addr = match data_map_addr.checked_sub(16) {
+            Some(addr) => addr,
+            None => {
+                return Some(DataMapDiagnostics {
+                    status: "data_map address too small for null_obj offset".to_string(),
+                    null_obj: "(underflow)".to_string(),
+                    table_start: "(skipped)".to_string(),
+                    table_end: "(skipped)".to_string(),
+                    table_size: 0,
+                    scanned_entries: 0,
+                    non_null_entries: 0,
+                    valid_node_samples: 0,
+                });
+            }
+        };
+        let null_obj = match reader.read_u64(null_obj_addr) {
             Ok(value) => value,
             Err(e) => {
                 return Some(DataMapDiagnostics {

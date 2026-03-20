@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use tracing::warn;
 
 use crate::chart::{Difficulty, SongInfo};
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::process::{ByteBuffer, ReadMemory};
 use crate::score::Lamp;
 
@@ -123,7 +123,10 @@ impl ScoreMap {
         let mut nodes: HashMap<(u32, i32, i32), ListNode> = HashMap::new();
 
         // Read null object address (used to skip empty entries)
-        let null_obj = reader.read_u64(data_map_addr.wrapping_sub(16))?;
+        let null_obj_addr = data_map_addr.checked_sub(16).ok_or_else(|| {
+            Error::InvalidOffset("data_map address too small for null_obj offset".into())
+        })?;
+        let null_obj = reader.read_u64(null_obj_addr)?;
 
         // Read start and end addresses of the hash table
         let start_address = reader.read_u64(data_map_addr)?;

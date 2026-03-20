@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use tracing::{debug, info, warn};
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::process::{ByteBuffer, ReadMemory};
 
 use super::SongInfo;
@@ -40,7 +40,12 @@ fn _fetch_song_database_bulk<R: ReadMemory>(
     layout: &EntryLayout,
 ) -> Result<HashMap<u32, SongInfo>> {
     const MAX_ENTRIES: usize = 5000;
-    let bulk_size = MAX_ENTRIES * entry_stride;
+    let bulk_size = entry_stride.checked_mul(MAX_ENTRIES).ok_or_else(|| {
+        Error::InvalidOffset(format!(
+            "entry stride overflow: {} * {}",
+            entry_stride, MAX_ENTRIES
+        ))
+    })?;
 
     // Try bulk read
     let buffer = match reader.read_bytes(song_list_addr, bulk_size) {
