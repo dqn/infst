@@ -52,7 +52,7 @@ describe("validateRegisterInput", () => {
 });
 
 describe("validateLampInput", () => {
-  const valid = { songId: 1000, difficulty: "SPA", lamp: "HARD" };
+  const valid = { title: "ANTHEM LANDING", difficulty: "SPA", lamp: "HARD" };
 
   it("accepts valid input", () => {
     expect(validateLampInput(valid).valid).toBe(true);
@@ -62,13 +62,12 @@ describe("validateLampInput", () => {
     expect(validateLampInput({ ...valid, exScore: 1500, missCount: 3 }).valid).toBe(true);
   });
 
-  it("rejects non-integer songId", () => {
-    expect(validateLampInput({ ...valid, songId: 1.5 }).valid).toBe(false);
+  it("rejects missing title", () => {
+    expect(validateLampInput({ difficulty: "SPA", lamp: "HARD" }).valid).toBe(false);
   });
 
-  it("rejects songId <= 0", () => {
-    expect(validateLampInput({ ...valid, songId: 0 }).valid).toBe(false);
-    expect(validateLampInput({ ...valid, songId: -1 }).valid).toBe(false);
+  it("rejects empty title", () => {
+    expect(validateLampInput({ title: "", difficulty: "SPA", lamp: "HARD" }).valid).toBe(false);
   });
 
   it("rejects invalid difficulty", () => {
