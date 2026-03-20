@@ -193,6 +193,8 @@ pub struct Infst {
     pub(crate) pending_result_fingerprint: Option<(u32, u8, u32)>,
     /// Handle for the background git thread to prevent concurrent git operations
     pub(crate) git_thread: Option<JoinHandle<()>>,
+    /// game_id -> internal_id mapping for IIDX pointer aliases.
+    pub(crate) game_id_aliases: HashMap<u32, u32>,
 }
 
 impl Infst {
@@ -229,6 +231,7 @@ impl Infst {
             result_poll_ticks: 0,
             pending_result_fingerprint: None,
             git_thread: None,
+            game_id_aliases: HashMap::new(),
         }
     }
 
