@@ -1033,6 +1033,9 @@ impl Infst {
             }
         };
 
+        // Flip and battle are game-global toggles, not per-player settings.
+        // Always read from the P1 base regardless of play_type.
+        // (Matches Reflux C# reference: Settings.cs lines 49-50)
         let flip = reader.read_i32(base + word * 3)?;
         let battle = reader.read_i32(base + word * 8)?;
 
