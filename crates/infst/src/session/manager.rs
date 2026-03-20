@@ -76,7 +76,12 @@ impl SessionManager {
         if let Some(path) = &self.current_json_session {
             let entry = format_json_entry(play_data);
             self.json_data.push(entry);
-            fs::write(path, serde_json::to_string_pretty(&self.json_data)?)?;
+
+            // Write to temp file first, then rename atomically to avoid
+            // data loss if the write is interrupted (disk full, process killed).
+            let tmp_path = path.with_extension("json.tmp");
+            fs::write(&tmp_path, serde_json::to_string_pretty(&self.json_data)?)?;
+            fs::rename(&tmp_path, path)?;
         }
         Ok(())
     }
