@@ -94,9 +94,11 @@ mod tests {
 
     #[test]
     fn test_database_search_attempts_greater_than_load_attempts() {
-        assert!(
-            database::MAX_SEARCH_ATTEMPTS > database::MAX_LOAD_ATTEMPTS,
-            "search should retry more times than load since it waits for game initialization"
-        );
+        const {
+            assert!(
+                database::MAX_SEARCH_ATTEMPTS > database::MAX_LOAD_ATTEMPTS,
+                "search should retry more times than load since it waits for game initialization"
+            );
+        }
     }
 }

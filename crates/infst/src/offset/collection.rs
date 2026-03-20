@@ -152,6 +152,48 @@ impl OffsetsCollection {
     }
 }
 
+/// Search for the "IIDX" header in memory near the entry table.
+///
+/// The IIDX header is a structure containing the ASCII bytes "IIDX" followed by
+/// metadata including an entry count close to the total number of songs.
+/// It is located before the entry table in memory.
+pub fn find_iidx_header<R: ReadMemory>(reader: &R, entry_table_addr: u64) -> Option<u64> {
+    // Search 256KB before the entry table
+    let search_size: u64 = 0x40000;
+    let search_start = entry_table_addr.saturating_sub(search_size);
+    let buf_size = (entry_table_addr - search_start) as usize;
+
+    let buffer = reader.read_bytes(search_start, buf_size).ok()?;
+    let iidx_pattern = b"IIDX";
+
+    // Search backwards (IIDX is typically near the entry table)
+    for i in (0..buffer.len().saturating_sub(12)).rev() {
+        if &buffer[i..i + 4] == iidx_pattern {
+            let addr = search_start + i as u64;
+
+            // Validate: next 4 bytes should be a small value (entry size ~80)
+            let entry_size = u32::from_le_bytes(buffer[i + 4..i + 8].try_into().ok()?);
+            if entry_size > 256 {
+                continue;
+            }
+
+            // Next 4 bytes should be the count (~1800-2000 songs)
+            let count = u32::from_le_bytes(buffer[i + 8..i + 12].try_into().ok()?);
+            if !(1500..=3000).contains(&count) {
+                continue;
+            }
+
+            debug!(
+                "Found IIDX header at 0x{:X} (entry_size={}, count={})",
+                addr, entry_size, count
+            );
+            return Some(addr);
+        }
+    }
+
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -202,46 +244,4 @@ mod tests {
             None
         );
     }
-}
-
-/// Search for the "IIDX" header in memory near the entry table.
-///
-/// The IIDX header is a structure containing the ASCII bytes "IIDX" followed by
-/// metadata including an entry count close to the total number of songs.
-/// It is located before the entry table in memory.
-pub fn find_iidx_header<R: ReadMemory>(reader: &R, entry_table_addr: u64) -> Option<u64> {
-    // Search 256KB before the entry table
-    let search_size: u64 = 0x40000;
-    let search_start = entry_table_addr.saturating_sub(search_size);
-    let buf_size = (entry_table_addr - search_start) as usize;
-
-    let buffer = reader.read_bytes(search_start, buf_size).ok()?;
-    let iidx_pattern = b"IIDX";
-
-    // Search backwards (IIDX is typically near the entry table)
-    for i in (0..buffer.len().saturating_sub(12)).rev() {
-        if &buffer[i..i + 4] == iidx_pattern {
-            let addr = search_start + i as u64;
-
-            // Validate: next 4 bytes should be a small value (entry size ~80)
-            let entry_size = u32::from_le_bytes(buffer[i + 4..i + 8].try_into().ok()?);
-            if entry_size > 256 {
-                continue;
-            }
-
-            // Next 4 bytes should be the count (~1800-2000 songs)
-            let count = u32::from_le_bytes(buffer[i + 8..i + 12].try_into().ok()?);
-            if !(1500..=3000).contains(&count) {
-                continue;
-            }
-
-            debug!(
-                "Found IIDX header at 0x{:X} (entry_size={}, count={})",
-                addr, entry_size, count
-            );
-            return Some(addr);
-        }
-    }
-
-    None
 }
