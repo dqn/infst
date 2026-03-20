@@ -86,4 +86,30 @@ mod tests {
         assert_eq!(Grade::from_score_ratio(2.0 / 9.0), Grade::E);
         assert_eq!(Grade::from_score_ratio(0.1), Grade::F);
     }
+
+    #[test]
+    fn test_grade_sub_boundaries() {
+        let epsilon = 1e-10;
+
+        // Just below AAA boundary (8/9) should be AA
+        assert_eq!(Grade::from_score_ratio(8.0 / 9.0 - epsilon), Grade::Aa);
+        // Just below AA boundary (7/9) should be A
+        assert_eq!(Grade::from_score_ratio(7.0 / 9.0 - epsilon), Grade::A);
+        // Just below A boundary (6/9) should be B
+        assert_eq!(Grade::from_score_ratio(6.0 / 9.0 - epsilon), Grade::B);
+        // Just below B boundary (5/9) should be C
+        assert_eq!(Grade::from_score_ratio(5.0 / 9.0 - epsilon), Grade::C);
+        // Just below C boundary (4/9) should be D
+        assert_eq!(Grade::from_score_ratio(4.0 / 9.0 - epsilon), Grade::D);
+        // Just below D boundary (3/9) should be E
+        assert_eq!(Grade::from_score_ratio(3.0 / 9.0 - epsilon), Grade::E);
+        // Just below E boundary (2/9) should be F
+        assert_eq!(Grade::from_score_ratio(2.0 / 9.0 - epsilon), Grade::F);
+    }
+
+    #[test]
+    fn test_grade_edge_cases() {
+        assert_eq!(Grade::from_score_ratio(0.0), Grade::F);
+        assert_eq!(Grade::from_score_ratio(-0.1), Grade::F);
+    }
 }

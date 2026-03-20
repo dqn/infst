@@ -18,6 +18,9 @@ pub mod retry {
 
     /// Delay (in ms) for each retry attempt (exponential backoff).
     pub const RETRY_DELAYS_MS: [u64; 5] = [100, 200, 400, 800, 1600];
+
+    // Compile-time check: RETRY_DELAYS_MS must have enough entries for MAX_READ_RETRIES.
+    const _: () = assert!(RETRY_DELAYS_MS.len() >= MAX_READ_RETRIES as usize);
 }
 
 /// Result screen polling configuration.
@@ -57,23 +60,43 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_retry_constants() {
-        assert_eq!(retry::MAX_READ_RETRIES, 5);
-        assert_eq!(retry::RETRY_DELAYS_MS.len(), 5);
+    fn test_retry_delays_cover_all_attempts() {
+        assert!(
+            retry::RETRY_DELAYS_MS.len() >= retry::MAX_READ_RETRIES as usize,
+            "RETRY_DELAYS_MS must have at least MAX_READ_RETRIES entries"
+        );
     }
 
     #[test]
-    fn test_polling_constants() {
-        assert_eq!(polling::POLL_DELAYS_MS.len(), 10);
-        let total: u64 = polling::POLL_DELAYS_MS.iter().sum();
-        assert_eq!(total, 2300); // 2.3 seconds
+    fn test_retry_delays_are_non_decreasing() {
+        for window in retry::RETRY_DELAYS_MS.windows(2) {
+            assert!(
+                window[1] >= window[0],
+                "retry delays should be non-decreasing: {} < {}",
+                window[1],
+                window[0]
+            );
+        }
     }
 
     #[test]
-    fn test_database_constants() {
-        assert_eq!(database::MAX_LOAD_ATTEMPTS, 12);
-        assert_eq!(database::MAX_SEARCH_ATTEMPTS, 30);
-        assert_eq!(database::RETRY_DELAY.as_secs(), 5);
-        assert_eq!(database::EXTRA_DELAY.as_secs(), 1);
+    fn test_polling_delays_are_positive() {
+        assert!(!polling::POLL_DELAYS_MS.is_empty());
+        for &delay in &polling::POLL_DELAYS_MS {
+            assert!(delay > 0, "polling delays must be positive");
+        }
+    }
+
+    #[test]
+    fn test_database_retry_delay_is_positive() {
+        assert!(!database::RETRY_DELAY.is_zero());
+    }
+
+    #[test]
+    fn test_database_search_attempts_greater_than_load_attempts() {
+        assert!(
+            database::MAX_SEARCH_ATTEMPTS > database::MAX_LOAD_ATTEMPTS,
+            "search should retry more times than load since it waits for game initialization"
+        );
     }
 }
