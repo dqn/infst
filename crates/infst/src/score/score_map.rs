@@ -271,6 +271,42 @@ impl ScoreMap {
     pub fn is_empty(&self) -> bool {
         self.scores.is_empty()
     }
+
+    /// Merge improvements from `other` into `self`, keeping the best value for each field.
+    ///
+    /// For each song_id and difficulty:
+    /// - lamp: keep the higher value (max)
+    /// - ex_score: keep the higher value (max)
+    /// - miss_count: keep the lower value (min); Some(x) beats None
+    ///
+    /// Songs present only in `other` are inserted into `self`.
+    pub fn merge_keep_best(&mut self, other: &ScoreMap) {
+        for (&song_id, other_data) in other.iter() {
+            let entry = self.get_or_insert(song_id);
+            for i in 0..10 {
+                // Lamp: keep max
+                if other_data.lamp[i] > entry.lamp[i] {
+                    entry.lamp[i] = other_data.lamp[i];
+                }
+
+                // EX score: keep max
+                if other_data.score[i] > entry.score[i] {
+                    entry.score[i] = other_data.score[i];
+                }
+
+                // Miss count: keep min (Some beats None)
+                match (entry.miss_count[i], other_data.miss_count[i]) {
+                    (None, Some(_)) => {
+                        entry.miss_count[i] = other_data.miss_count[i];
+                    }
+                    (Some(current), Some(other_val)) if other_val < current => {
+                        entry.miss_count[i] = Some(other_val);
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -726,5 +762,110 @@ mod tests {
                 "lamp={lamp_val} mismatch"
             );
         }
+    }
+
+    #[test]
+    fn test_merge_keep_best_higher_lamp_in_other_survives() {
+        let mut fresh = ScoreMap::new();
+        let mut fresh_data = ScoreData::new(1001);
+        fresh_data.lamp[3] = Lamp::Clear; // SPA = Clear
+        fresh.insert(1001, fresh_data);
+
+        let mut old = ScoreMap::new();
+        let mut old_data = ScoreData::new(1001);
+        old_data.lamp[3] = Lamp::HardClear; // SPA = HardClear (better)
+        old.insert(1001, old_data);
+
+        fresh.merge_keep_best(&old);
+
+        assert_eq!(fresh.get(1001).unwrap().lamp[3], Lamp::HardClear);
+    }
+
+    #[test]
+    fn test_merge_keep_best_lower_lamp_in_other_does_not_overwrite() {
+        let mut fresh = ScoreMap::new();
+        let mut fresh_data = ScoreData::new(1001);
+        fresh_data.lamp[3] = Lamp::HardClear;
+        fresh.insert(1001, fresh_data);
+
+        let mut old = ScoreMap::new();
+        let mut old_data = ScoreData::new(1001);
+        old_data.lamp[3] = Lamp::Clear; // worse
+        old.insert(1001, old_data);
+
+        fresh.merge_keep_best(&old);
+
+        assert_eq!(fresh.get(1001).unwrap().lamp[3], Lamp::HardClear);
+    }
+
+    #[test]
+    fn test_merge_keep_best_better_miss_count_survives() {
+        let mut fresh = ScoreMap::new();
+        let mut fresh_data = ScoreData::new(1001);
+        fresh_data.miss_count[3] = Some(10);
+        fresh.insert(1001, fresh_data);
+
+        let mut old = ScoreMap::new();
+        let mut old_data = ScoreData::new(1001);
+        old_data.miss_count[3] = Some(5); // better (lower)
+        old.insert(1001, old_data);
+
+        fresh.merge_keep_best(&old);
+
+        assert_eq!(fresh.get(1001).unwrap().miss_count[3], Some(5));
+    }
+
+    #[test]
+    fn test_merge_keep_best_some_miss_count_beats_none() {
+        let mut fresh = ScoreMap::new();
+        let mut fresh_data = ScoreData::new(1001);
+        fresh_data.miss_count[3] = None;
+        fresh.insert(1001, fresh_data);
+
+        let mut old = ScoreMap::new();
+        let mut old_data = ScoreData::new(1001);
+        old_data.miss_count[3] = Some(7);
+        old.insert(1001, old_data);
+
+        fresh.merge_keep_best(&old);
+
+        assert_eq!(fresh.get(1001).unwrap().miss_count[3], Some(7));
+    }
+
+    #[test]
+    fn test_merge_keep_best_higher_ex_score_survives() {
+        let mut fresh = ScoreMap::new();
+        let mut fresh_data = ScoreData::new(1001);
+        fresh_data.score[3] = 1500;
+        fresh.insert(1001, fresh_data);
+
+        let mut old = ScoreMap::new();
+        let mut old_data = ScoreData::new(1001);
+        old_data.score[3] = 2000; // better
+        old.insert(1001, old_data);
+
+        fresh.merge_keep_best(&old);
+
+        assert_eq!(fresh.get(1001).unwrap().score[3], 2000);
+    }
+
+    #[test]
+    fn test_merge_keep_best_non_overlapping_songs_preserved() {
+        let mut fresh = ScoreMap::new();
+        let mut fresh_data = ScoreData::new(1001);
+        fresh_data.lamp[0] = Lamp::Clear;
+        fresh.insert(1001, fresh_data);
+
+        let mut old = ScoreMap::new();
+        let mut old_data = ScoreData::new(2001);
+        old_data.lamp[0] = Lamp::HardClear;
+        old.insert(2001, old_data);
+
+        fresh.merge_keep_best(&old);
+
+        // Both songs should be present
+        assert_eq!(fresh.len(), 2);
+        assert_eq!(fresh.get(1001).unwrap().lamp[0], Lamp::Clear);
+        assert_eq!(fresh.get(2001).unwrap().lamp[0], Lamp::HardClear);
     }
 }

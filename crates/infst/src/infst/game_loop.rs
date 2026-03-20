@@ -100,6 +100,7 @@ impl Infst {
         self.pending_result_fingerprint = None;
         self.last_result_fingerprint = None;
         self.current_playing = None;
+        self.game_id_aliases.clear();
 
         loop {
             // Check for shutdown signal
@@ -666,7 +667,11 @@ impl Infst {
     /// work for all known songs.
     fn reload_score_map(&mut self, reader: &MemoryReader) {
         match ScoreMap::load_from_memory(reader, self.offsets.data_map, &self.game_data.song_db) {
-            Ok(map) => {
+            Ok(mut map) => {
+                // Merge session improvements from the old map into the fresh map.
+                // The game may not have persisted recent results yet, so the old map
+                // can contain better lamp/score/miss_count values from this session.
+                map.merge_keep_best(&self.game_data.score_map);
                 info!("Reloaded score map: {} entries", map.len());
                 self.game_data.score_map = map;
             }
@@ -945,8 +950,15 @@ impl Infst {
     fn write_back_notes(&mut self, play_data: &PlayData) {
         let song_id = play_data.chart.song_id;
         let diff_index = play_data.chart.difficulty as usize;
+        let notes = play_data.chart.total_notes;
         if let Some(song) = self.game_data.song_db.get_mut(&song_id) {
-            song.total_notes[diff_index] = play_data.chart.total_notes;
+            song.total_notes[diff_index] = notes;
+        }
+        // Also update the original entry if this is an aliased game_id
+        if let Some(&internal_id) = self.game_id_aliases.get(&song_id)
+            && let Some(song) = self.game_data.song_db.get_mut(&internal_id)
+        {
+            song.total_notes[diff_index] = notes;
         }
     }
 
@@ -980,6 +992,8 @@ impl Infst {
             let mut aliased = song.clone();
             aliased.id = song_id;
             self.game_data.song_db.insert(song_id, aliased);
+            // Record alias so write_back_notes can propagate to the original entry
+            self.game_id_aliases.insert(song_id, internal_id);
             return chart;
         }
 
