@@ -152,7 +152,7 @@ pub fn build_song_id_title_map<R: ReadMemory>(
 /// Fetch a single song by its song_id from memory
 ///
 /// This function searches through the song list entries to find a specific song.
-/// song_id is stored at offset 816 within each 1200-byte entry.
+/// Uses the provided `EntryLayout` to correctly parse entries regardless of version.
 ///
 /// Memory structure:
 /// - entry[i] = song_list_addr + i * ENTRY_SIZE (0x630 = 1584 bytes)
@@ -163,6 +163,7 @@ pub fn fetch_song_by_id<R: ReadMemory>(
     target_song_id: u32,
     scan_size: usize,
     entry_stride: usize,
+    layout: &super::EntryLayout,
 ) -> Option<SongInfo> {
     if song_list_addr == 0 {
         return None;
@@ -175,8 +176,7 @@ pub fn fetch_song_by_id<R: ReadMemory>(
     for i in 0..max_entries {
         let entry_addr = song_list_addr + i * stride;
 
-        // Use the proper read_from_memory function
-        match SongInfo::read_from_memory(reader, entry_addr) {
+        match SongInfo::read_from_memory_with_layout(reader, entry_addr, layout) {
             Ok(Some(song)) if song.id == target_song_id => {
                 debug!(
                     "Dynamically loaded song_id={} title={:?} folder={}",
@@ -193,8 +193,8 @@ pub fn fetch_song_by_id<R: ReadMemory>(
 
 /// Build song database directly from memory for new INFINITAS versions
 ///
-/// This function scans memory to find all loaded songs. Each entry is 1008 bytes
-/// and contains all song metadata including song_id at offset 624.
+/// This function scans memory to find all loaded songs. Uses the provided
+/// `EntryLayout` to correctly parse entries regardless of version.
 ///
 /// Memory structure:
 /// - entry[i] = song_list_base + i * ENTRY_SIZE (0x630 = 1584 bytes)
@@ -203,6 +203,7 @@ pub fn fetch_song_database_from_memory_scan<R: ReadMemory>(
     song_list_base: u64,
     scan_size: usize,
     entry_stride: usize,
+    layout: &super::EntryLayout,
 ) -> HashMap<u32, SongInfo> {
     let stride = entry_stride as u64;
 
@@ -214,8 +215,7 @@ pub fn fetch_song_database_from_memory_scan<R: ReadMemory>(
     for i in 0..max_entries {
         let entry_addr = song_list_base + i * stride;
 
-        // Use the proper read_from_memory function
-        let song = match SongInfo::read_from_memory(reader, entry_addr) {
+        let song = match SongInfo::read_from_memory_with_layout(reader, entry_addr, layout) {
             Ok(Some(song)) => song,
             _ => continue,
         };

@@ -103,9 +103,11 @@ impl SongInfo {
     pub fn parse_entry_with_layout(entry: &[u8], layout: &EntryLayout) -> Result<Option<Self>> {
         let buf = ByteBuffer::new(entry);
 
-        // Check if entry is valid (song_id should not be 0)
+        // Validate song_id: must be positive. Reject 0, negative values, and
+        // out-of-range values to prevent corrupt data from entering the database.
+        // Negative i32 cast to u32 would silently wrap to a large positive value.
         let song_id = buf.read_i32_at(layout.song_id).unwrap_or(0);
-        if song_id == 0 {
+        if song_id <= 0 {
             return Ok(None);
         }
 
@@ -313,6 +315,24 @@ mod tests {
     fn test_parse_from_buffer_empty_entry() {
         let entry = vec![0u8; SongInfo::MEMORY_SIZE];
         let result = SongInfo::parse_from_buffer(&entry, 0).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_parse_entry_rejects_negative_song_id() {
+        let layout = EntryLayout::v3_default();
+        let mut entry = vec![0u8; SongInfo::MEMORY_SIZE];
+        // Write a negative song_id (-1 = 0xFFFFFFFF as i32)
+        entry[layout.song_id..layout.song_id + 4].copy_from_slice(&(-1i32).to_le_bytes());
+        // Write a valid folder so this would otherwise look like a plausible entry
+        entry[layout.folder..layout.folder + 4].copy_from_slice(&43i32.to_le_bytes());
+        let (encoded, _, _) = encoding_rs::SHIFT_JIS.encode("Corrupt Entry");
+        let title_bytes = encoded.as_ref();
+        let len = title_bytes.len().min(SongInfo::SLAB);
+        entry[layout.title..layout.title + len].copy_from_slice(&title_bytes[..len]);
+
+        let result = SongInfo::parse_entry_with_layout(&entry, &layout).unwrap();
+        // Negative song_id must be rejected (not silently wrapped to u32::MAX)
         assert!(result.is_none());
     }
 

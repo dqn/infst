@@ -170,6 +170,32 @@ pub fn build_song_database_from_tsv_with_memory<R: ReadMemory>(
     tsv_path: &str,
     scan_size: usize,
 ) -> HashMap<u32, SongInfo> {
+    use super::EntryLayout;
+    build_song_database_from_tsv_with_memory_layout(
+        reader,
+        song_list_addr,
+        tsv_path,
+        scan_size,
+        &EntryLayout::v3_default(),
+    )
+}
+
+/// Build song database with TSV as primary source, using the specified entry layout.
+///
+/// Strategy:
+/// 1. Load TSV for complete song metadata (1749+ songs)
+/// 2. Scan memory for song_id -> title mappings
+/// 3. Match TSV entries to song_ids by title
+/// 4. For unmatched TSV entries, create placeholder entries
+///
+/// This ensures we have complete song data even with lazy-loaded versions.
+pub fn build_song_database_from_tsv_with_memory_layout<R: ReadMemory>(
+    reader: &R,
+    song_list_addr: u64,
+    tsv_path: &str,
+    scan_size: usize,
+    layout: &super::EntryLayout,
+) -> HashMap<u32, SongInfo> {
     use std::path::Path;
 
     // Step 1: Load TSV database
@@ -194,7 +220,8 @@ pub fn build_song_database_from_tsv_with_memory<R: ReadMemory>(
         reader,
         song_list_addr,
         scan_size,
-        SongInfo::MEMORY_SIZE,
+        layout.entry_size,
+        layout,
     );
     info!("Found {} songs in memory scan", memory_songs.len());
 

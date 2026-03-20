@@ -638,11 +638,13 @@ impl Infst {
             SongInfo::MEMORY_SIZE
         };
         let scan_size = entry_stride * 5000;
+        let layout = self.offsets.effective_layout();
         let scan_result = fetch_song_database_from_memory_scan(
             reader,
             self.offsets.song_db_address(),
             scan_size,
             entry_stride,
+            &layout,
         );
 
         let mut new_songs = 0usize;
@@ -923,12 +925,14 @@ impl Infst {
             SongInfo::MEMORY_SIZE
         };
         let scan_size = entry_stride * 5000;
+        let layout = self.offsets.effective_layout();
         if let Some(song) = fetch_song_by_id(
             reader,
             self.offsets.song_db_address(),
             song_id,
             scan_size,
             entry_stride,
+            &layout,
         ) {
             info!("Dynamically loaded song: {} ({})", song.title, song_id);
             let chart = ChartInfo::from_song_info(&song, difficulty, true);

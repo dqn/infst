@@ -263,6 +263,7 @@ fn load_song_database(
     reader: &MemoryReader,
     song_list: u64,
     entry_stride: usize,
+    layout: &infst::chart::EntryLayout,
     shutdown: &ShutdownSignal,
 ) -> Result<Option<HashMap<u32, SongInfo>>> {
     let tsv_path = "tracker.tsv";
@@ -289,6 +290,7 @@ fn load_song_database(
         song_list,
         scan_size,
         entry_stride,
+        layout,
     );
 
     if song_db.is_empty() {
@@ -338,10 +340,12 @@ fn run_tracking_session(
     }
 
     // Load game resources
+    let layout = infst.offsets().effective_layout();
     let song_db = match load_song_database(
         &reader,
         infst.offsets().song_db_address(),
         infst.offsets().entry_stride(),
+        &layout,
         shutdown,
     )? {
         Some(db) => db,

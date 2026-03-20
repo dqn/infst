@@ -2,7 +2,7 @@
 //!
 //! Tests the SongInfo memory reading, title normalization, and song database operations.
 
-use infst::chart::{SongInfo, fetch_song_by_id, fetch_song_database_from_memory_scan};
+use infst::chart::{EntryLayout, SongInfo, fetch_song_by_id, fetch_song_database_from_memory_scan};
 use infst::process::MockMemoryReader;
 
 /// Test normalize_title_for_matching behavior through round-trip matching
@@ -194,7 +194,15 @@ mod fetch_song_by_id_tests {
         let base = 0x1000;
 
         // Fetch middle song
-        let result = fetch_song_by_id(&reader, base, 1002, entry_size * 5, SongInfo::MEMORY_SIZE);
+        let layout = EntryLayout::v3_default();
+        let result = fetch_song_by_id(
+            &reader,
+            base,
+            1002,
+            entry_size * 5,
+            SongInfo::MEMORY_SIZE,
+            &layout,
+        );
         assert!(result.is_some());
         let song = result.unwrap();
         assert_eq!(song.id, 1002);
@@ -210,7 +218,15 @@ mod fetch_song_by_id_tests {
         buffer.extend(create_song_entry(1002, "Second Song"));
 
         let reader = MockMemoryReader::new(buffer);
-        let result = fetch_song_by_id(&reader, 0x1000, 1001, entry_size * 3, SongInfo::MEMORY_SIZE);
+        let layout = EntryLayout::v3_default();
+        let result = fetch_song_by_id(
+            &reader,
+            0x1000,
+            1001,
+            entry_size * 3,
+            SongInfo::MEMORY_SIZE,
+            &layout,
+        );
 
         assert!(result.is_some());
         assert_eq!(result.unwrap().id, 1001);
@@ -224,7 +240,15 @@ mod fetch_song_by_id_tests {
         buffer.extend(create_song_entry(1001, "Only Song"));
 
         let reader = MockMemoryReader::new(buffer);
-        let result = fetch_song_by_id(&reader, 0x1000, 9999, entry_size * 2, SongInfo::MEMORY_SIZE);
+        let layout = EntryLayout::v3_default();
+        let result = fetch_song_by_id(
+            &reader,
+            0x1000,
+            9999,
+            entry_size * 2,
+            SongInfo::MEMORY_SIZE,
+            &layout,
+        );
 
         assert!(result.is_none());
     }
@@ -232,7 +256,8 @@ mod fetch_song_by_id_tests {
     #[test]
     fn test_fetch_with_zero_address() {
         let reader = MockMemoryReader::new(vec![0u8; 100]);
-        let result = fetch_song_by_id(&reader, 0, 1001, 1000, SongInfo::MEMORY_SIZE);
+        let layout = EntryLayout::v3_default();
+        let result = fetch_song_by_id(&reader, 0, 1001, 1000, SongInfo::MEMORY_SIZE, &layout);
 
         assert!(result.is_none());
     }
@@ -262,6 +287,7 @@ mod fetch_song_database_tests {
     #[test]
     fn test_scan_multiple_songs() {
         let entry_size = SongInfo::MEMORY_SIZE;
+        let layout = EntryLayout::v3_default();
         let mut buffer = Vec::new();
 
         buffer.extend(create_song_entry(1001, "Song A"));
@@ -274,6 +300,7 @@ mod fetch_song_database_tests {
             0x1000,
             entry_size * 4,
             SongInfo::MEMORY_SIZE,
+            &layout,
         );
 
         assert_eq!(result.len(), 3);
@@ -285,6 +312,7 @@ mod fetch_song_database_tests {
     #[test]
     fn test_scan_skips_invalid_song_ids() {
         let entry_size = SongInfo::MEMORY_SIZE;
+        let layout = EntryLayout::v3_default();
         let mut buffer = Vec::new();
 
         // Valid song
@@ -302,6 +330,7 @@ mod fetch_song_database_tests {
             0x1000,
             entry_size * 4,
             SongInfo::MEMORY_SIZE,
+            &layout,
         );
 
         assert_eq!(result.len(), 2);
@@ -313,6 +342,7 @@ mod fetch_song_database_tests {
     #[test]
     fn test_scan_skips_duplicate_song_ids() {
         let entry_size = SongInfo::MEMORY_SIZE;
+        let layout = EntryLayout::v3_default();
         let mut buffer = Vec::new();
 
         buffer.extend(create_song_entry(1001, "First"));
@@ -325,6 +355,7 @@ mod fetch_song_database_tests {
             0x1000,
             entry_size * 4,
             SongInfo::MEMORY_SIZE,
+            &layout,
         );
 
         assert_eq!(result.len(), 2);
@@ -334,12 +365,14 @@ mod fetch_song_database_tests {
 
     #[test]
     fn test_scan_empty_buffer() {
+        let layout = EntryLayout::v3_default();
         let reader = MockMemoryReader::new(vec![0u8; SongInfo::MEMORY_SIZE * 2]);
         let result = fetch_song_database_from_memory_scan(
             &reader,
             0x1000,
             SongInfo::MEMORY_SIZE * 3,
             SongInfo::MEMORY_SIZE,
+            &layout,
         );
 
         assert!(result.is_empty());
@@ -348,6 +381,7 @@ mod fetch_song_database_tests {
     #[test]
     fn test_scan_with_gaps() {
         let entry_size = SongInfo::MEMORY_SIZE;
+        let layout = EntryLayout::v3_default();
         let mut buffer = Vec::new();
 
         buffer.extend(create_song_entry(1001, "Song A"));
@@ -360,6 +394,7 @@ mod fetch_song_database_tests {
             0x1000,
             entry_size * 4,
             SongInfo::MEMORY_SIZE,
+            &layout,
         );
 
         assert_eq!(result.len(), 2);
