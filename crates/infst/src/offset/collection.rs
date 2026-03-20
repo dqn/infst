@@ -97,8 +97,8 @@ impl OffsetsCollection {
 
         // The current song pointer is at iidx_header - 0x40 (u64)
         // The game_id verification is at iidx_header - 0x34 (i32)
-        let ptr_addr = self.iidx_header - 0x40;
-        let gid_addr = self.iidx_header - 0x34;
+        let ptr_addr = self.iidx_header.checked_sub(0x40)?;
+        let gid_addr = self.iidx_header.checked_sub(0x34)?;
 
         // Verify the game_id matches what we expect
         let gid = reader.read_i32(gid_addr).ok()?;
@@ -149,6 +149,58 @@ impl OffsetsCollection {
         } else {
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::process::mock::MockMemoryBuilder;
+
+    /// Build an OffsetsCollection with the given iidx_header and song_entry_table.
+    fn make_offsets(iidx_header: u64, song_entry_table: u64) -> OffsetsCollection {
+        OffsetsCollection {
+            iidx_header,
+            song_entry_table,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn resolve_returns_none_when_iidx_header_too_small_to_subtract() {
+        // iidx_header = 0x10, which is less than 0x40.
+        // Without checked_sub this would wrap around to a huge address.
+        let offsets = make_offsets(0x10, 0x5000);
+        let reader = MockMemoryBuilder::new().base(0x0).with_size(0x100).build();
+
+        assert_eq!(
+            offsets.resolve_current_song_internal_id(&reader, 1001),
+            None
+        );
+    }
+
+    #[test]
+    fn resolve_returns_none_when_iidx_header_is_exactly_threshold() {
+        // iidx_header = 0x3F: one less than 0x40, still underflows.
+        let offsets = make_offsets(0x3F, 0x5000);
+        let reader = MockMemoryBuilder::new().base(0x0).with_size(0x100).build();
+
+        assert_eq!(
+            offsets.resolve_current_song_internal_id(&reader, 1001),
+            None
+        );
+    }
+
+    #[test]
+    fn resolve_returns_none_when_iidx_header_zero() {
+        let offsets = make_offsets(0, 0x5000);
+        let reader = MockMemoryBuilder::new().base(0x0).with_size(0x100).build();
+
+        // Early return because iidx_header == 0
+        assert_eq!(
+            offsets.resolve_current_song_internal_id(&reader, 1001),
+            None
+        );
     }
 }
 
