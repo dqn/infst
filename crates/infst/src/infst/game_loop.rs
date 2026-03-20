@@ -316,8 +316,11 @@ impl Infst {
             self.pending_result_fingerprint = None;
         } else {
             debug!("No valid lamp during initial polling (false transition), skipping");
+            // Do NOT clear current_playing here. This is a false transition, so the
+            // cross-validation reference should be preserved for the next real result.
+            // Clearing it would cause the next result to match via None => true
+            // (accept any chart), bypassing cross-validation entirely.
         }
-        self.current_playing = None;
     }
 
     /// Poll for result data while in ResultScreen state (V3 fallback)
@@ -831,13 +834,13 @@ impl Infst {
         // so we only write back reliable values to song_db.
         // judge_notes is NOT authoritative: partial plays (premature end) yield
         // fewer notes than the chart actually has.
-        let (effective_notes, notes_from_chart_memory) = if chart_notes > 0 {
+        let (effective_notes, notes_from_current_song) = if chart_notes > 0 {
             (chart_notes, true)
         } else if chart.total_notes > 0
             && !entry_notes_likely_bpm
             && (ex_score as u64) <= (chart.total_notes as u64) * 2
         {
-            (chart.total_notes, false) // already in song_db, no writeback needed
+            (chart.total_notes, false) // not from CurrentSong memory read, skip writeback
         } else if judge_notes > 0 {
             (judge_notes, false) // unreliable for partial plays, do NOT write back
         } else {
@@ -852,7 +855,7 @@ impl Infst {
         // Only write back to song_db when the source is chart_notes (from
         // CurrentSong memory read), which is the game's authoritative value.
         // judge_notes would pollute song_db with partial play data.
-        if notes_from_chart_memory && let Some(song) = self.game_data.song_db.get_mut(&song_id) {
+        if notes_from_current_song && let Some(song) = self.game_data.song_db.get_mut(&song_id) {
             let diff_index = difficulty as usize;
             song.total_notes[diff_index] = effective_notes;
         }
