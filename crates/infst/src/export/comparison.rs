@@ -33,7 +33,7 @@ pub fn compare_with_personal_best(
 
     // Score comparison: only show diff if best score exists and current is higher
     if best_score > 0 && play_data.ex_score > best_score {
-        comparison.score_diff = Some(play_data.ex_score as i32 - best_score as i32);
+        comparison.score_diff = Some((play_data.ex_score - best_score) as i32);
     }
 
     // Grade comparison: calculate grade from best score and compare
@@ -52,11 +52,10 @@ pub fn compare_with_personal_best(
     // Miss count comparison: only show when improved (decreased)
     if play_data.miss_count_valid() {
         let best_miss = best.miss_count[diff_index];
-        if let Some(best_miss) = best_miss {
-            let diff = play_data.miss_count() as i32 - best_miss as i32;
-            if diff < 0 {
-                comparison.miss_count_diff = Some(diff);
-            }
+        if let Some(best_miss) = best_miss
+            && play_data.miss_count() < best_miss
+        {
+            comparison.miss_count_diff = Some(-((best_miss - play_data.miss_count()) as i32));
         }
     }
 

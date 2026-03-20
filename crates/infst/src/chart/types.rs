@@ -45,7 +45,7 @@ impl ChartInfo {
 
     /// Calculate max EX score (total_notes * 2)
     pub fn max_ex_score(&self) -> u32 {
-        self.total_notes * 2
+        self.total_notes.saturating_mul(2)
     }
 }
 
