@@ -203,16 +203,13 @@ pub fn validate_signature_offsets<R: ReadMemory>(reader: &R, offsets: &OffsetsCo
         );
     }
 
-    // Validate relative distances between offsets
-    let within_range = |actual: u64, expected: u64, range: u64| {
-        if actual >= expected {
-            actual - expected <= range
-        } else {
-            expected - actual <= range
-        }
-    };
+    // Validate relative distances between offsets using signed arithmetic
+    // to correctly handle cases where addresses are in unexpected order.
+    let signed_distance = |a: u64, b: u64| -> i64 { (a as i64).wrapping_sub(b as i64) };
+    let within_range =
+        |actual: i64, expected: u64, range: u64| (actual - expected as i64).unsigned_abs() <= range;
 
-    let judge_to_play = offsets.judge_data.wrapping_sub(offsets.play_settings);
+    let judge_to_play = signed_distance(offsets.judge_data, offsets.play_settings);
     if !within_range(
         judge_to_play,
         JUDGE_TO_PLAY_SETTINGS,
@@ -225,7 +222,7 @@ pub fn validate_signature_offsets<R: ReadMemory>(reader: &R, offsets: &OffsetsCo
         return false;
     }
 
-    let song_to_judge = offsets.song_list.wrapping_sub(offsets.judge_data);
+    let song_to_judge = signed_distance(offsets.song_list, offsets.judge_data);
     if !within_range(
         song_to_judge,
         JUDGE_TO_SONG_LIST,
@@ -238,7 +235,7 @@ pub fn validate_signature_offsets<R: ReadMemory>(reader: &R, offsets: &OffsetsCo
         return false;
     }
 
-    let play_data_delta = offsets.play_data.wrapping_sub(offsets.play_settings);
+    let play_data_delta = signed_distance(offsets.play_data, offsets.play_settings);
     if !within_range(
         play_data_delta,
         PLAY_SETTINGS_TO_PLAY_DATA,
@@ -251,7 +248,7 @@ pub fn validate_signature_offsets<R: ReadMemory>(reader: &R, offsets: &OffsetsCo
         return false;
     }
 
-    let current_song_delta = offsets.current_song.wrapping_sub(offsets.judge_data);
+    let current_song_delta = signed_distance(offsets.current_song, offsets.judge_data);
     if !within_range(
         current_song_delta,
         JUDGE_TO_CURRENT_SONG,

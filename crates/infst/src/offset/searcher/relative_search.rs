@@ -53,7 +53,12 @@ impl<R: ReadMemory> OffsetSearcher<'_, R> {
 
     /// Search for JudgeData near SongList using relative offset
     pub(crate) fn search_judge_data_near_song_list(&self, song_list: u64) -> Result<u64> {
-        let expected = song_list.wrapping_sub(JUDGE_TO_SONG_LIST);
+        let expected = song_list.checked_sub(JUDGE_TO_SONG_LIST).ok_or_else(|| {
+            Error::offset_search_failed(format!(
+                "SongList address 0x{:X} is too low for relative JudgeData search (underflow)",
+                song_list
+            ))
+        })?;
 
         // First, try to find a candidate where both JudgeData and the inferred
         // CurrentSong position are valid. This cross-validation is more reliable.
@@ -84,7 +89,12 @@ impl<R: ReadMemory> OffsetSearcher<'_, R> {
 
     /// Search for PlaySettings near JudgeData using relative offset
     pub(crate) fn search_play_settings_near_judge_data(&self, judge_data: u64) -> Result<u64> {
-        let expected = judge_data.wrapping_sub(JUDGE_TO_PLAY_SETTINGS);
+        let expected = judge_data.checked_sub(JUDGE_TO_PLAY_SETTINGS).ok_or_else(|| {
+            Error::offset_search_failed(format!(
+                "JudgeData address 0x{:X} is too low for relative PlaySettings search (underflow)",
+                judge_data
+            ))
+        })?;
 
         // First, try to find a candidate where both PlaySettings and the inferred
         // PlayData position are valid. This cross-validation is more reliable.
@@ -338,8 +348,9 @@ mod tests {
 
     #[test]
     fn test_search_judge_data_relative() {
-        let song_list = 0x2000u64;
-        let expected_judge = song_list.wrapping_sub(JUDGE_TO_SONG_LIST);
+        // Use a realistic address high enough that checked_sub won't underflow
+        let song_list = 0x143000000u64;
+        let expected_judge = song_list - JUDGE_TO_SONG_LIST;
 
         let reader = MockMemoryBuilder::new()
             .base(expected_judge)
@@ -352,5 +363,20 @@ mod tests {
         let result = searcher.search_judge_data_near_song_list(song_list);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), expected_judge);
+    }
+
+    #[test]
+    fn test_search_judge_data_underflow_returns_error() {
+        // A song_list address too low to subtract JUDGE_TO_SONG_LIST should return an error
+        let song_list = 0x2000u64;
+
+        let reader = MockMemoryBuilder::new()
+            .base(0x1000)
+            .with_size(0x100)
+            .build();
+        let searcher = OffsetSearcher::new(&reader);
+
+        let result = searcher.search_judge_data_near_song_list(song_list);
+        assert!(result.is_err());
     }
 }
