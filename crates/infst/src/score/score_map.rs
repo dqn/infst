@@ -28,8 +28,6 @@ pub struct ScoreData {
     pub score: [u32; 10],
     /// Miss count for each difficulty
     pub miss_count: [Option<u32>; 10],
-    /// DJ Points for each difficulty
-    pub dj_points: [f64; 10],
 }
 
 impl ScoreData {
@@ -328,15 +326,6 @@ mod tests {
         // All miss counts should default to None
         for mc in &data.miss_count {
             assert!(mc.is_none());
-        }
-    }
-
-    #[test]
-    fn test_score_data_dj_points_default() {
-        let data = ScoreData::new(1000);
-        // All DJ points should default to 0.0
-        for &djp in &data.dj_points {
-            assert!((djp - 0.0).abs() < f64::EPSILON);
         }
     }
 
