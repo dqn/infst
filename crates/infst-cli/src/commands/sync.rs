@@ -13,10 +13,8 @@ use anyhow::{Context, Result};
 use flate2::Compression;
 use flate2::write::GzEncoder;
 use infst::{
-    MemoryReader, OffsetSearcher, ReadMemory, ScoreMap,
-    chart::{Difficulty, fetch_song_database_bulk_with_layout},
-    decode_shift_jis_to_string,
-    score::Lamp,
+    MemoryReader, OffsetSearcher, ReadMemory, ScoreMap, chart::Difficulty,
+    decode_shift_jis_to_string, score::Lamp,
 };
 use serde::{Deserialize, Serialize};
 use tracing::debug;
@@ -102,7 +100,8 @@ impl SyncCache {
         let Ok(content) = serde_json::to_string(self) else {
             return;
         };
-        if let Err(e) = fs::write(&path, &content) {
+        let tmp_path = path.with_extension("tmp");
+        if let Err(e) = fs::write(&tmp_path, &content).and_then(|()| fs::rename(&tmp_path, &path)) {
             eprintln!("Warning: failed to save sync cache: {}", e);
         }
     }
@@ -229,14 +228,10 @@ pub fn run(endpoint: Option<&str>, token: Option<&str>, pid: Option<u32>) -> Res
     eprintln!("Read {} entries from text table", text_entries.len());
 
     // Load ScoreMap from DataMap (keyed by game_id)
+    // ScoreMap::load_from_memory doesn't use the song_db parameter, so pass an empty map
+    // to skip the expensive ~7.5MB song database read.
     eprintln!("Loading score data...");
-    let song_db = fetch_song_database_bulk_with_layout(
-        &reader,
-        offsets.song_db_address(),
-        offsets.entry_stride(),
-        offsets.entry_layout.as_ref(),
-    )?;
-    let score_map = ScoreMap::load_from_memory(&reader, offsets.data_map, &song_db)?;
+    let score_map = ScoreMap::load_from_memory(&reader, offsets.data_map, &HashMap::new())?;
     eprintln!("Loaded {} score entries", score_map.len());
 
     // Build LampEntry list: text table provides game_id + levels + V3 title,

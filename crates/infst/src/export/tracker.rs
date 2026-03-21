@@ -214,7 +214,11 @@ pub fn export_tracker_tsv<P: AsRef<Path>>(
         }
     }
 
-    fs::write(path, lines.join("\n"))?;
+    // Write to temp file first, then rename atomically to avoid corruption
+    let path = path.as_ref();
+    let tmp_path = path.with_extension("tsv.tmp");
+    fs::write(&tmp_path, lines.join("\n"))?;
+    fs::rename(&tmp_path, path)?;
     Ok(())
 }
 
