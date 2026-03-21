@@ -61,7 +61,9 @@ pub fn run(
 fn setup_shutdown_handler() -> Arc<ShutdownSignal> {
     let shutdown = Arc::new(ShutdownSignal::new());
 
-    // Keyboard input monitor (Esc, q, Q to quit)
+    // Keyboard input monitor (Esc, q, Q to quit).
+    // Intentionally detached: the thread self-terminates when shutdown is signaled
+    // and the process is about to exit, so joining is unnecessary.
     let shutdown_keyboard = Arc::clone(&shutdown);
     let _keyboard_handle = input::spawn_keyboard_monitor(shutdown_keyboard);
 

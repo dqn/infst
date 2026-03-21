@@ -152,6 +152,14 @@ impl Infst {
             }
         }
 
+        // Wait for any in-flight API request to finish before exiting
+        if let Some(handle) = self.api_thread.take() {
+            debug!("Waiting for in-flight API request to finish...");
+            if let Err(e) = handle.join() {
+                warn!("API thread panicked during cleanup: {:?}", e);
+            }
+        }
+
         Ok(())
     }
 
@@ -564,7 +572,7 @@ impl Infst {
 
     /// Send lamp data to the API endpoint in a background thread
     #[cfg(feature = "api")]
-    fn send_lamp_to_api(&self, play_data: &PlayData) {
+    fn send_lamp_to_api(&mut self, play_data: &PlayData) {
         let Some(ref api_config) = self.config.api_config else {
             return;
         };
@@ -608,15 +616,22 @@ impl Infst {
             miss_count: best_miss,
         };
 
-        thread::spawn(move || {
+        // Wait for any in-flight API request to finish before starting a new one
+        if let Some(handle) = self.api_thread.take()
+            && let Err(e) = handle.join()
+        {
+            warn!("Previous API thread panicked: {:?}", e);
+        }
+
+        self.api_thread = Some(thread::spawn(move || {
             if let Err(e) = send_lamp_request(&req) {
                 warn!("Failed to send lamp to API: {}", e);
             }
-        });
+        }));
     }
 
     #[cfg(not(feature = "api"))]
-    fn send_lamp_to_api(&self, _play_data: &PlayData) {}
+    fn send_lamp_to_api(&mut self, _play_data: &PlayData) {}
 
     /// Save play data to session file (TSV)
     fn save_session_data(&mut self, play_data: &PlayData) {
