@@ -86,7 +86,9 @@ impl OffsetCache {
         let content = serde_json::to_string_pretty(self)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
 
-        fs::write(&path, content)?;
+        let tmp_path = path.as_ref().with_extension("json.tmp");
+        fs::write(&tmp_path, &content)?;
+        fs::rename(&tmp_path, path.as_ref())?;
         info!("Saved offset cache to {}", path.as_ref().display());
         Ok(())
     }
