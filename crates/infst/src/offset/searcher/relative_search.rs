@@ -69,7 +69,9 @@ impl<R: ReadMemory> OffsetSearcher<'_, R> {
                 return false;
             }
             // Cross-validate: check if CurrentSong at expected relative position is valid
-            let inferred_current_song = addr.wrapping_add(JUDGE_TO_CURRENT_SONG);
+            let Some(inferred_current_song) = addr.checked_add(JUDGE_TO_CURRENT_SONG) else {
+                return false;
+            };
             this.reader
                 .validate_current_song_address(inferred_current_song)
         });
@@ -106,7 +108,9 @@ impl<R: ReadMemory> OffsetSearcher<'_, R> {
                     return false;
                 }
                 // Cross-validate: check if PlayData at expected relative position is valid
-                let inferred_play_data = addr.wrapping_add(PLAY_SETTINGS_TO_PLAY_DATA);
+                let Some(inferred_play_data) = addr.checked_add(PLAY_SETTINGS_TO_PLAY_DATA) else {
+                    return false;
+                };
                 this.reader.validate_play_data_address(inferred_play_data)
             });
 
@@ -127,7 +131,12 @@ impl<R: ReadMemory> OffsetSearcher<'_, R> {
 
     /// Search for PlayData near PlaySettings using relative offset
     pub(crate) fn search_play_data_near_play_settings(&self, play_settings: u64) -> Result<u64> {
-        let expected = play_settings.wrapping_add(PLAY_SETTINGS_TO_PLAY_DATA);
+        let expected = play_settings.checked_add(PLAY_SETTINGS_TO_PLAY_DATA).ok_or_else(|| {
+            Error::offset_search_failed(format!(
+                "PlaySettings address 0x{:X} is too high for relative PlayData search (overflow)",
+                play_settings
+            ))
+        })?;
         self.search_near_expected(expected, PLAY_DATA_SEARCH_RANGE, |this, addr| {
             this.reader.validate_play_data_address(addr)
         })
@@ -145,7 +154,12 @@ impl<R: ReadMemory> OffsetSearcher<'_, R> {
     /// yet (all fields are zero). The offset has been stable at 0x1E4 across all
     /// known versions (V1, V2, V3), so the inferred position is reliable.
     pub(crate) fn search_current_song_near_judge_data(&self, judge_data: u64) -> Result<u64> {
-        let expected = judge_data.wrapping_add(JUDGE_TO_CURRENT_SONG);
+        let expected = judge_data.checked_add(JUDGE_TO_CURRENT_SONG).ok_or_else(|| {
+            Error::offset_search_failed(format!(
+                "JudgeData address 0x{:X} is too high for relative CurrentSong search (overflow)",
+                judge_data
+            ))
+        })?;
         if let Some(addr) =
             self.search_near_expected(expected, CURRENT_SONG_SEARCH_RANGE, |this, addr| {
                 this.reader.validate_current_song_address(addr)

@@ -35,6 +35,7 @@ mod data_map;
 mod interactive;
 #[cfg(feature = "legacy-signatures")]
 pub mod legacy;
+#[cfg(feature = "legacy-signatures")]
 pub mod pattern;
 mod relative_search;
 #[cfg(feature = "legacy-signatures")]

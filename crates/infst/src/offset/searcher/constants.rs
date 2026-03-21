@@ -49,9 +49,11 @@ pub const MAX_SEARCH_SIZE: usize = 300 * 1024 * 1024;
 pub const EXPECTED_SONG_LIST_OFFSET: u64 = 0x3180000;
 
 /// Code scan chunk size for signature search (4MB)
+#[cfg(feature = "legacy-signatures")]
 pub const CODE_SCAN_CHUNK_SIZE: usize = 4 * 1024 * 1024;
 
 /// Maximum range to scan from base address for signatures (128MB)
+#[cfg(feature = "legacy-signatures")]
 pub const CODE_SCAN_LIMIT: usize = 128 * 1024 * 1024;
 
 /// Minimum number of songs expected in INFINITAS (for validation)
@@ -154,9 +156,11 @@ pub use crate::score::DATA_MAP_HASH_BUCKET_SENTINEL as DATA_MAP_SENTINEL;
 /// Expected ImageBase for INFINITAS executable (64-bit Windows default)
 ///
 /// All valid data addresses should be above this value.
+#[cfg(feature = "legacy-signatures")]
 pub const IMAGE_BASE: u64 = 0x140000000;
 
 /// Minimum valid data address (ImageBase + typical code section)
 ///
 /// Data sections are typically above the code sections.
+#[cfg(feature = "legacy-signatures")]
 pub const MIN_VALID_DATA_ADDRESS: u64 = IMAGE_BASE + 0x1000000;
