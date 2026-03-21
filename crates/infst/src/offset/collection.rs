@@ -132,7 +132,9 @@ impl OffsetsCollection {
         } else {
             3000 // fallback matching find_iidx_header validation range
         };
-        let table_end = table_start + max_entries * stride;
+        let table_end = max_entries
+            .checked_mul(stride)
+            .and_then(|size| table_start.checked_add(size))?;
         if entry_start < table_start || entry_start >= table_end {
             debug!(
                 "IIDX pointer out of entry table range: 0x{:X} (table: 0x{:X}-0x{:X})",
@@ -169,6 +171,10 @@ impl OffsetsCollection {
 ///
 /// Returns `(header_address, song_count)` if found.
 pub fn find_iidx_header<R: ReadMemory>(reader: &R, entry_table_addr: u64) -> Option<(u64, u32)> {
+    if entry_table_addr == 0 {
+        return None;
+    }
+
     // Search 256KB before the entry table
     let search_size: u64 = 0x40000;
     let search_start = entry_table_addr.saturating_sub(search_size);
