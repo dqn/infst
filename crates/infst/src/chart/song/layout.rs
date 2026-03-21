@@ -5,7 +5,7 @@
 //! the need for hardcoded constants.
 
 use serde::{Deserialize, Serialize};
-use tracing::debug;
+use tracing::{debug, warn};
 
 /// Detected field offsets within a song entry.
 ///
@@ -110,6 +110,9 @@ impl EntryLayout {
 
         // Step 4: Assign text block roles based on cluster position
         let (title_english, genre, artist) = assign_text_roles(&text_blocks);
+
+        // Step 4b: Validate text role assignments
+        validate_text_roles(&entries, &text_blocks, title_offset, title_english);
 
         // Step 5: Detect score fields (optional)
         let (bpm_notes, bpm_notes_stride) =
@@ -308,6 +311,65 @@ fn assign_text_roles(text_blocks: &[usize]) -> (Option<usize>, Option<usize>, Op
         5 => (Some(cluster[1]), Some(cluster[2]), Some(cluster[4])),
         // 6+ blocks: skip unknowns at positions 1 and 4
         _ => (Some(cluster[2]), Some(cluster[3]), Some(cluster[5])),
+    }
+}
+
+/// Validate text role assignments after `assign_text_roles`.
+///
+/// Emits warnings when:
+/// 1. The contiguous text block count doesn't match any known layout (4, 5, or 6 blocks).
+/// 2. `title_english` was assigned but its content is identical to `title` in every entry,
+///    suggesting misassignment.
+fn validate_text_roles(
+    entries: &[&[u8]],
+    text_blocks: &[usize],
+    title_offset: usize,
+    title_english: Option<usize>,
+) {
+    let block_size = EntryLayout::TEXT_BLOCK_SIZE;
+
+    // Count contiguous cluster size (same logic as assign_text_roles)
+    if let Some(&start) = text_blocks.first() {
+        let cluster_len = text_blocks
+            .iter()
+            .filter(|&&off| off >= start && (off - start).is_multiple_of(block_size))
+            .count();
+
+        // Known cluster sizes: 4 (V1/V2), 6 (V3 with 2 unknowns)
+        // 5 is also plausible (one unknown slot). Anything else is suspicious.
+        if !matches!(cluster_len, 4..=6) {
+            let offsets_hex: Vec<String> = text_blocks
+                .iter()
+                .filter(|&&off| off >= start && (off - start).is_multiple_of(block_size))
+                .map(|off| format!("0x{:X}", off))
+                .collect();
+            warn!(
+                "EntryLayout: unexpected text block count {} (expected 4, 5, or 6). \
+                 Offsets: [{}]. Text role assignment may be incorrect",
+                cluster_len,
+                offsets_hex.join(", ")
+            );
+        }
+    }
+
+    // Cross-validate title_english vs title: if they're identical in every entry,
+    // the assignment is likely wrong (title_english should differ in at least some songs).
+    if let Some(te_offset) = title_english {
+        let all_identical = entries.iter().all(|entry| {
+            let title_block = &entry[title_offset..title_offset + block_size];
+            let te_block = &entry[te_offset..te_offset + block_size];
+            title_block == te_block
+        });
+
+        if all_identical {
+            warn!(
+                "EntryLayout: title_english (0x{:X}) is identical to title (0x{:X}) in all {} \
+                 entries. Role assignment may be incorrect",
+                te_offset,
+                title_offset,
+                entries.len()
+            );
+        }
     }
 }
 
@@ -904,5 +966,93 @@ mod tests {
         assert_eq!(layout.bpm_notes, Some(0x378));
         assert_eq!(layout.bpm_notes_stride, 8);
         assert_eq!(layout.ex_scores, Some(0x3F0));
+    }
+
+    // -----------------------------------------------------------------------
+    // Tests: validate_text_roles
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_validate_text_roles_known_block_counts_no_panic() {
+        // 4-block and 6-block are known layouts; validate should not panic.
+        let entry = vec![0u8; 0x400];
+        let entries: Vec<&[u8]> = vec![&entry, &entry, &entry];
+
+        // 4 contiguous blocks (V1/V2 style)
+        let blocks_4 = vec![0x00, 0x40, 0x80, 0xC0];
+        validate_text_roles(&entries, &blocks_4, 0x00, Some(0x40));
+
+        // 6 contiguous blocks (V3 style)
+        let blocks_6 = vec![0x00, 0x40, 0x80, 0xC0, 0x100, 0x140];
+        validate_text_roles(&entries, &blocks_6, 0x00, Some(0x80));
+    }
+
+    #[test]
+    fn test_validate_text_roles_identical_title_and_title_english() {
+        // When title and title_english are at different offsets but have identical
+        // content, validate_text_roles should detect this (emits a warning).
+        // Here we verify it doesn't panic and the logic is reachable.
+        let block_size = EntryLayout::TEXT_BLOCK_SIZE;
+        let entry_size = block_size * 6;
+
+        // Build entries where title (0x00) and title_english (0x80) are identical
+        let mut entry1 = vec![0u8; entry_size];
+        write_shift_jis(&mut entry1, 0x00, 64, "IDENTICAL");
+        write_shift_jis(&mut entry1, 0x80, 64, "IDENTICAL");
+
+        let mut entry2 = vec![0u8; entry_size];
+        write_shift_jis(&mut entry2, 0x00, 64, "IDENTICAL");
+        write_shift_jis(&mut entry2, 0x80, 64, "IDENTICAL");
+
+        let mut entry3 = vec![0u8; entry_size];
+        write_shift_jis(&mut entry3, 0x00, 64, "IDENTICAL");
+        write_shift_jis(&mut entry3, 0x80, 64, "IDENTICAL");
+
+        let entries: Vec<&[u8]> = vec![&entry1, &entry2, &entry3];
+        let blocks = vec![0x00, 0x40, 0x80, 0xC0, 0x100, 0x140];
+
+        // Should not panic; internally detects all-identical and warns
+        validate_text_roles(&entries, &blocks, 0x00, Some(0x80));
+    }
+
+    #[test]
+    fn test_validate_text_roles_differing_title_english() {
+        // When title and title_english differ in at least one entry, no
+        // identical-content warning should fire.
+        let block_size = EntryLayout::TEXT_BLOCK_SIZE;
+        let entry_size = block_size * 6;
+
+        let mut entry1 = vec![0u8; entry_size];
+        write_shift_jis(&mut entry1, 0x00, 64, "タイトル");
+        write_shift_jis(&mut entry1, 0x80, 64, "English Title");
+
+        let mut entry2 = vec![0u8; entry_size];
+        write_shift_jis(&mut entry2, 0x00, 64, "別タイトル");
+        write_shift_jis(&mut entry2, 0x80, 64, "Another Title");
+
+        let mut entry3 = vec![0u8; entry_size];
+        write_shift_jis(&mut entry3, 0x00, 64, "曲名");
+        write_shift_jis(&mut entry3, 0x80, 64, "Song Name");
+
+        let entries: Vec<&[u8]> = vec![&entry1, &entry2, &entry3];
+        let blocks = vec![0x00, 0x40, 0x80, 0xC0, 0x100, 0x140];
+
+        // Should not panic or warn about identical content
+        validate_text_roles(&entries, &blocks, 0x00, Some(0x80));
+    }
+
+    #[test]
+    fn test_validate_text_roles_unusual_block_count() {
+        // 3 blocks and 7 blocks are not in the known set; should trigger a warning.
+        let entry = vec![0u8; 0x400];
+        let entries: Vec<&[u8]> = vec![&entry, &entry, &entry];
+
+        // 3 contiguous blocks (not a known layout)
+        let blocks_3 = vec![0x00, 0x40, 0x80];
+        validate_text_roles(&entries, &blocks_3, 0x00, Some(0x40));
+
+        // 7 contiguous blocks (not a known layout)
+        let blocks_7 = vec![0x00, 0x40, 0x80, 0xC0, 0x100, 0x140, 0x180];
+        validate_text_roles(&entries, &blocks_7, 0x00, Some(0x80));
     }
 }
