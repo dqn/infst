@@ -6,7 +6,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use tracing::warn;
+use tracing::debug;
 
 use crate::chart::{Difficulty, SongInfo, UnlockData, get_unlock_state_for_difficulty};
 use crate::error::Result;
@@ -65,7 +65,7 @@ fn collect_song_export_data(
         Some(u) => u,
         None => {
             if score_map.get(song_id).is_some() {
-                warn!(
+                debug!(
                     song_id,
                     title = %song.title,
                     "Song with score data excluded from export: no unlock data found (may be aliased)"

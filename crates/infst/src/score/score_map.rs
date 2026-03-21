@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use tracing::warn;
+use tracing::{debug, warn};
 
 use crate::chart::{Difficulty, SongInfo};
 use crate::error::{Error, Result};
@@ -213,7 +213,7 @@ impl ScoreMap {
         loop {
             // Prevent runaway traversal on corrupt data
             if depth >= MAX_LIST_DEPTH {
-                warn!(
+                debug!(
                     entry_point = format_args!("{entry_point:#X}"),
                     depth, "linked list traversal hit depth limit, aborting chain"
                 );

@@ -760,7 +760,7 @@ impl Infst {
                 self.current_playing = Some((song_id, difficulty));
             }
             Err(e) => {
-                warn!("Failed to fetch current chart on Playing: {}", e);
+                debug!("Failed to fetch current chart on Playing: {}", e);
                 // Keep previous value if any, or None
             }
         }

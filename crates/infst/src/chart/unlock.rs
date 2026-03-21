@@ -35,7 +35,7 @@ impl UnlockData {
         let unlocks = buf.read_i32_at(8).ok()?;
 
         let unlock_type = match unlock_type_val {
-            1 => UnlockType::Base,
+            0 | 1 => UnlockType::Base,
             2 => UnlockType::Bits,
             3 => UnlockType::Sub,
             v => {
