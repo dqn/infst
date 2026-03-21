@@ -34,12 +34,10 @@ impl UnlockData {
         let unlock_type_val = buf.read_i32_at(4).ok()?;
         let unlocks = buf.read_i32_at(8).ok()?;
 
-        let unlock_type = match unlock_type_val {
-            1 => UnlockType::Base,
-            2 => UnlockType::Bits,
-            3 => UnlockType::Sub,
-            _ => UnlockType::Base,
-        };
+        let unlock_type = UnlockType::from_u8(unlock_type_val as u8).unwrap_or_else(|| {
+            tracing::warn!(unlock_type_val, "Unknown unlock type, defaulting to Base");
+            UnlockType::Base
+        });
 
         Some(Self {
             song_id,

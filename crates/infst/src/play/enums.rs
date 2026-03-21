@@ -42,9 +42,9 @@ impl std::fmt::Display for PlayType {
 #[repr(u8)]
 pub enum UnlockType {
     #[default]
-    Base = 0,
-    Bits = 1,
-    Sub = 2,
+    Base = 1,
+    Bits = 2,
+    Sub = 3,
 }
 
 impl UnlockType {
