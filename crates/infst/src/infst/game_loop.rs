@@ -899,34 +899,13 @@ impl Infst {
             .saturating_add(judge.bad)
             .saturating_add(judge.poor);
 
-        // V3: entry offset 0x378 contains BPM, not total_notes. Detect this
-        // by checking if all non-zero values in the song's total_notes array
-        // are identical -- real note counts vary across difficulties, BPM does not.
-        let entry_notes_likely_bpm = self
-            .game_data
-            .song_db
-            .get(&song_id)
-            .map(|song| {
-                let non_zero: Vec<u32> = song
-                    .total_notes
-                    .iter()
-                    .copied()
-                    .filter(|&n| n > 0)
-                    .collect();
-                non_zero.len() >= 2 && non_zero.iter().all(|&n| n == non_zero[0])
-            })
-            .unwrap_or(false);
-
         // Track whether the notes source is authoritative (from game memory)
         // so we only write back reliable values to song_db.
         // judge_notes is NOT authoritative: partial plays (premature end) yield
         // fewer notes than the chart actually has.
         let (effective_notes, notes_from_current_song) = if chart_notes > 0 {
             (chart_notes, true)
-        } else if chart.total_notes > 0
-            && !entry_notes_likely_bpm
-            && (ex_score as u64) <= (chart.total_notes as u64) * 2
-        {
+        } else if chart.total_notes > 0 && (ex_score as u64) <= (chart.total_notes as u64) * 2 {
             (chart.total_notes, false) // not from CurrentSong memory read, skip writeback
         } else if judge_notes > 0 {
             (judge_notes, false) // unreliable for partial plays, do NOT write back
