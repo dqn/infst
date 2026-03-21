@@ -164,7 +164,7 @@ impl SongInfo {
         // Detect BPM vs total_notes: when all non-zero values are identical,
         // this is BPM data, not per-chart note counts.
         let non_zero: Vec<u32> = raw_values.iter().copied().filter(|&v| v > 0).collect();
-        let all_identical = !non_zero.is_empty() && non_zero.iter().all(|&v| v == non_zero[0]);
+        let all_identical = non_zero.len() >= 2 && non_zero.iter().all(|&v| v == non_zero[0]);
 
         let (bpm, total_notes) = if all_identical {
             let bpm: Arc<str> = Arc::from(non_zero[0].to_string());

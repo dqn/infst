@@ -898,7 +898,7 @@ impl Infst {
                     .copied()
                     .filter(|&n| n > 0)
                     .collect();
-                !non_zero.is_empty() && non_zero.iter().all(|&n| n == non_zero[0])
+                non_zero.len() >= 2 && non_zero.iter().all(|&n| n == non_zero[0])
             })
             .unwrap_or(false);
 
