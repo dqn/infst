@@ -9,6 +9,8 @@ use std::fs;
 use std::io::Write;
 use std::time::Duration;
 
+use super::upload::resolve_credentials;
+use crate::cli_utils;
 use anyhow::{Context, Result};
 use flate2::Compression;
 use flate2::write::GzEncoder;
@@ -17,10 +19,6 @@ use infst::{
     decode_shift_jis_to_string, score::Lamp,
 };
 use serde::{Deserialize, Serialize};
-use tracing::debug;
-
-use super::upload::resolve_credentials;
-use crate::cli_utils;
 
 #[derive(Serialize, Clone)]
 struct LampEntry {
@@ -130,7 +128,9 @@ fn read_text_table(reader: &MemoryReader, song_list_addr: u64) -> Result<Vec<Tex
     let mut entries = Vec::new();
     let mut consecutive_empty = 0;
 
-    for i in 0..TEXT_TABLE_MAX_ENTRIES {
+    // Start from entry 1: entry 0 has no previous entry for V3 title lookup
+    // (V3 title is at entry (i-1) + 0x5B0), so it always produces an empty title.
+    for i in 1..TEXT_TABLE_MAX_ENTRIES {
         let base = i * TEXT_TABLE_STRIDE;
         if base + TEXT_TABLE_STRIDE > buffer.len() {
             break;
@@ -140,19 +140,14 @@ fn read_text_table(reader: &MemoryReader, song_list_addr: u64) -> Result<Vec<Tex
 
         // Read V3 title from the PREVIOUS entry's 0x5B0 offset.
         // Entry i's game_id corresponds to the V3 title at entry (i-1) + 0x5B0.
-        let title = if i == 0 {
-            // First entry has no previous entry for V3 title lookup; will be skipped
-            debug!("Text table entry 0 skipped: no previous entry for V3 title lookup");
-            String::new()
+        let prev_base = (i - 1) * TEXT_TABLE_STRIDE;
+        let title_start = prev_base + TEXT_TABLE_V3_TITLE_OFFSET;
+        let title = if title_start + TEXT_TABLE_TITLE_SIZE <= buffer.len() {
+            decode_shift_jis_to_string(&buffer[title_start..title_start + TEXT_TABLE_TITLE_SIZE])
+                .trim()
+                .to_string()
         } else {
-            let prev_base = (i - 1) * TEXT_TABLE_STRIDE;
-            let title_start = prev_base + TEXT_TABLE_V3_TITLE_OFFSET;
-            if title_start + TEXT_TABLE_TITLE_SIZE <= buffer.len() {
-                let title_bytes = &buffer[title_start..title_start + TEXT_TABLE_TITLE_SIZE];
-                decode_shift_jis_to_string(title_bytes).trim().to_string()
-            } else {
-                String::new()
-            }
+            String::new()
         };
 
         if title.is_empty() {

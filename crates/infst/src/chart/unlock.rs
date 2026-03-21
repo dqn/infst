@@ -130,7 +130,7 @@ fn parse_unlock_buffer(
 ///
 /// Special handling for:
 /// - SPB (Beginner): For non-Sub songs, check if note count is non-zero
-/// - SPL/DPL (Leggendaria): For Sub songs, requires both SPA and DPA to be unlocked
+/// - SPL/DPL (Leggendaria): For Sub songs, requires the same play-style Another to be unlocked
 pub fn get_unlock_state_for_difficulty(
     unlock_db: &HashMap<u32, UnlockData>,
     song_db: &HashMap<u32, SongInfo>,
@@ -157,10 +157,13 @@ pub fn get_unlock_state_for_difficulty(
     // Handle Leggendaria difficulties (SPL/DPL)
     if difficulty == Difficulty::SpL || difficulty == Difficulty::DpL {
         if unlock_data.unlock_type == UnlockType::Sub {
-            // For Sub songs, require both SPA and DPA to be unlocked
-            let spa_unlocked = unlock_data.is_difficulty_unlocked(Difficulty::SpA);
-            let dpa_unlocked = unlock_data.is_difficulty_unlocked(Difficulty::DpA);
-            return spa_unlocked && dpa_unlocked;
+            // For Sub songs, require the same play-style Another to be unlocked
+            let another = if difficulty == Difficulty::SpL {
+                Difficulty::SpA
+            } else {
+                Difficulty::DpA
+            };
+            return unlock_data.is_difficulty_unlocked(another);
         } else {
             // For other songs, just check the unlock bit
             return unlock_data.is_difficulty_unlocked(difficulty);
