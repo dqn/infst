@@ -11,6 +11,11 @@ use crate::score::Lamp;
 /// The table is typically a few hundred KB; anything larger suggests corrupt memory.
 const MAX_DATA_MAP_BUFFER_SIZE: usize = 16 * 1024 * 1024;
 
+/// Maximum depth for linked list traversal.
+/// Belt-and-suspenders defense alongside the visited set: a corrupt list with many
+/// unique but invalid addresses would otherwise cause unbounded ReadProcessMemory calls.
+const MAX_LIST_DEPTH: usize = 1000;
+
 /// Sentinel value found in INFINITAS data map hash table buckets.
 ///
 /// Buckets containing this value do not point to a valid linked list and must be
@@ -203,8 +208,19 @@ impl ScoreMap {
         nodes: &mut HashMap<(u32, i32, i32), ListNode>,
     ) {
         let mut current_addr = entry_point;
+        let mut depth: usize = 0;
 
         loop {
+            // Prevent runaway traversal on corrupt data
+            if depth >= MAX_LIST_DEPTH {
+                warn!(
+                    entry_point = format_args!("{entry_point:#X}"),
+                    depth, "linked list traversal hit depth limit, aborting chain"
+                );
+                break;
+            }
+            depth += 1;
+
             // Prevent infinite loops
             if visited.contains(&current_addr) {
                 break;
