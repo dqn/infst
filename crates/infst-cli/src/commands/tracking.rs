@@ -342,13 +342,17 @@ fn run_tracking_session(
 
     // Search for IIDX header (V3: used to resolve game_id -> internal_id at runtime)
     if infst.offsets().song_entry_table != 0
-        && let Some(iidx_addr) =
+        && let Some((iidx_addr, song_count)) =
             infst::offset::find_iidx_header(&reader, infst.offsets().song_entry_table)
     {
         let mut offsets = infst.offsets().clone();
         offsets.iidx_header = iidx_addr;
+        offsets.iidx_song_count = song_count;
         infst.update_offsets(offsets);
-        info!("IIDX header found at 0x{:X}", iidx_addr);
+        info!(
+            "IIDX header found at 0x{:X} (song_count={})",
+            iidx_addr, song_count
+        );
     }
 
     // Load game resources

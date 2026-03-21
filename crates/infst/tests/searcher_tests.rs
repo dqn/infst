@@ -253,6 +253,7 @@ fn test_offsets_collection_is_valid() {
         song_entry_table: 0,
         song_entry_size: 0,
         iidx_header: 0,
+        iidx_song_count: 0,
         entry_layout: None,
     };
     assert!(valid.is_valid());
@@ -269,6 +270,7 @@ fn test_offsets_collection_is_valid() {
         song_entry_table: 0,
         song_entry_size: 0,
         iidx_header: 0,
+        iidx_song_count: 0,
         entry_layout: None,
     };
     assert!(!invalid.is_valid());

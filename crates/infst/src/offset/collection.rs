@@ -28,6 +28,10 @@ pub struct OffsetsCollection {
     /// The pointer at iidx_header - 0x40 points to the current song's entry title field.
     #[serde(default)]
     pub iidx_header: u64,
+    /// Song count read from the IIDX header (V3+).
+    /// Used to compute the entry table boundary for pointer validation.
+    #[serde(default)]
+    pub iidx_song_count: u32,
     /// Auto-detected entry field layout.
     /// When `None`, callers should use `EntryLayout::v3_default()`.
     #[serde(default)]
@@ -123,7 +127,12 @@ impl OffsetsCollection {
         // Validate: entry_start should be within the entry table range
         let table_start = self.song_entry_table;
         let stride = self.entry_stride() as u64;
-        let table_end = table_start + 1810 * stride; // conservative upper bound
+        let max_entries = if self.iidx_song_count > 0 {
+            self.iidx_song_count as u64 + 200 // margin for future song additions
+        } else {
+            3000 // fallback matching find_iidx_header validation range
+        };
+        let table_end = table_start + max_entries * stride;
         if entry_start < table_start || entry_start >= table_end {
             debug!(
                 "IIDX pointer out of entry table range: 0x{:X} (table: 0x{:X}-0x{:X})",
@@ -157,7 +166,9 @@ impl OffsetsCollection {
 /// The IIDX header is a structure containing the ASCII bytes "IIDX" followed by
 /// metadata including an entry count close to the total number of songs.
 /// It is located before the entry table in memory.
-pub fn find_iidx_header<R: ReadMemory>(reader: &R, entry_table_addr: u64) -> Option<u64> {
+///
+/// Returns `(header_address, song_count)` if found.
+pub fn find_iidx_header<R: ReadMemory>(reader: &R, entry_table_addr: u64) -> Option<(u64, u32)> {
     // Search 256KB before the entry table
     let search_size: u64 = 0x40000;
     let search_start = entry_table_addr.saturating_sub(search_size);
@@ -187,7 +198,7 @@ pub fn find_iidx_header<R: ReadMemory>(reader: &R, entry_table_addr: u64) -> Opt
                 "Found IIDX header at 0x{:X} (entry_size={}, count={})",
                 addr, entry_size, count
             );
-            return Some(addr);
+            return Some((addr, count));
         }
     }
 
