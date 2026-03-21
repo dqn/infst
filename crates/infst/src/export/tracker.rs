@@ -321,7 +321,10 @@ pub fn export_song_list<P: AsRef<Path>>(path: P, song_db: &HashMap<u32, SongInfo
         }
     }
 
-    fs::write(path, lines.join("\n"))?;
+    let path = path.as_ref();
+    let tmp_path = path.with_extension("txt.tmp");
+    fs::write(&tmp_path, lines.join("\n"))?;
+    fs::rename(&tmp_path, path)?;
     Ok(())
 }
 
@@ -332,8 +335,11 @@ pub fn export_tracker_json<P: AsRef<Path>>(
     unlock_db: &HashMap<u32, UnlockData>,
     score_map: &ScoreMap,
 ) -> Result<()> {
+    let path = path.as_ref();
     let content = generate_tracker_json(song_db, unlock_db, score_map)?;
-    fs::write(path, content)?;
+    let tmp_path = path.with_extension("json.tmp");
+    fs::write(&tmp_path, &content)?;
+    fs::rename(&tmp_path, path)?;
     Ok(())
 }
 
