@@ -531,6 +531,26 @@ mod tests {
         assert_eq!(song.total_notes, [0u32; 10]);
     }
 
+    #[test]
+    fn test_bpm_detection_single_nonzero_not_detected_as_bpm() {
+        // When only 1 non-zero value exists in bpm_notes, the >= 2 threshold
+        // prevents BPM detection. The value is treated as note count.
+        let layout = EntryLayout::v3_default();
+        let bpm_off = layout.bpm_notes.unwrap();
+        let mut entry = vec![0u8; SongInfo::MEMORY_SIZE];
+        entry[layout.song_id..layout.song_id + 4].copy_from_slice(&1001i32.to_le_bytes());
+        // Write a single non-zero value at slot 3 (SPA) only
+        let off = bpm_off + 3 * layout.bpm_notes_stride;
+        entry[off..off + 4].copy_from_slice(&150u32.to_le_bytes());
+
+        let song = SongInfo::parse_from_buffer(&entry, 0).unwrap().unwrap();
+
+        // Single non-zero value -> not detected as BPM
+        assert_eq!(&*song.bpm, "");
+        // The value should be preserved as total_notes
+        assert_eq!(song.total_notes[3], 150);
+    }
+
     /// Build a song entry with trailing spaces in text fields to test trimming.
     fn build_song_entry_with_trailing_spaces(title: &str, artist: &str, song_id: u32) -> Vec<u8> {
         let layout = EntryLayout::v3_default();

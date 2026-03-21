@@ -617,4 +617,54 @@ mod tests {
         assert_eq!(lines.len(), 1);
         assert!(lines[0].contains("Title"));
     }
+
+    #[test]
+    fn test_export_tracker_tsv_writes_file() {
+        let mut song_db: HashMap<u32, SongInfo> = HashMap::new();
+        song_db.insert(1000, create_test_song(1000, "Disk Write Test"));
+
+        let mut unlock_db: HashMap<u32, UnlockData> = HashMap::new();
+        unlock_db.insert(
+            1000,
+            UnlockData {
+                song_id: 1000,
+                unlock_type: UnlockType::Base,
+                unlocks: 0x3FF,
+            },
+        );
+
+        let score_map = ScoreMap::new();
+
+        // Create a unique temp directory for this test
+        let tmp_dir = std::env::temp_dir().join(format!("infst_test_{}", std::process::id()));
+        std::fs::create_dir_all(&tmp_dir).unwrap();
+        let output_path = tmp_dir.join("tracker.tsv");
+        let tmp_file_path = output_path.with_extension("tsv.tmp");
+
+        let result = export_tracker_tsv(&output_path, &song_db, &unlock_db, &score_map);
+        assert!(
+            result.is_ok(),
+            "export_tracker_tsv failed: {:?}",
+            result.err()
+        );
+
+        // Verify output file exists and is not empty
+        assert!(output_path.exists(), "Output file should exist");
+        let content = std::fs::read_to_string(&output_path).unwrap();
+        assert!(!content.is_empty(), "Output file should not be empty");
+        assert!(
+            content.contains("Disk Write Test"),
+            "Output should contain the song title"
+        );
+
+        // Verify no leftover .tsv.tmp file (atomic rename should have removed it)
+        assert!(
+            !tmp_file_path.exists(),
+            ".tsv.tmp file should not be left behind"
+        );
+
+        // Cleanup
+        let _ = std::fs::remove_file(&output_path);
+        let _ = std::fs::remove_dir(&tmp_dir);
+    }
 }

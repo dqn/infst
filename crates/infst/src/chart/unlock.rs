@@ -257,4 +257,47 @@ mod tests {
         assert_eq!(unlock.unlock_type, UnlockType::Base);
         assert_eq!(unlock.unlocks, 0x1F);
     }
+
+    /// Helper to build a 32-byte unlock buffer with a specific unlock_type i32 at offset 4.
+    fn build_unlock_bytes_with_type(unlock_type_val: i32) -> [u8; 32] {
+        let mut bytes = [0u8; 32];
+        // song_id = 1000 at offset 0
+        bytes[0..4].copy_from_slice(&1000u32.to_le_bytes());
+        // unlock_type at offset 4
+        bytes[4..8].copy_from_slice(&unlock_type_val.to_le_bytes());
+        // unlocks = 0x1F at offset 8
+        bytes[8..12].copy_from_slice(&0x1Fi32.to_le_bytes());
+        bytes
+    }
+
+    #[test]
+    fn test_from_bytes_unknown_type_zero_defaults_to_base() {
+        let bytes = build_unlock_bytes_with_type(0);
+        let unlock = UnlockData::from_bytes(&bytes).unwrap();
+        assert_eq!(unlock.song_id, 1000);
+        assert_eq!(unlock.unlock_type, UnlockType::Base);
+        assert_eq!(unlock.unlocks, 0x1F);
+    }
+
+    #[test]
+    fn test_from_bytes_unknown_type_four_defaults_to_base() {
+        let bytes = build_unlock_bytes_with_type(4);
+        let unlock = UnlockData::from_bytes(&bytes).unwrap();
+        assert_eq!(unlock.unlock_type, UnlockType::Base);
+    }
+
+    #[test]
+    fn test_from_bytes_unknown_type_large_value_defaults_to_base() {
+        // 0x107 = 263, tests i32 values > 255
+        let bytes = build_unlock_bytes_with_type(0x107);
+        let unlock = UnlockData::from_bytes(&bytes).unwrap();
+        assert_eq!(unlock.unlock_type, UnlockType::Base);
+    }
+
+    #[test]
+    fn test_from_bytes_unknown_type_negative_defaults_to_base() {
+        let bytes = build_unlock_bytes_with_type(-1);
+        let unlock = UnlockData::from_bytes(&bytes).unwrap();
+        assert_eq!(unlock.unlock_type, UnlockType::Base);
+    }
 }
