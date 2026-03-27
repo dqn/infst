@@ -210,13 +210,14 @@ fn validate_or_search_offsets(
         && let Some(version) = game_version
         && let Some(cached_offsets) = try_load_cached_offsets(version)
     {
-        // Validate cached offsets still work
+        // Validate cached offsets still work (re-verifies play_settings position
+        // to detect memory layout drift between game sessions)
         let searcher = OffsetSearcher::new(reader);
-        if searcher.validate_basic_memory_access(&cached_offsets) {
+        if searcher.validate_cached_offsets(&cached_offsets) {
             info!("Using cached offsets (validated)");
             return Ok(Some(cached_offsets));
         } else {
-            info!("Cached offsets invalid, performing fresh search...");
+            info!("Cached offsets stale or invalid, performing fresh search...");
         }
     }
 

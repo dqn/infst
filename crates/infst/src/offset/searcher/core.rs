@@ -380,6 +380,39 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         validate_basic_memory_access(self.reader, offsets)
     }
 
+    /// Validate cached offsets by re-verifying key derived positions.
+    ///
+    /// Memory layout can shift slightly between game sessions even with the
+    /// same game version. Basic memory access checks only confirm the addresses
+    /// are readable, not that they point to the correct structures. This method
+    /// re-searches play_settings from judge_data to detect drift.
+    pub fn validate_cached_offsets(&self, offsets: &OffsetsCollection) -> bool {
+        if !validate_basic_memory_access(self.reader, offsets) {
+            return false;
+        }
+
+        // Re-verify play_settings via relative search from judge_data.
+        // play_settings/play_data are heap-allocated and can shift between sessions.
+        match self.search_play_settings_near_judge_data(offsets.judge_data) {
+            Ok(found) if found == offsets.play_settings => true,
+            Ok(found) => {
+                debug!(
+                    "Cached play_settings 0x{:X} drifted (fresh search found 0x{:X})",
+                    offsets.play_settings, found
+                );
+                false
+            }
+            Err(_) => {
+                // Cannot verify; on result screen play_settings may not validate.
+                // Fall back to basic validation which already passed.
+                debug!(
+                    "Could not re-verify play_settings from judge_data (may be on result screen)"
+                );
+                true
+            }
+        }
+    }
+
     /// Detect entry field layout from the entry table.
     ///
     /// Reads several entries from the entry table and runs `EntryLayout::detect`
