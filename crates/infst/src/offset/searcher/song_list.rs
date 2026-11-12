@@ -514,7 +514,16 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
 
     /// Count songs with new layout: song_id at offset 0
     fn count_songs_new_layout(&self, start_addr: u64) -> usize {
-        const STRUCT_SIZE: u64 = SongInfo::MEMORY_SIZE as u64;
+        let Some(stride) = self.detect_entry_stride(start_addr) else {
+            return 0;
+        };
+        let Ok(sample) = self.reader.read_bytes(start_addr, stride * 3) else {
+            return 0;
+        };
+        if crate::chart::EntryLayout::detect_supported(&sample, stride).is_none() {
+            return 0;
+        }
+        let struct_size = stride as u64;
         const MAX_ITERATIONS: usize = 10_000;
         let mut count = 0;
         let mut addr = start_addr;
@@ -535,7 +544,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                     // Try a few more entries in case of gaps
                     let mut found_skip = None;
                     for skip in 1u64..10 {
-                        let next_addr = addr + (skip * STRUCT_SIZE);
+                        let next_addr = addr + (skip * struct_size);
                         if let Ok(next_id) = self.reader.read_i32(next_addr)
                             && (1000..=50000).contains(&next_id)
                         {
@@ -544,7 +553,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                         }
                     }
                     if let Some(skip) = found_skip {
-                        addr += skip * STRUCT_SIZE;
+                        addr += skip * struct_size;
                     } else {
                         break;
                     }
@@ -553,7 +562,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                 }
             } else {
                 count += 1;
-                addr += STRUCT_SIZE;
+                addr += struct_size;
             }
         }
 

@@ -13,7 +13,7 @@ use super::layout::EntryLayout;
 /// Reads all entries in a single ReadProcessMemory call (~5.7MB) instead of
 /// ~5000 individual calls. Falls back to `fetch_song_database` on failure.
 ///
-/// When `layout` is `None`, the V3 default layout is used.
+/// The layout must match a supported profile verified against live entries.
 pub fn fetch_song_database_bulk<R: ReadMemory>(
     reader: &R,
     song_list_addr: u64,
@@ -29,8 +29,37 @@ pub fn fetch_song_database_bulk_with_layout<R: ReadMemory>(
     entry_stride: usize,
     layout: Option<&EntryLayout>,
 ) -> Result<HashMap<u32, SongInfo>> {
-    let effective_layout = layout.cloned().unwrap_or_else(EntryLayout::v3_default);
+    let effective_layout = resolve_layout(reader, song_list_addr, entry_stride, layout)?;
     _fetch_song_database_bulk(reader, song_list_addr, entry_stride, &effective_layout)
+}
+
+fn resolve_layout<R: ReadMemory>(
+    reader: &R,
+    address: u64,
+    stride: usize,
+    cached: Option<&EntryLayout>,
+) -> Result<EntryLayout> {
+    if !EntryLayout::supported()
+        .iter()
+        .any(|layout| layout.entry_size == stride)
+    {
+        return Err(Error::InvalidOffset(format!(
+            "Unsupported song entry stride {stride:#x}; run probe-entry for diagnostics"
+        )));
+    }
+    let sample = reader.read_bytes(address, stride * 3)?;
+    let layout = EntryLayout::detect_supported(&sample, stride).ok_or_else(|| {
+        Error::InvalidOffset(
+            "Song metadata does not match a supported layout; run probe-entry for diagnostics"
+                .into(),
+        )
+    })?;
+    if cached.is_some_and(|cached| cached != &layout) {
+        return Err(Error::InvalidOffset(
+            "Cached song layout disagrees with live memory; detect offsets again".into(),
+        ));
+    }
+    Ok(layout)
 }
 
 fn _fetch_song_database_bulk<R: ReadMemory>(
@@ -74,6 +103,10 @@ fn _fetch_song_database_bulk<R: ReadMemory>(
             break;
         }
 
+        let entry = &buffer[offset..offset + layout.entry_size];
+        if entry.iter().any(|&byte| byte != 0) {
+            layout.validate_entry(entry)?;
+        }
         match SongInfo::parse_from_buffer_with_layout(&buffer, offset, layout) {
             Ok(Some(song)) if !song.title.is_empty() && song.id > 0 => {
                 result.entry(song.id).or_insert(song);
@@ -130,12 +163,8 @@ pub fn fetch_song_database<R: ReadMemory>(
     song_list_addr: u64,
     entry_stride: usize,
 ) -> Result<HashMap<u32, SongInfo>> {
-    _fetch_song_database(
-        reader,
-        song_list_addr,
-        entry_stride,
-        &EntryLayout::v3_default(),
-    )
+    let layout = resolve_layout(reader, song_list_addr, entry_stride, None)?;
+    _fetch_song_database(reader, song_list_addr, entry_stride, &layout)
 }
 
 fn _fetch_song_database<R: ReadMemory>(
@@ -153,7 +182,11 @@ fn _fetch_song_database<R: ReadMemory>(
         let address = song_list_addr + entry_index * entry_stride as u64;
 
         // Read using the detected layout, then fall back to metadata table for song_id
-        let read_result = SongInfo::read_from_memory_with_layout(reader, address, layout)?;
+        let entry = reader.read_bytes(address, layout.entry_size)?;
+        if entry.iter().any(|&byte| byte != 0) {
+            layout.validate_entry(&entry)?;
+        }
+        let read_result = SongInfo::parse_entry_with_layout(&entry, layout)?;
         let read_result = match read_result {
             Some(mut song) if song.id == 0 && !song.title.is_empty() => {
                 // song_id may be in a separate metadata table (version 2026012800+)

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
 use crate::play::UnlockType;
-use crate::process::{ByteBuffer, ReadMemory, decode_shift_jis};
+use crate::process::{ByteBuffer, ReadMemory};
 
 use super::encoding_fixes::{fix_artist_encoding, fix_title_encoding};
 
@@ -19,7 +19,7 @@ pub use database::{
     fetch_song_database, fetch_song_database_bulk, fetch_song_database_bulk_with_layout,
 };
 pub use game_id::{apply_game_id_mapping, build_game_id_index, build_game_id_index_with_layout};
-pub use layout::EntryLayout;
+pub use layout::{EntryLayout, TextEncoding};
 pub use scan::{
     analyze_metadata_table, build_song_id_title_map, fetch_song_by_id,
     fetch_song_database_from_memory_scan,
@@ -114,33 +114,30 @@ impl SongInfo {
         // Parse folder (i32)
         let folder = buf.read_i32_at(layout.folder).unwrap_or(0);
 
-        // Helper: decode Shift-JIS and trim whitespace.
-        // Entry table fields may contain trailing spaces before the null
-        // terminator (or fill the entire 64-byte buffer without one).
-        // Trimming here -- the most upstream location -- ensures all
-        // consumers get clean data and title-based JOINs succeed.
-        let decode_and_trim =
-            |bytes: &[u8]| -> Arc<str> { Arc::from(decode_shift_jis(bytes).trim()) };
-
-        // Parse title (always present)
-        let mut title = decode_and_trim(buf.slice_at(layout.title, Self::SLAB)?);
-
-        // Parse optional text fields
+        let decode = |offset: usize| -> Result<Arc<str>> {
+            Ok(layout
+                .text_encoding
+                .decode(buf.slice_at(offset, layout.text_encoding.field_size())?)?
+                .into())
+        };
+        let mut title = decode(layout.title)?;
         let title_english = if let Some(off) = layout.title_english {
-            decode_and_trim(buf.slice_at(off, Self::SLAB)?)
+            layout::TextEncoding::ShiftJis
+                .decode(buf.slice_at(off, Self::SLAB)?)?
+                .into()
         } else {
             Arc::from("")
         };
-        let genre = if let Some(off) = layout.genre {
-            decode_and_trim(buf.slice_at(off, Self::SLAB)?)
-        } else {
-            Arc::from("")
-        };
-        let mut artist = if let Some(off) = layout.artist {
-            decode_and_trim(buf.slice_at(off, Self::SLAB)?)
-        } else {
-            Arc::from("")
-        };
+        let genre = layout
+            .genre
+            .map(decode)
+            .transpose()?
+            .unwrap_or_else(|| Arc::from(""));
+        let mut artist = layout
+            .artist
+            .map(decode)
+            .transpose()?
+            .unwrap_or_else(|| Arc::from(""));
 
         if let Some(fixed) = fix_title_encoding(&title) {
             title = fixed;
@@ -166,13 +163,19 @@ impl SongInfo {
         let non_zero: Vec<u32> = raw_values.iter().copied().filter(|&v| v > 0).collect();
         let all_identical = non_zero.len() >= 2 && non_zero.iter().all(|&v| v == non_zero[0]);
 
-        let (bpm, total_notes) = if all_identical {
+        let (bpm, mut total_notes) = if all_identical {
             let bpm: Arc<str> = Arc::from(non_zero[0].to_string());
             (bpm, [0u32; 10])
         } else {
             let bpm: Arc<str> = Arc::from("");
             (bpm, raw_values)
         };
+
+        if let Some(notes_offset) = layout.note_counts {
+            for (i, notes) in total_notes.iter_mut().enumerate() {
+                *notes = buf.read_u32_at(notes_offset + i * 4)?;
+            }
+        }
 
         // Read embedded EX scores
         let mut embedded_ex_scores = [0u32; 10];
@@ -234,6 +237,7 @@ mod tests {
         let mut entry = vec![0u8; SongInfo::MEMORY_SIZE];
         // Write song_id
         entry[layout.song_id..layout.song_id + 4].copy_from_slice(&(song_id as i32).to_le_bytes());
+        entry[layout.folder..layout.folder + 4].copy_from_slice(&43u32.to_le_bytes());
         // Write title as Shift-JIS
         let (encoded, _, _) = encoding_rs::SHIFT_JIS.encode(title);
         let title_bytes = encoded.as_ref();
@@ -340,10 +344,11 @@ mod tests {
 
     #[test]
     fn test_fetch_song_database_bulk_matches_per_entry() {
-        // Build buffer with 2 songs
+        // Use three independent songs to validate the runtime layout.
         let mut buffer = Vec::new();
         buffer.extend_from_slice(&build_song_entry("Alpha", 5000));
         buffer.extend_from_slice(&build_song_entry("Beta", 5001));
+        buffer.extend_from_slice(&build_song_entry("Gamma", 5002));
         for _ in 0..10 {
             buffer.extend_from_slice(&vec![0u8; SongInfo::MEMORY_SIZE]);
         }

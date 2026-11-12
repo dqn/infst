@@ -203,7 +203,7 @@ API はべき等のため、何度実行しても安全。
 - `Settings`, `RawSettings` - プレイ設定（生データ構造含む）
 - `GameStateDetector` - ゲーム状態検出
 - `ScoreMap`, `ScoreData` - ゲーム内スコアデータ
-- `EntryLayout` - エントリフィールドレイアウト（自動検出）
+- `EntryLayout` - 同期・エクスポート・追跡で共有する検証済みレイアウトと文字コード
 - `OffsetsCollection` - メモリオフセット集
 - `OffsetSearcher`, `OffsetSearcherBuilder` - オフセット検索（Builder パターン対応）
 - `SessionManager` - セッション管理
@@ -263,7 +263,7 @@ API はべき等のため、何度実行しても安全。
 2. 先頭エントリの `[song_id, folder]` を検証
 3. 0x200 以降、16バイト境界で次の有効な `[song_id(1000-50000), folder(1-200)]` ペアを走査
 4. 候補 stride で 3 件以上のエントリが存在すれば確定
-5. 検出失敗時は `SongInfo::MEMORY_SIZE` にフォールバック
+5. 検出した stride と複数曲の内容を既知プロファイルで検証する。未対応形式ではエラーにする
 
 これにより、エントリサイズが変わっても SongList の検出とイテレーションは自動的に動作する。
 
@@ -420,7 +420,7 @@ charts テーブルと lamps テーブルの結合は **title + difficulty** ベ
 | charts.infinitas_title | export → tracker.tsv → normalize → title-mapping.json | V3 エントリテーブルの Shift-JIS タイトル (encoding_fixes 適用済み) |
 | lamps.title | sync → `chart/text_table.rs` | レイアウトに応じた Shift-JIS / UTF-16 デコード (fix_title_encoding + trim 適用) |
 
-同期用テキストテーブルは旧形式（stride `0x630`）と UTF-16 形式（stride `0x730`）を判別する。タイトルは前ブロック、game_id とレベルは現ブロックから読む対応関係を維持する。新形式の確認は同期処理が対象で、export / リアルタイム追跡のレイアウト対応は別途検証が必要。
+同期・エクスポート・追跡の楽曲メタデータは `EntryLayout::supported()` を共有する。未知の形式を V3 として読むフォールバックは使わない。同期では全レコードの文字コード・ID・難易度を検証してから送信する。ゲーム更新への対応時は [メモリレイアウト対応手順](docs/memory-layouts.md) を読み、失敗する回帰テストを追加してから共有定義を修正する。プレイ状態や ScoreMap の構造は別途検証する。
 
 `just update-charts` で export → normalize → charts sync → lamps sync の全パイプラインを実行。
 

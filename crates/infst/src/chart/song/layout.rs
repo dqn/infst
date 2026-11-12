@@ -1,11 +1,62 @@
 //! Automatic detection of song entry field layout.
 //!
-//! Different INFINITAS versions use different field offsets within song entries.
-//! This module detects the layout by analyzing multiple raw entries, eliminating
-//! the need for hardcoded constants.
+//! Runtime profiles shared by synchronization, export and tracking.
+//!
+//! Known profiles are validated against multiple raw entries before use.
+//! Heuristic detection remains available for investigating unsupported versions.
 
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
+
+/// Encoding of localized song metadata (romanized titles remain Shift-JIS).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TextEncoding {
+    #[default]
+    ShiftJis,
+    Utf16Le,
+}
+
+impl TextEncoding {
+    pub fn field_size(self) -> usize {
+        match self {
+            Self::ShiftJis => 64,
+            Self::Utf16Le => 128,
+        }
+    }
+
+    pub fn decode(self, bytes: &[u8]) -> crate::error::Result<String> {
+        use crate::error::Error;
+        let text = match self {
+            Self::ShiftJis => {
+                let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+                let (text, errors) =
+                    encoding_rs::SHIFT_JIS.decode_without_bom_handling(&bytes[..end]);
+                if errors {
+                    return Err(Error::EncodingError("Invalid Shift-JIS song text".into()));
+                }
+                text.into_owned()
+            }
+            Self::Utf16Le => {
+                if !bytes.len().is_multiple_of(2) {
+                    return Err(Error::EncodingError("Truncated UTF-16 song text".into()));
+                }
+                let units: Vec<u16> = bytes
+                    .chunks_exact(2)
+                    .map(|b| u16::from_le_bytes([b[0], b[1]]))
+                    .take_while(|&unit| unit != 0)
+                    .collect();
+                String::from_utf16(&units)
+                    .map_err(|_| Error::EncodingError("Invalid UTF-16 song text".into()))?
+            }
+        };
+        if text.chars().any(char::is_control) {
+            return Err(Error::EncodingError(
+                "Control character in song text".into(),
+            ));
+        }
+        Ok(text.trim().to_string())
+    }
+}
 
 /// Detected field offsets within a song entry.
 ///
@@ -15,18 +66,20 @@ use tracing::{debug, warn};
 pub struct EntryLayout {
     /// Total entry size in bytes.
     pub entry_size: usize,
+    #[serde(default)]
+    pub text_encoding: TextEncoding,
 
     // --- Required fields ---
     /// Offset of song_id (i32, 1000-50000).
     pub song_id: usize,
     /// Offset of folder (i32, 1-200). Always song_id + 4.
     pub folder: usize,
-    /// Offset of title (64-byte Shift-JIS block).
+    /// Offset of localized title, decoded using `text_encoding`.
     pub title: usize,
     /// Offset of levels array (10 bytes, each 0-12).
     pub levels: usize,
 
-    // --- Optional text fields (64 bytes each) ---
+    // --- Optional text fields (romanized title: 64 bytes; localized: encoding-dependent) ---
     pub title_english: Option<usize>,
     pub genre: Option<usize>,
     pub artist: Option<usize>,
@@ -36,6 +89,9 @@ pub struct EntryLayout {
     pub bpm_notes: Option<usize>,
     /// Stride between BPM/notes values (typically 4 or 8 bytes).
     pub bpm_notes_stride: usize,
+    /// Independently verified chart note counts (10 x u32), when separate from BPM.
+    #[serde(default)]
+    pub note_counts: Option<usize>,
     /// Offset of EX scores (10 x u32, contiguous).
     pub ex_scores: Option<usize>,
     /// Offset of clear lamps (10 x u32, contiguous).
@@ -49,13 +105,14 @@ impl Default for EntryLayout {
 }
 
 impl EntryLayout {
-    /// The text block size used in all known versions (64 bytes).
+    /// Block size used by the legacy Shift-JIS heuristic scanner.
     const TEXT_BLOCK_SIZE: usize = 64;
 
-    /// Returns the V3 hardcoded layout (current fallback).
+    /// Returns the explicit V3 profile; runtime readers validate it before use.
     pub fn v3_default() -> Self {
         Self {
             entry_size: 0x630,
+            text_encoding: TextEncoding::ShiftJis,
             song_id: 0x000,
             folder: 0x004,
             title: 0x180,
@@ -65,9 +122,78 @@ impl EntryLayout {
             artist: Some(0x2C0),
             bpm_notes: Some(0x378),
             bpm_notes_stride: 8,
+            note_counts: None,
             ex_scores: Some(0x3F0),
             lamps: Some(0x430),
         }
+    }
+
+    /// Supported runtime profiles. Heuristic detection is for diagnostics only.
+    pub fn supported() -> [Self; 2] {
+        [
+            Self::v3_default(),
+            Self {
+                entry_size: 0x730,
+                text_encoding: TextEncoding::Utf16Le,
+                song_id: 0,
+                folder: 4,
+                title: 0x180,
+                levels: 0x460,
+                title_english: Some(0x280),
+                genre: Some(0x2c0),
+                artist: Some(0x340),
+                bpm_notes: Some(0x478),
+                bpm_notes_stride: 8,
+                note_counts: Some(0x4f0),
+                // These fields have not been verified for the UTF-16 version.
+                // Scores must come from ScoreMap rather than guessed offsets.
+                ex_scores: None,
+                lamps: None,
+            },
+        ]
+    }
+
+    /// Match a known profile against multiple independent song entries.
+    pub fn detect_supported(buffer: &[u8], entry_size: usize) -> Option<Self> {
+        Self::supported().into_iter().find(|layout| {
+            layout.entry_size == entry_size
+                && buffer.len() >= entry_size * 3
+                && buffer.chunks_exact(entry_size).take(3).all(|entry| {
+                    layout.validate_entry(entry).is_ok()
+                        && entry[layout.levels..layout.levels + 10]
+                            .iter()
+                            .any(|&level| level > 0)
+                })
+                && buffer[..4] != buffer[entry_size..entry_size + 4]
+        })
+    }
+
+    pub(crate) fn validate_entry(&self, entry: &[u8]) -> crate::error::Result<()> {
+        use crate::{error::Error, process::ByteBuffer};
+        let invalid = || {
+            Error::InvalidOffset(
+                "Unsupported or inconsistent song entry layout; run probe-entry for diagnostics"
+                    .into(),
+            )
+        };
+        if entry.len() < self.entry_size {
+            return Err(invalid());
+        }
+        let buf = ByteBuffer::new(entry);
+        let id = buf.read_u32_at(self.song_id)?;
+        let folder = buf.read_u32_at(self.folder)?;
+        let title = self
+            .text_encoding
+            .decode(buf.slice_at(self.title, self.text_encoding.field_size())?)?;
+        let levels = buf.slice_at(self.levels, 10)?;
+        if !(1000..=90000).contains(&id)
+            || !(1..=200).contains(&folder)
+            || (title.is_empty() && levels.iter().any(|&level| level > 0))
+            || levels.iter().any(|&level| level > 12)
+        {
+            return Err(invalid());
+        }
+        Ok(())
     }
 
     /// Detect field layout by analyzing a contiguous buffer of raw entries.
@@ -77,6 +203,12 @@ impl EntryLayout {
     pub fn detect(buffer: &[u8], entry_size: usize) -> Option<Self> {
         if entry_size < 64 || buffer.len() < entry_size * 3 {
             return None;
+        }
+
+        if let Some(layout) = Self::detect_supported(buffer, entry_size)
+            && layout.text_encoding == TextEncoding::Utf16Le
+        {
+            return Some(layout);
         }
 
         let entry_count = buffer.len() / entry_size;
@@ -130,6 +262,7 @@ impl EntryLayout {
 
         Some(EntryLayout {
             entry_size,
+            text_encoding: TextEncoding::ShiftJis,
             song_id: song_id_offset,
             folder: folder_offset,
             title: title_offset,
@@ -139,6 +272,7 @@ impl EntryLayout {
             artist,
             bpm_notes,
             bpm_notes_stride,
+            note_counts: None,
             ex_scores,
             lamps,
         })

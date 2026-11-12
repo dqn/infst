@@ -713,7 +713,10 @@ impl Infst {
             );
             return;
         };
-        let layout = self.offsets.effective_layout();
+        let Ok(layout) = self.offsets.effective_layout() else {
+            warn!("Cannot rescan songs without a verified layout");
+            return;
+        };
         let scan_result = fetch_song_database_from_memory_scan(
             reader,
             self.offsets.song_db_address(),
@@ -1022,15 +1025,16 @@ impl Infst {
                 unlocked: true,
             };
         };
-        let layout = self.offsets.effective_layout();
-        if let Some(song) = fetch_song_by_id(
-            reader,
-            self.offsets.song_db_address(),
-            song_id,
-            scan_size,
-            entry_stride,
-            &layout,
-        ) {
+        if let Ok(layout) = self.offsets.effective_layout()
+            && let Some(song) = fetch_song_by_id(
+                reader,
+                self.offsets.song_db_address(),
+                song_id,
+                scan_size,
+                entry_stride,
+                &layout,
+            )
+        {
             info!("Dynamically loaded song: {} ({})", song.title, song_id);
             let chart = ChartInfo::from_song_info(&song, difficulty, true);
             // Add to song database for future lookups

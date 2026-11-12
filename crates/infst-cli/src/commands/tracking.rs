@@ -359,7 +359,7 @@ fn run_tracking_session(
     }
 
     // Load game resources
-    let layout = infst.offsets().effective_layout();
+    let layout = infst.offsets().effective_layout()?;
     let song_db = match load_song_database(
         &reader,
         infst.offsets().song_db_address(),

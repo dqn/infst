@@ -20,7 +20,7 @@ pub struct OffsetsCollection {
     #[serde(default)]
     pub song_entry_table: u64,
     /// Auto-detected song entry size in bytes.
-    /// 0 means not detected (callers should fall back to SongInfo::MEMORY_SIZE).
+    /// 0 means not detected; runtime consumers must first validate the profile.
     #[serde(default)]
     pub song_entry_size: usize,
     /// Address of the "IIDX" header in memory (V3+).
@@ -32,8 +32,8 @@ pub struct OffsetsCollection {
     /// Used to compute the entry table boundary for pointer validation.
     #[serde(default)]
     pub iidx_song_count: u32,
-    /// Auto-detected entry field layout.
-    /// When `None`, callers should use `EntryLayout::v3_default()`.
+    /// Validated supported entry field layout.
+    /// When `None`, runtime consumers must detect and validate the layout.
     #[serde(default)]
     pub entry_layout: Option<EntryLayout>,
 }
@@ -75,11 +75,20 @@ impl OffsetsCollection {
         }
     }
 
-    /// Get the effective entry layout (detected or V3 default).
-    pub fn effective_layout(&self) -> EntryLayout {
+    /// Require an explicitly detected supported layout; missing/stale profiles are errors.
+    pub fn effective_layout(&self) -> crate::error::Result<EntryLayout> {
         self.entry_layout
-            .clone()
-            .unwrap_or_else(EntryLayout::v3_default)
+            .as_ref()
+            .filter(|layout| {
+                layout.entry_size == self.song_entry_size
+                    && EntryLayout::supported().contains(layout)
+            })
+            .cloned()
+            .ok_or_else(|| {
+                crate::error::Error::InvalidOffset(
+                    "Missing or unsupported song layout; detect offsets again".into(),
+                )
+            })
     }
 
     /// Resolve the current song's internal_id via the IIDX pointer structure.
@@ -121,7 +130,7 @@ impl OffsetsCollection {
         }
 
         // Entry start = title_ptr - title_offset
-        let title_offset = self.effective_layout().title as u64;
+        let title_offset = self.effective_layout().ok()?.title as u64;
         let entry_start = title_ptr.checked_sub(title_offset)?;
 
         // Validate: entry_start should be within the entry table range

@@ -288,7 +288,10 @@ fn finds_utf16_song_table_after_game_update() {
         data[off + 0x1e0..off + 0x1ea].copy_from_slice(&[0, 2, 6, 10, 0, 0, 1, 7, 10, 0]);
         data[off + 0x4b0..off + 0x4b4].copy_from_slice(&(1000u32 + i as u32).to_le_bytes());
         data[off + 0x4b4..off + 0x4b8].copy_from_slice(&43u32.to_le_bytes());
-        data[off + 0x630..off + 0x634].copy_from_slice(&[82, 0, 0x52, 0x97]);
+        // The final block has no following song title.
+        if i < 1099 {
+            data[off + 0x630..off + 0x634].copy_from_slice(&[82, 0, 0x52, 0x97]);
+        }
     }
     let reader = infst::process::MockMemoryReader::with_base(data, 0x140000000);
     let mut searcher = OffsetSearcher::new(&reader);

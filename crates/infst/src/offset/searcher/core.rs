@@ -110,26 +110,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         // Detect song entry stride. If detection fails, song_list points to a
         // text table header (e.g., "5.1.1."), not the entry table itself.
         // In that case, search for the entry table separately.
-        if let Some(stride) = self.detect_entry_stride(offsets.song_list) {
-            offsets.song_entry_size = stride;
-            info!("  Song entry stride: 0x{:X} ({} bytes)", stride, stride);
-        } else {
-            info!("  SongList is a text table header, searching for song entry table...");
-            // Use the found SongList as hint (entry table is nearby)
-            if let Ok(entry_table) = self.search_song_list_by_song_id(offsets.song_list) {
-                offsets.song_entry_table = entry_table;
-                offsets.song_entry_size = self
-                    .detect_entry_stride(entry_table)
-                    .unwrap_or(crate::chart::SongInfo::MEMORY_SIZE);
-                info!(
-                    "  Song entry table: 0x{:X} (stride: 0x{:X})",
-                    entry_table, offsets.song_entry_size
-                );
-            }
-        }
-
-        // Detect entry field layout
-        self.detect_entry_layout_for(&mut offsets);
+        self.resolve_song_entry_layout(&mut offsets)?;
 
         // Phase 2: JudgeData (relative search from SongList)
         info!("Phase 2: Searching JudgeData via relative offset from SongList...");
@@ -197,17 +178,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         offsets.song_list = self.search_song_list_offset(song_list_hint)?;
         debug!("  SongList: 0x{:X}", offsets.song_list);
 
-        if let Some(stride) = self.detect_entry_stride(offsets.song_list) {
-            offsets.song_entry_size = stride;
-        } else if let Ok(entry_table) = self.search_song_list_by_song_id(offsets.song_list) {
-            offsets.song_entry_table = entry_table;
-            offsets.song_entry_size = self
-                .detect_entry_stride(entry_table)
-                .unwrap_or(crate::chart::SongInfo::MEMORY_SIZE);
-        }
-
-        // Detect entry field layout
-        self.detect_entry_layout_for(&mut offsets);
+        self.resolve_song_entry_layout(&mut offsets)?;
 
         offsets.data_map = self.search_data_map_offset(base).or_else(|e| {
             debug!(
@@ -251,17 +222,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         offsets.song_list = self.search_song_list_offset(song_list_hint)?;
         debug!("  SongList: 0x{:X}", offsets.song_list);
 
-        if let Some(stride) = self.detect_entry_stride(offsets.song_list) {
-            offsets.song_entry_size = stride;
-        } else if let Ok(entry_table) = self.search_song_list_by_song_id(offsets.song_list) {
-            offsets.song_entry_table = entry_table;
-            offsets.song_entry_size = self
-                .detect_entry_stride(entry_table)
-                .unwrap_or(crate::chart::SongInfo::MEMORY_SIZE);
-        }
-
-        // Detect entry field layout
-        self.detect_entry_layout_for(&mut offsets);
+        self.resolve_song_entry_layout(&mut offsets)?;
 
         offsets.data_map = self.search_data_map_offset(base).or_else(|e| {
             debug!(
@@ -301,17 +262,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         offsets.song_list = self.search_song_list_offset(song_list_hint)?;
         debug!("  SongList: 0x{:X}", offsets.song_list);
 
-        if let Some(stride) = self.detect_entry_stride(offsets.song_list) {
-            offsets.song_entry_size = stride;
-        } else if let Ok(entry_table) = self.search_song_list_by_song_id(offsets.song_list) {
-            offsets.song_entry_table = entry_table;
-            offsets.song_entry_size = self
-                .detect_entry_stride(entry_table)
-                .unwrap_or(crate::chart::SongInfo::MEMORY_SIZE);
-        }
-
-        // Detect entry field layout
-        self.detect_entry_layout_for(&mut offsets);
+        self.resolve_song_entry_layout(&mut offsets)?;
 
         offsets.unlock_data = self.search_unlock_data_offset(offsets.song_list)?;
         debug!("  UnlockData: 0x{:X}", offsets.unlock_data);
@@ -346,17 +297,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         offsets.song_list = self.search_song_list_offset(song_list_hint)?;
         debug!("  SongList: 0x{:X}", offsets.song_list);
 
-        if let Some(stride) = self.detect_entry_stride(offsets.song_list) {
-            offsets.song_entry_size = stride;
-        } else if let Ok(entry_table) = self.search_song_list_by_song_id(offsets.song_list) {
-            offsets.song_entry_table = entry_table;
-            offsets.song_entry_size = self
-                .detect_entry_stride(entry_table)
-                .unwrap_or(crate::chart::SongInfo::MEMORY_SIZE);
-        }
-
-        // Detect entry field layout
-        self.detect_entry_layout_for(&mut offsets);
+        self.resolve_song_entry_layout(&mut offsets)?;
 
         if offsets.song_list == 0 {
             return Err(Error::offset_search_failed(
@@ -371,13 +312,13 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
     /// Validate all offsets in a collection (delegates to validation module)
     #[inline]
     pub fn validate_signature_offsets(&self, offsets: &OffsetsCollection) -> bool {
-        validate_signature_offsets(self.reader, offsets)
+        validate_signature_offsets(self.reader, offsets) && self.validate_song_layout(offsets)
     }
 
     /// Validate basic memory access for file-loaded offsets (delegates to validation module)
     #[inline]
     pub fn validate_basic_memory_access(&self, offsets: &OffsetsCollection) -> bool {
-        validate_basic_memory_access(self.reader, offsets)
+        validate_basic_memory_access(self.reader, offsets) && self.validate_song_layout(offsets)
     }
 
     /// Validate cached offsets by re-verifying key derived positions.
@@ -387,7 +328,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
     /// are readable, not that they point to the correct structures. This method
     /// re-searches play_settings from judge_data to detect drift.
     pub fn validate_cached_offsets(&self, offsets: &OffsetsCollection) -> bool {
-        if !validate_basic_memory_access(self.reader, offsets) {
+        if !self.validate_basic_memory_access(offsets) {
             return false;
         }
 
@@ -413,33 +354,46 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         }
     }
 
-    /// Detect entry field layout from the entry table.
-    ///
-    /// Reads several entries from the entry table and runs `EntryLayout::detect`
-    /// to determine field offsets. Stores the result in `offsets.entry_layout`.
-    fn detect_entry_layout_for(&self, offsets: &mut OffsetsCollection) {
-        let entry_addr = offsets.song_db_address();
-        let stride = offsets.entry_stride();
-
-        if entry_addr == 0 || stride == 0 {
-            return;
-        }
-
-        let num_entries = 5;
-        let buf = match self.reader.read_bytes(entry_addr, stride * num_entries) {
-            Ok(b) => b,
-            Err(_) => return,
+    fn validate_song_layout(&self, offsets: &OffsetsCollection) -> bool {
+        let Ok(layout) = offsets.effective_layout() else {
+            return false;
         };
+        let Ok(sample) = self
+            .reader
+            .read_bytes(offsets.song_db_address(), layout.entry_size * 3)
+        else {
+            return false;
+        };
+        EntryLayout::detect_supported(&sample, layout.entry_size).as_ref() == Some(&layout)
+    }
 
-        offsets.entry_layout = EntryLayout::detect(&buf, stride);
-        if let Some(ref layout) = offsets.entry_layout {
-            info!(
-                "  Entry layout detected: song_id=0x{:X}, title=0x{:X}, levels=0x{:X}",
-                layout.song_id, layout.title, layout.levels
-            );
+    /// Resolve a supported entry table; never substitute a guessed V3 layout.
+    fn resolve_song_entry_layout(&mut self, offsets: &mut OffsetsCollection) -> Result<()> {
+        let entry_addr = if self.detect_entry_stride(offsets.song_list).is_some() {
+            offsets.song_list
         } else {
-            debug!("  Entry layout detection failed, will use V3 default");
-        }
+            let address = self.search_song_list_by_song_id(offsets.song_list)?;
+            offsets.song_entry_table = address;
+            address
+        };
+        let stride = self.detect_entry_stride(entry_addr).ok_or_else(|| {
+            Error::offset_search_failed(
+                "Unknown song entry stride; run probe-entry for diagnostics",
+            )
+        })?;
+        let sample = self.reader.read_bytes(entry_addr, stride * 3)?;
+        let layout = EntryLayout::detect_supported(&sample, stride).ok_or_else(|| {
+            Error::offset_search_failed(format!(
+                "Unsupported song layout (stride {stride:#x}); run probe-entry for diagnostics"
+            ))
+        })?;
+        info!(
+            "  Verified song layout: stride={:#x}, encoding={:?}",
+            stride, layout.text_encoding
+        );
+        offsets.song_entry_size = stride;
+        offsets.entry_layout = Some(layout);
+        Ok(())
     }
 
     /// Find all matches of a pattern in the current buffer

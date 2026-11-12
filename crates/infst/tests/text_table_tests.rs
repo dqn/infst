@@ -62,3 +62,62 @@ fn rejects_uninitialized_table() {
     let reader = MockMemoryReader::new(vec![0; 0x730 * 5000]);
     assert!(read_text_table(&reader, 0x1000).is_err());
 }
+
+#[test]
+fn rejects_corrupt_levels_beyond_layout_detection_sample() {
+    let mut memory = vec![0; 0x730 * 5000];
+    for i in 0..4 {
+        let previous = i * 0x730;
+        let current = previous + 0x730;
+        memory[previous + 0x630..previous + 0x634].copy_from_slice(b"R\x003\x00");
+        memory[current + 0x1e3] = if i == 3 { 13 } else { 11 };
+        memory[current + 0x4b0..current + 0x4b4]
+            .copy_from_slice(&(1001u32 + i as u32).to_le_bytes());
+    }
+    let result = read_text_table(&MockMemoryReader::new(memory), 0x1000);
+    assert!(
+        result.is_err(),
+        "corrupt fourth song must abort the entire sync read"
+    );
+}
+
+#[test]
+fn rejects_invalid_ids_beyond_layout_detection_sample() {
+    for bad_id in [90001u32, 1001] {
+        let mut memory = vec![0; 0x730 * 5000];
+        for i in 0..4 {
+            let previous = i * 0x730;
+            let current = previous + 0x730;
+            memory[previous + 0x630..previous + 0x634].copy_from_slice(b"R\x003\x00");
+            memory[current + 0x1e3] = 11;
+            let id = if i == 3 { bad_id } else { 1001 + i as u32 };
+            memory[current + 0x4b0..current + 0x4b4].copy_from_slice(&id.to_le_bytes());
+        }
+        assert!(
+            read_text_table(&MockMemoryReader::new(memory), 0x1000).is_err(),
+            "invalid or duplicate ID {bad_id} must abort the entire sync read"
+        );
+    }
+}
+
+#[test]
+fn incomplete_song_tuples_abort_instead_of_silently_dropping_scores() {
+    for missing_title in [true, false] {
+        let mut memory = vec![0; 0x730 * 5000];
+        for i in 0..4 {
+            let previous = i * 0x730;
+            let current = previous + 0x730;
+            if i != 3 || !missing_title {
+                memory[previous + 0x630..previous + 0x634].copy_from_slice(b"R\x003\x00");
+            }
+            memory[current + 0x1e3] = 11;
+            let id = if i == 3 && !missing_title {
+                0
+            } else {
+                1001u32 + i as u32
+            };
+            memory[current + 0x4b0..current + 0x4b4].copy_from_slice(&id.to_le_bytes());
+        }
+        assert!(read_text_table(&MockMemoryReader::new(memory), 0x1000).is_err());
+    }
+}
