@@ -9,11 +9,13 @@
 mod difficulty;
 mod encoding_fixes;
 mod song;
+mod text_table;
 mod types;
 mod unlock;
 
 pub use difficulty::*;
 pub use encoding_fixes::*;
 pub use song::*;
+pub use text_table::{TextTableEntry, read_text_table};
 pub use types::*;
 pub use unlock::*;

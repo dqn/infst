@@ -1,6 +1,6 @@
 //! Sync command for reading game memory and uploading directly to the web service.
 //!
-//! Reads titles and game_ids from the text table (stride 0x630 at `offsets.song_list`),
+//! Reads titles and game_ids from the version-detected text table,
 //! then looks up score data from DataMap/ScoreMap using those game_ids.
 //! This avoids the game_id/internal_id mismatch by reading game_id from the text table.
 
@@ -15,8 +15,7 @@ use anyhow::{Context, Result};
 use flate2::Compression;
 use flate2::write::GzEncoder;
 use infst::{
-    MemoryReader, OffsetSearcher, ReadMemory, ScoreMap, chart::Difficulty,
-    decode_shift_jis_to_string, score::Lamp,
+    MemoryReader, OffsetSearcher, ScoreMap, chart::Difficulty, chart::read_text_table, score::Lamp,
 };
 use serde::{Deserialize, Serialize};
 
@@ -45,20 +44,6 @@ const ALL_DIFFICULTIES: [Difficulty; 10] = [
     Difficulty::DpA,
     Difficulty::DpL,
 ];
-
-/// Text table layout constants (stride 0x630 = 1584 bytes per entry)
-const TEXT_TABLE_STRIDE: usize = 0x630;
-/// V3 title within this text table block belongs to the NEXT entry's game_id.
-/// So for entry i, the V3 title at 0x5B0 is the title for entry (i+1)'s game_id.
-/// We read title from offset 0x5B0 of the PREVIOUS entry (= current entry - stride + 0x5B0).
-/// Equivalently, we shift the title read by -1 entry.
-const TEXT_TABLE_V3_TITLE_OFFSET: usize = 0x5B0;
-const TEXT_TABLE_TITLE_SIZE: usize = 64;
-const TEXT_TABLE_LEVELS_OFFSET: usize = 0x160;
-const TEXT_TABLE_LEVELS_SIZE: usize = 10;
-const TEXT_TABLE_GAME_ID_OFFSET: usize = 0x430;
-const TEXT_TABLE_MAX_ENTRIES: usize = 5000;
-const TEXT_TABLE_MAX_CONSECUTIVE_EMPTY: usize = 10;
 
 // --- Sync cache for differential sync ---
 
@@ -109,94 +94,6 @@ impl SyncCache {
     }
 }
 
-/// Data extracted from a single text table entry.
-struct TextTableEntry {
-    title: String,
-    levels: [u8; 10],
-    game_id: u32,
-}
-
-/// Read all entries from the "5.1.1." text table.
-fn read_text_table(reader: &MemoryReader, song_list_addr: u64) -> Result<Vec<TextTableEntry>> {
-    // Bulk read the entire table to minimize process memory reads.
-    // Each entry is TEXT_TABLE_STRIDE bytes; read up to MAX_ENTRIES.
-    let total_size = TEXT_TABLE_STRIDE * TEXT_TABLE_MAX_ENTRIES;
-    let buffer = reader
-        .read_bytes(song_list_addr, total_size)
-        .context("Failed to read text table from memory")?;
-
-    let mut entries = Vec::new();
-    let mut consecutive_empty = 0;
-
-    // Start from entry 1: entry 0 has no previous entry for V3 title lookup
-    // (V3 title is at entry (i-1) + 0x5B0), so it always produces an empty title.
-    for i in 1..TEXT_TABLE_MAX_ENTRIES {
-        let base = i * TEXT_TABLE_STRIDE;
-        if base + TEXT_TABLE_STRIDE > buffer.len() {
-            break;
-        }
-
-        let entry_buf = &buffer[base..base + TEXT_TABLE_STRIDE];
-
-        // Read V3 title from the PREVIOUS entry's 0x5B0 offset.
-        // Entry i's game_id corresponds to the V3 title at entry (i-1) + 0x5B0.
-        let prev_base = (i - 1) * TEXT_TABLE_STRIDE;
-        let title_start = prev_base + TEXT_TABLE_V3_TITLE_OFFSET;
-        let title = if title_start + TEXT_TABLE_TITLE_SIZE <= buffer.len() {
-            decode_shift_jis_to_string(&buffer[title_start..title_start + TEXT_TABLE_TITLE_SIZE])
-                .trim()
-                .to_string()
-        } else {
-            String::new()
-        };
-
-        if title.is_empty() {
-            consecutive_empty += 1;
-            if consecutive_empty >= TEXT_TABLE_MAX_CONSECUTIVE_EMPTY {
-                break;
-            }
-            continue;
-        }
-        consecutive_empty = 0;
-
-        // Read levels (10 bytes at offset 0x160)
-        let mut levels = [0u8; 10];
-        levels.copy_from_slice(
-            &entry_buf[TEXT_TABLE_LEVELS_OFFSET..TEXT_TABLE_LEVELS_OFFSET + TEXT_TABLE_LEVELS_SIZE],
-        );
-
-        // Read game_id (u32 at offset 0x430)
-        let game_id = u32::from_le_bytes(
-            entry_buf[TEXT_TABLE_GAME_ID_OFFSET..TEXT_TABLE_GAME_ID_OFFSET + 4]
-                .try_into()
-                .unwrap(),
-        );
-
-        // Skip entries with invalid game_id (empty slots in the table)
-        if game_id == 0 || !(1000..=90000).contains(&game_id) {
-            continue;
-        }
-
-        // Apply encoding fixes (same as SongInfo::parse_entry for V3 title)
-        let title = infst::chart::fix_title_encoding(&title)
-            .map(|arc| arc.to_string())
-            .unwrap_or(title);
-
-        // Skip if title is empty after decoding (V3 title field may be empty for some entries)
-        if title.is_empty() {
-            continue;
-        }
-
-        entries.push(TextTableEntry {
-            title,
-            levels,
-            game_id,
-        });
-    }
-
-    Ok(entries)
-}
-
 pub fn run(endpoint: Option<&str>, token: Option<&str>, pid: Option<u32>) -> Result<()> {
     let current_version = env!("CARGO_PKG_VERSION");
     eprintln!("infst {} - Sync Mode", current_version);
@@ -231,7 +128,7 @@ pub fn run(endpoint: Option<&str>, token: Option<&str>, pid: Option<u32>) -> Res
 
     // Build LampEntry list: text table provides game_id + levels + V3 title,
     // ScoreMap provides lamps + EX scores.
-    // V3 title (at offset 0x5B0) matches export/charts since both come from V3 entry table.
+    // Titles are decoded according to the detected game layout.
     let mut entries: Vec<LampEntry> = Vec::new();
     let mut seen: std::collections::HashSet<(String, String)> = std::collections::HashSet::new();
 

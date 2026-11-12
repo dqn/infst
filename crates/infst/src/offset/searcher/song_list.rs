@@ -47,6 +47,14 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
                     continue;
                 }
 
+                // The UTF-16 update enlarged entries; validate the sync table using
+                // its own layout instead of interpreting text as a V3 song entry.
+                if let Ok(entries) = crate::chart::read_text_table(self.reader, addr)
+                    && entries.len() >= MIN_EXPECTED_SONGS
+                {
+                    return Ok(addr);
+                }
+
                 // Try the address itself and nearby offsets
                 // "5.1.1." might be a header, with actual song list starting after it
                 let offsets_to_try: &[i64] = &[

@@ -275,3 +275,25 @@ fn test_offsets_collection_is_valid() {
     };
     assert!(!invalid.is_valid());
 }
+
+#[test]
+fn finds_utf16_song_table_after_game_update() {
+    // November 2026 memory: romanized title at +0x280 of a 0x730-byte entry.
+    // Relative to that title: levels +0x1e0, next game ID +0x4b0,
+    // and next UTF-16 title +0x630.
+    let mut data = vec![0; 12 * 1024 * 1024];
+    for i in 0..1100 {
+        let off = 0x1000 + i * 0x730;
+        data[off..off + 6].copy_from_slice(b"5.1.1.");
+        data[off + 0x1e0..off + 0x1ea].copy_from_slice(&[0, 2, 6, 10, 0, 0, 1, 7, 10, 0]);
+        data[off + 0x4b0..off + 0x4b4].copy_from_slice(&(1000u32 + i as u32).to_le_bytes());
+        data[off + 0x4b4..off + 0x4b8].copy_from_slice(&43u32.to_le_bytes());
+        data[off + 0x630..off + 0x634].copy_from_slice(&[82, 0, 0x52, 0x97]);
+    }
+    let reader = infst::process::MockMemoryReader::with_base(data, 0x140000000);
+    let mut searcher = OffsetSearcher::new(&reader);
+    assert_eq!(
+        searcher.search_song_list_offset(0x140001000).unwrap(),
+        0x140001000
+    );
+}

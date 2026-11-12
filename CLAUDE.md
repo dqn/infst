@@ -244,7 +244,7 @@ API はべき等のため、何度実行しても安全。
 オフセット検索は**相対オフセット検索**を主軸としている：
 
 1. **SongList**: 2段階フォールバック
-   - 第1段階: `"5.1.1."` パターン検索 + song count バリデーション
+   - 第1段階: `"5.1.1."` パターン検索 + 同期用テーブルのレイアウト・曲数検証。未検出時は従来の song count バリデーション
    - 第2段階（フォールバック）: `[song_id=1001, folder=43]` パターン検索
    - 検出後: **entry stride 自動検出**（次の有効エントリまでの距離を動的計算）
 2. **JudgeData**: SongList からの相対オフセット（-0x94E3C8）で検索
@@ -418,7 +418,9 @@ charts テーブルと lamps テーブルの結合は **title + difficulty** ベ
 | データ | ソース | title フィールド |
 |--------|--------|-----------------|
 | charts.infinitas_title | export → tracker.tsv → normalize → title-mapping.json | V3 エントリテーブルの Shift-JIS タイトル (encoding_fixes 適用済み) |
-| lamps.title | sync → テキストテーブル 0x5B0 | 同上 (fix_title_encoding + trim 適用) |
+| lamps.title | sync → `chart/text_table.rs` | レイアウトに応じた Shift-JIS / UTF-16 デコード (fix_title_encoding + trim 適用) |
+
+同期用テキストテーブルは旧形式（stride `0x630`）と UTF-16 形式（stride `0x730`）を判別する。タイトルは前ブロック、game_id とレベルは現ブロックから読む対応関係を維持する。新形式の確認は同期処理が対象で、export / リアルタイム追跡のレイアウト対応は別途検証が必要。
 
 `just update-charts` で export → normalize → charts sync → lamps sync の全パイプラインを実行。
 
