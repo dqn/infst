@@ -1,5 +1,6 @@
 //! Launch command: install/uninstall URL handler and Special K, run game from URL.
 
+#[cfg(any(target_os = "windows", test))]
 mod url;
 
 #[cfg(target_os = "windows")]
@@ -10,6 +11,7 @@ mod special_k;
 use anyhow::{Result, bail};
 
 use crate::cli::LaunchAction;
+#[cfg(target_os = "windows")]
 use url::parse_launch_url;
 
 pub fn run(action: LaunchAction) -> Result<()> {

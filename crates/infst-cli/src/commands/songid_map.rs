@@ -157,7 +157,7 @@ fn probe_text_table<R: ReadMemory>(reader: &R, text_base: u64, game_song_id: i32
     // Dump first bytes to understand structure
     if let Ok(header) = reader.read_bytes(text_base, 32) {
         let title = decode_shift_jis_to_string(&header);
-        println!("  First 32 bytes: {:02X?}", &header);
+        println!("  First 32 bytes: {:02X?}", header);
         println!("  As string: {:?}", title);
     }
 

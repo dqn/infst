@@ -41,8 +41,10 @@ impl TextEncoding {
                     return Err(Error::EncodingError("Truncated UTF-16 song text".into()));
                 }
                 let units: Vec<u16> = bytes
-                    .chunks_exact(2)
-                    .map(|b| u16::from_le_bytes([b[0], b[1]]))
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
+                    .map(|b| u16::from_le_bytes(*b))
                     .take_while(|&unit| unit != 0)
                     .collect();
                 String::from_utf16(&units)

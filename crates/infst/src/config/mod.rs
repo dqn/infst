@@ -81,7 +81,7 @@ mod tests {
 
     #[test]
     fn test_polling_delays_are_positive() {
-        assert!(!polling::POLL_DELAYS_MS.is_empty());
+        const { assert!(!polling::POLL_DELAYS_MS.is_empty()) };
         for &delay in &polling::POLL_DELAYS_MS {
             assert!(delay > 0, "polling delays must be positive");
         }

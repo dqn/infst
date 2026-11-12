@@ -60,7 +60,7 @@ pub fn search_consecutive_song_ids(reader: &MemoryReader, base: u64, module_size
 
     // Sort by count
     let mut sorted: Vec<_> = delta_counts.into_iter().collect();
-    sorted.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+    sorted.sort_by_key(|candidate| std::cmp::Reverse(candidate.1.len()));
 
     println!("    Top entry size candidates:");
     for (delta, addresses) in sorted.iter().take(5) {

@@ -139,7 +139,7 @@ impl<'a, R: ReadMemory> OffsetSearcher<'a, R> {
         // Log all candidates for debugging
         if !all_candidates.is_empty() {
             // Sort by song count descending
-            all_candidates.sort_by(|a, b| b.1.cmp(&a.1));
+            all_candidates.sort_by_key(|candidate| std::cmp::Reverse(candidate.1));
             warn!(
                 "  SongList pattern search: no valid candidate found. Best candidates: {:?}",
                 all_candidates.iter().take(5).collect::<Vec<_>>()

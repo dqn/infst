@@ -37,8 +37,8 @@ pub fn validate_judge_data_candidate<R: ReadMemory + ?Sized>(reader: &R, addr: u
 
     // If not all zeros, verify each i32 value is in valid range
     // Each judgment value should be 0-3000 (MAX_NOTES), combo breaks 0-500, etc.
-    for chunk in bytes.chunks_exact(4) {
-        let value = i32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+    for &chunk in bytes.as_chunks::<4>().0 {
+        let value = i32::from_le_bytes(chunk);
         // All values should be non-negative and reasonably bounded
         if !(0..=judge::MAX_NOTES).contains(&value) {
             return false;
