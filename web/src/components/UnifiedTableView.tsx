@@ -170,30 +170,30 @@ export const UnifiedTableView: FC<UnifiedTableViewProps> = ({
                   </label>
                 </div>
               </div>
-              <div class="table-column-scroll">
-                {/* Column stats */}
-                <div class="column-stats" data-table-key={table.tableKey}>
-                  {LAMP_VALUES.map((lamp) => {
-                    const style = getLampStyle(lamp);
-                    const count = lampCounts.get(lamp) ?? 0;
-                    return (
-                      <span
-                        data-lamp-stat={lamp}
-                        style={`padding:1px 6px;border-radius:3px;color:${style.color};background:${style.background}${style.border ? `;border:${style.border}` : ""}${count === 0 ? ";display:none" : ""}`}
-                      >
-                        {lamp}:{" "}
-                        <span class="lamp-count">{count}</span>
-                      </span>
-                    );
-                  })}
-                  <span
-                    style="color:#666;margin-left:4px;"
-                    data-total-count
-                  >
-                    ({allEntries.length})
-                  </span>
-                </div>
+              {/* Column stats */}
+              <div class="column-stats" data-table-key={table.tableKey}>
+                {LAMP_VALUES.map((lamp) => {
+                  const style = getLampStyle(lamp);
+                  const count = lampCounts.get(lamp) ?? 0;
+                  return (
+                    <span
+                      data-lamp-stat={lamp}
+                      style={`padding:1px 6px;border-radius:3px;color:${style.color};background:${style.background}${style.border ? `;border:${style.border}` : ""}${count === 0 ? ";display:none" : ""}`}
+                    >
+                      {lamp}:{" "}
+                      <span class="lamp-count">{count}</span>
+                    </span>
+                  );
+                })}
+                <span
+                  style="color:#666;margin-left:4px;"
+                  data-total-count
+                >
+                  ({allEntries.length})
+                </span>
+              </div>
 
+              <div class="table-column-scroll">
                 {/* Tier groups */}
                 {table.tiers.map((tier) => (
                   <div class="tier-group">
