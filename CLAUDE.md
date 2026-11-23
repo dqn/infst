@@ -422,6 +422,8 @@ charts テーブルと lamps テーブルの結合は **title + difficulty** ベ
 
 同期・エクスポート・追跡の楽曲メタデータは `EntryLayout::supported()` を共有する。未知の形式を V3 として読むフォールバックは使わない。同期では全レコードの文字コード・ID・難易度を検証してから送信する。ゲーム更新への対応時は [メモリレイアウト対応手順](docs/memory-layouts.md) を読み、失敗する回帰テストを追加してから共有定義を修正する。プレイ状態や ScoreMap の構造は別途検証する。
 
+normalize は難易度表にない INFINITAS 収録の SP☆11/12 譜面を、normal/hard それぞれの表へ「未定」として追加する。掲載済み譜面の評価・属性は保持し、タイトルと難易度で重複を防ぐ。
+
 `just update-charts` で export → normalize → charts sync → lamps sync の全パイプラインを実行。
 
 ### TSV フォーマット

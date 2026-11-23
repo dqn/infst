@@ -678,6 +678,37 @@ export async function normalize(): Promise<void> {
     rl.close();
   }
 
+  // Include every supported INFINITAS chart, even when the table has no rating.
+  let unrankedAdded = 0;
+  for (const key of Object.keys(ENDPOINTS) as EndpointKey[]) {
+    const entries = result[key];
+    const included = new Set(
+      entries.map((entry) => `${entry.infinitasTitle}:${entry.difficulty}`),
+    );
+    let sortOrder = Math.max(-1, ...entries.map((entry) => entry.sortOrder)) + 1;
+
+    for (const entry of tracker.values()) {
+      for (const difficulty of ["SPN", "SPH", "SPA", "SPL"] as const) {
+        const chartKey = `${entry.title}:${difficulty}`;
+        if (entry.ratings[difficulty] !== EXPECTED_RATING[key] || included.has(chartKey)) {
+          continue;
+        }
+        const suffix = { SPN: "(N)", SPH: "(H)", SPA: "", SPL: "(L)" }[difficulty];
+        entries.push({
+          songId: entry.songId,
+          title: `${entry.title}${suffix}`,
+          infinitasTitle: entry.title,
+          difficulty,
+          tier: "未定",
+          attributes: [],
+          sortOrder: sortOrder++,
+        });
+        included.add(chartKey);
+        unrankedAdded++;
+      }
+    }
+  }
+
   // Save updated resolutions
   await saveResolutions(savedResolutions);
   if (savedHits > 0) {
@@ -694,6 +725,7 @@ export async function normalize(): Promise<void> {
   console.log(`  Not in INFINITAS: ${notInInfinitas}`);
   console.log(`  Chart not available: ${chartNotAvailable}`);
   console.log(`  Rating mismatch: ${ratingMismatch}`);
+  console.log(`  Unranked charts added: ${unrankedAdded}`);
   console.log(`  Need interactive resolution: ${pending.length}`);
   console.log("\nPer endpoint:");
   for (const [key, entries] of Object.entries(result) as [

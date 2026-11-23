@@ -6078,6 +6078,928 @@
         "終盤難"
       ],
       "sortOrder": 505
+    },
+    {
+      "songId": 31035,
+      "title": "今宵、ロマンス横丁。",
+      "infinitasTitle": "今宵、ロマンス横丁。",
+      "difficulty": "SPA",
+      "tier": "地力A",
+      "attributes": [
+        "CN",
+        "BSS",
+        "二重階段"
+      ],
+      "sortOrder": 582
+    },
+    {
+      "songId": 30077,
+      "title": "ぞうしょく！？マイデンティティ",
+      "infinitasTitle": "ぞうしょく！？マイデンティティ",
+      "difficulty": "SPA",
+      "tier": "地力B+",
+      "attributes": [
+        "CN",
+        "繰り返し乱打"
+      ],
+      "sortOrder": 583
+    },
+    {
+      "songId": 12007,
+      "title": "INAZUMA(L)",
+      "infinitasTitle": "INAZUMA",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 584
+    },
+    {
+      "songId": 13029,
+      "title": "tripping contact",
+      "infinitasTitle": "tripping contact",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 585
+    },
+    {
+      "songId": 15024,
+      "title": "Do it!! Do it!!(L)",
+      "infinitasTitle": "Do it!! Do it!!",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 586
+    },
+    {
+      "songId": 15061,
+      "title": "CaptivAte2～覚醒～(L)",
+      "infinitasTitle": "CaptivAte2～覚醒～",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 587
+    },
+    {
+      "songId": 18006,
+      "title": "ELECTRIC MASSIVE DIVER",
+      "infinitasTitle": "ELECTRIC MASSIVE DIVER",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 588
+    },
+    {
+      "songId": 19052,
+      "title": "ユミル(L)",
+      "infinitasTitle": "ユミル",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 589
+    },
+    {
+      "songId": 21048,
+      "title": "Immortal",
+      "infinitasTitle": "Immortal",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 590
+    },
+    {
+      "songId": 21060,
+      "title": "M.D.Injection(L)",
+      "infinitasTitle": "M.D.Injection",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 591
+    },
+    {
+      "songId": 22006,
+      "title": "Reflux(L)",
+      "infinitasTitle": "Reflux",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 592
+    },
+    {
+      "songId": 22070,
+      "title": "Ludus In Tenebris",
+      "infinitasTitle": "Ludus In Tenebris",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 593
+    },
+    {
+      "songId": 22080,
+      "title": "Hollywood Galaxy(DJ NAGAI Remix)",
+      "infinitasTitle": "Hollywood Galaxy(DJ NAGAI Remix)",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 594
+    },
+    {
+      "songId": 23085,
+      "title": "SEITEN NO TERIYAKI(L)",
+      "infinitasTitle": "SEITEN NO TERIYAKI",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 595
+    },
+    {
+      "songId": 24080,
+      "title": "Beat Juggling Mix(L)",
+      "infinitasTitle": "Beat Juggling Mix",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 596
+    },
+    {
+      "songId": 25000,
+      "title": "THE CANNONBALLER(L)",
+      "infinitasTitle": "THE CANNONBALLER",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 597
+    },
+    {
+      "songId": 25020,
+      "title": "東京神話(L)",
+      "infinitasTitle": "東京神話",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 598
+    },
+    {
+      "songId": 26086,
+      "title": "お菓子の王国(L)",
+      "infinitasTitle": "お菓子の王国",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 599
+    },
+    {
+      "songId": 27009,
+      "title": "27th style(L)",
+      "infinitasTitle": "27th style",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 600
+    },
+    {
+      "songId": 27013,
+      "title": "Like+it!(L)",
+      "infinitasTitle": "Like+it!",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 601
+    },
+    {
+      "songId": 27031,
+      "title": "セピアの軌跡 ft. 天宮みや(少女フラクタル)(L)",
+      "infinitasTitle": "セピアの軌跡 ft. 天宮みや(少女フラクタル)",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 602
+    },
+    {
+      "songId": 27096,
+      "title": "If(L)",
+      "infinitasTitle": "If",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 603
+    },
+    {
+      "songId": 29030,
+      "title": "Skreaming for Salvation",
+      "infinitasTitle": "Skreaming for Salvation",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 604
+    },
+    {
+      "songId": 30099,
+      "title": "ちょえちょえまぎか(L)",
+      "infinitasTitle": "ちょえちょえまぎか",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 605
+    },
+    {
+      "songId": 32050,
+      "title": "God Mind",
+      "infinitasTitle": "God Mind",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 606
+    },
+    {
+      "songId": 32066,
+      "title": "SμG@R RU$#",
+      "infinitasTitle": "SμG@R RU$#",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 607
+    },
+    {
+      "songId": 33078,
+      "title": "3y3s(Long ver.)",
+      "infinitasTitle": "3y3s(Long ver.)",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 608
+    },
+    {
+      "songId": 80006,
+      "title": "Remain",
+      "infinitasTitle": "Remain",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 609
+    },
+    {
+      "songId": 80011,
+      "title": "TSAR BOMBA",
+      "infinitasTitle": "TSAR BOMBA",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 610
+    },
+    {
+      "songId": 80014,
+      "title": "1116",
+      "infinitasTitle": "1116",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 611
+    },
+    {
+      "songId": 80016,
+      "title": "concon(L)",
+      "infinitasTitle": "concon",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 612
+    },
+    {
+      "songId": 80028,
+      "title": "ALL OK!!",
+      "infinitasTitle": "ALL OK!!",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 613
+    },
+    {
+      "songId": 80035,
+      "title": "情熱タンデムRUNAWAY",
+      "infinitasTitle": "情熱タンデムRUNAWAY",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 614
+    },
+    {
+      "songId": 80037,
+      "title": "uən",
+      "infinitasTitle": "uən",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 615
+    },
+    {
+      "songId": 80039,
+      "title": "FEEDING FRENZY",
+      "infinitasTitle": "FEEDING FRENZY",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 616
+    },
+    {
+      "songId": 80044,
+      "title": "Cross Fire",
+      "infinitasTitle": "Cross Fire",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 617
+    },
+    {
+      "songId": 80047,
+      "title": "ジオメトリック∮ティーパーティー",
+      "infinitasTitle": "ジオメトリック∮ティーパーティー",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 618
+    },
+    {
+      "songId": 80050,
+      "title": "Cosy Catastrophe",
+      "infinitasTitle": "Cosy Catastrophe",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 619
+    },
+    {
+      "songId": 80053,
+      "title": "Spirit of the Beast",
+      "infinitasTitle": "Spirit of the Beast",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 620
+    },
+    {
+      "songId": 80057,
+      "title": "恋歌疾風！かるたクイーンいろは",
+      "infinitasTitle": "恋歌疾風！かるたクイーンいろは",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 621
+    },
+    {
+      "songId": 80059,
+      "title": "キヤロラ衛星の軌跡",
+      "infinitasTitle": "キヤロラ衛星の軌跡",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 622
+    },
+    {
+      "songId": 80063,
+      "title": "Inner Spirit -GIGA HiTECH MIX-",
+      "infinitasTitle": "Inner Spirit -GIGA HiTECH MIX-",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 623
+    },
+    {
+      "songId": 80064,
+      "title": "GHEL NAGARAJA",
+      "infinitasTitle": "GHEL NAGARAJA",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 624
+    },
+    {
+      "songId": 80067,
+      "title": "STAY GOLD",
+      "infinitasTitle": "STAY GOLD",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 625
+    },
+    {
+      "songId": 80072,
+      "title": "REFLEXES MANIPULATION",
+      "infinitasTitle": "REFLEXES MANIPULATION",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 626
+    },
+    {
+      "songId": 80073,
+      "title": "onslaught",
+      "infinitasTitle": "onslaught",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 627
+    },
+    {
+      "songId": 80081,
+      "title": "ドゥサンコオデッセイ!!",
+      "infinitasTitle": "ドゥサンコオデッセイ!!",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 628
+    },
+    {
+      "songId": 80082,
+      "title": "光風霽月",
+      "infinitasTitle": "光風霽月",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 629
+    },
+    {
+      "songId": 80088,
+      "title": "終末を追う者",
+      "infinitasTitle": "終末を追う者",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 630
+    },
+    {
+      "songId": 80090,
+      "title": "Welcome to the Mosh Pit",
+      "infinitasTitle": "Welcome to the Mosh Pit",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 631
+    },
+    {
+      "songId": 80097,
+      "title": "多極性ニューロンの崩壊による人間の末路",
+      "infinitasTitle": "多極性ニューロンの崩壊による人間の末路",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 632
+    },
+    {
+      "songId": 80098,
+      "title": "天泣",
+      "infinitasTitle": "天泣",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 633
+    },
+    {
+      "songId": 80099,
+      "title": "見習い天使と星降りの丘",
+      "infinitasTitle": "見習い天使と星降りの丘",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 634
+    },
+    {
+      "songId": 80100,
+      "title": "鬼華-修羅の舞-",
+      "infinitasTitle": "鬼華-修羅の舞-",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 635
+    },
+    {
+      "songId": 80104,
+      "title": "ポチコの幸せな日常",
+      "infinitasTitle": "ポチコの幸せな日常",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 636
+    },
+    {
+      "songId": 80105,
+      "title": "Chronoxia",
+      "infinitasTitle": "Chronoxia",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 637
+    },
+    {
+      "songId": 32007,
+      "title": "天使のカンタータ -Cantata of Angels-",
+      "infinitasTitle": "天使のカンタータ -Cantata of Angels-",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [
+        "CN",
+        "坂譜面",
+        "物量"
+      ],
+      "sortOrder": 638
+    },
+    {
+      "songId": 27045,
+      "title": "Override(L)",
+      "infinitasTitle": "Override",
+      "difficulty": "SPL",
+      "tier": "地力S",
+      "attributes": [
+        "物量",
+        "皿複合"
+      ],
+      "sortOrder": 639
+    },
+    {
+      "songId": 20088,
+      "title": "お米の美味しい炊き方、そしてお米を食べることによるその効果。(L)",
+      "infinitasTitle": "お米の美味しい炊き方、そしてお米を食べることによるその効果。",
+      "difficulty": "SPL",
+      "tier": "地力S",
+      "attributes": [
+        "トリル"
+      ],
+      "sortOrder": 640
+    },
+    {
+      "songId": 28095,
+      "title": "Level 3",
+      "infinitasTitle": "Level 3",
+      "difficulty": "SPA",
+      "tier": "個人差S",
+      "attributes": [
+        "BSS",
+        "連皿"
+      ],
+      "sortOrder": 641
+    },
+    {
+      "songId": 29000,
+      "title": "SOLID WYVERN(L)",
+      "infinitasTitle": "SOLID WYVERN",
+      "difficulty": "SPL",
+      "tier": "地力A+",
+      "attributes": [
+        "終盤難",
+        "皿絡み",
+        "BSS"
+      ],
+      "sortOrder": 642
+    },
+    {
+      "songId": 25024,
+      "title": "O/D*20(L)",
+      "infinitasTitle": "O/D*20",
+      "difficulty": "SPL",
+      "tier": "地力A",
+      "attributes": [
+        "CN",
+        "皿絡み",
+        "物量"
+      ],
+      "sortOrder": 643
+    },
+    {
+      "songId": 22027,
+      "title": "GUILTY(L)",
+      "infinitasTitle": "GUILTY",
+      "difficulty": "SPL",
+      "tier": "地力B+",
+      "attributes": [
+        "CN",
+        "高密度"
+      ],
+      "sortOrder": 644
+    },
+    {
+      "songId": 31081,
+      "title": "Xb10r",
+      "infinitasTitle": "Xb10r",
+      "difficulty": "SPA",
+      "tier": "地力B+",
+      "attributes": [
+        "CN",
+        "MSS"
+      ],
+      "sortOrder": 645
+    },
+    {
+      "songId": 15054,
+      "title": "ミラージュ・レジデンス(L)",
+      "infinitasTitle": "ミラージュ・レジデンス",
+      "difficulty": "SPL",
+      "tier": "個人差B+",
+      "attributes": [
+        "CN",
+        "軸"
+      ],
+      "sortOrder": 646
+    },
+    {
+      "songId": 30078,
+      "title": "Chaotoxin",
+      "infinitasTitle": "Chaotoxin",
+      "difficulty": "SPA",
+      "tier": "地力B",
+      "attributes": [
+        "乱打",
+        "連皿"
+      ],
+      "sortOrder": 647
+    },
+    {
+      "songId": 30100,
+      "title": "MAX 360",
+      "infinitasTitle": "MAX 360",
+      "difficulty": "SPA",
+      "tier": "地力B",
+      "attributes": [
+        "CN",
+        "同時押し"
+      ],
+      "sortOrder": 648
+    },
+    {
+      "songId": 32094,
+      "title": "COSMIC V3LOCITY",
+      "infinitasTitle": "COSMIC V3LOCITY",
+      "difficulty": "SPA",
+      "tier": "地力C",
+      "attributes": [
+        "CN"
+      ],
+      "sortOrder": 649
+    },
+    {
+      "songId": 28054,
+      "title": "Viridian",
+      "infinitasTitle": "Viridian",
+      "difficulty": "SPA",
+      "tier": "地力C",
+      "attributes": [
+        "乱打"
+      ],
+      "sortOrder": 650
+    },
+    {
+      "songId": 31116,
+      "title": "The Onlyonez",
+      "infinitasTitle": "The Onlyonez",
+      "difficulty": "SPA",
+      "tier": "個人差E",
+      "attributes": [
+        "CN",
+        "皿絡み"
+      ],
+      "sortOrder": 651
+    },
+    {
+      "songId": 27065,
+      "title": "Crank It(L)",
+      "infinitasTitle": "Crank It",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 652
+    },
+    {
+      "songId": 30005,
+      "title": "[ ]DENTITY",
+      "infinitasTitle": "[ ]DENTITY",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 653
+    },
+    {
+      "songId": 32001,
+      "title": "スキッテイエェエエェ!!!!",
+      "infinitasTitle": "スキッテイエェエエェ!!!!",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 654
+    },
+    {
+      "songId": 32005,
+      "title": "SISYPHUS",
+      "infinitasTitle": "SISYPHUS",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 655
+    },
+    {
+      "songId": 32009,
+      "title": "Pinky Happy Crazy",
+      "infinitasTitle": "Pinky Happy Crazy",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 656
+    },
+    {
+      "songId": 32012,
+      "title": "Without Heaven",
+      "infinitasTitle": "Without Heaven",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 657
+    },
+    {
+      "songId": 32020,
+      "title": "hora de verdad",
+      "infinitasTitle": "hora de verdad",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 658
+    },
+    {
+      "songId": 32033,
+      "title": "Flämingo",
+      "infinitasTitle": "Flämingo",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 659
+    },
+    {
+      "songId": 32050,
+      "title": "MARLIN",
+      "infinitasTitle": "MARLIN",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 660
+    },
+    {
+      "songId": 32059,
+      "title": "FlyAway",
+      "infinitasTitle": "FlyAway",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 661
+    },
+    {
+      "songId": 32062,
+      "title": "アラビアン ハイパー ナイト",
+      "infinitasTitle": "アラビアン ハイパー ナイト",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 662
+    },
+    {
+      "songId": 32095,
+      "title": "Skratch Education Lv-1",
+      "infinitasTitle": "Skratch Education Lv-1",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 663
+    },
+    {
+      "songId": 32099,
+      "title": "Uaigh Gealaí",
+      "infinitasTitle": "Uaigh Gealaí",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 664
+    },
+    {
+      "songId": 32100,
+      "title": "XHRONOXAPSULΞ",
+      "infinitasTitle": "XHRONOXAPSULΞ",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 665
+    },
+    {
+      "songId": 32108,
+      "title": "EYE OF THE HEAVEN",
+      "infinitasTitle": "EYE OF THE HEAVEN",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 666
+    },
+    {
+      "songId": 33088,
+      "title": "RIZING-GAMERS.",
+      "infinitasTitle": "RIZING-GAMERS.",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 667
+    },
+    {
+      "songId": 33090,
+      "title": "Astra Blaze",
+      "infinitasTitle": "Astra Blaze",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 668
+    },
+    {
+      "songId": 33092,
+      "title": "King of Tribe",
+      "infinitasTitle": "King of Tribe",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 669
+    },
+    {
+      "songId": 33116,
+      "title": "THUNDERSTRIKE",
+      "infinitasTitle": "THUNDERSTRIKE",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 670
+    },
+    {
+      "songId": 33120,
+      "title": "Mighty Beat Monsterz",
+      "infinitasTitle": "Mighty Beat Monsterz",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 671
+    },
+    {
+      "songId": 80043,
+      "title": "Dynasty(L)",
+      "infinitasTitle": "Dynasty",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 672
+    },
+    {
+      "songId": 80109,
+      "title": "In Your EyEs",
+      "infinitasTitle": "In Your EyEs",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 673
+    },
+    {
+      "songId": 80113,
+      "title": "Lagrangian Point Ø",
+      "infinitasTitle": "Lagrangian Point Ø",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 674
+    },
+    {
+      "songId": 80115,
+      "title": "Euphoric Fragmentation",
+      "infinitasTitle": "Euphoric Fragmentation",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 675
+    },
+    {
+      "songId": 80117,
+      "title": "NEPHILIM DELTA",
+      "infinitasTitle": "NEPHILIM DELTA",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 676
+    },
+    {
+      "songId": 80119,
+      "title": "Come To m1dy",
+      "infinitasTitle": "Come To m1dy",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 677
+    },
+    {
+      "songId": 80122,
+      "title": "Deep tenDon Reflex",
+      "infinitasTitle": "Deep tenDon Reflex",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 678
     }
   ],
   "sp12-normal": [
@@ -12159,6 +13081,928 @@
         "終盤難"
       ],
       "sortOrder": 478
+    },
+    {
+      "songId": 31035,
+      "title": "今宵、ロマンス横丁。",
+      "infinitasTitle": "今宵、ロマンス横丁。",
+      "difficulty": "SPA",
+      "tier": "地力B+",
+      "attributes": [
+        "CN",
+        "BSS",
+        "二重階段"
+      ],
+      "sortOrder": 582
+    },
+    {
+      "songId": 30077,
+      "title": "ぞうしょく！？マイデンティティ",
+      "infinitasTitle": "ぞうしょく！？マイデンティティ",
+      "difficulty": "SPA",
+      "tier": "地力B+",
+      "attributes": [
+        "CN",
+        "繰り返し乱打"
+      ],
+      "sortOrder": 583
+    },
+    {
+      "songId": 12007,
+      "title": "INAZUMA(L)",
+      "infinitasTitle": "INAZUMA",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 584
+    },
+    {
+      "songId": 13029,
+      "title": "tripping contact",
+      "infinitasTitle": "tripping contact",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 585
+    },
+    {
+      "songId": 15024,
+      "title": "Do it!! Do it!!(L)",
+      "infinitasTitle": "Do it!! Do it!!",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 586
+    },
+    {
+      "songId": 15061,
+      "title": "CaptivAte2～覚醒～(L)",
+      "infinitasTitle": "CaptivAte2～覚醒～",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 587
+    },
+    {
+      "songId": 18006,
+      "title": "ELECTRIC MASSIVE DIVER",
+      "infinitasTitle": "ELECTRIC MASSIVE DIVER",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 588
+    },
+    {
+      "songId": 19052,
+      "title": "ユミル(L)",
+      "infinitasTitle": "ユミル",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 589
+    },
+    {
+      "songId": 21048,
+      "title": "Immortal",
+      "infinitasTitle": "Immortal",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 590
+    },
+    {
+      "songId": 21060,
+      "title": "M.D.Injection(L)",
+      "infinitasTitle": "M.D.Injection",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 591
+    },
+    {
+      "songId": 22006,
+      "title": "Reflux(L)",
+      "infinitasTitle": "Reflux",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 592
+    },
+    {
+      "songId": 22070,
+      "title": "Ludus In Tenebris",
+      "infinitasTitle": "Ludus In Tenebris",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 593
+    },
+    {
+      "songId": 22080,
+      "title": "Hollywood Galaxy(DJ NAGAI Remix)",
+      "infinitasTitle": "Hollywood Galaxy(DJ NAGAI Remix)",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 594
+    },
+    {
+      "songId": 23085,
+      "title": "SEITEN NO TERIYAKI(L)",
+      "infinitasTitle": "SEITEN NO TERIYAKI",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 595
+    },
+    {
+      "songId": 24080,
+      "title": "Beat Juggling Mix(L)",
+      "infinitasTitle": "Beat Juggling Mix",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 596
+    },
+    {
+      "songId": 25000,
+      "title": "THE CANNONBALLER(L)",
+      "infinitasTitle": "THE CANNONBALLER",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 597
+    },
+    {
+      "songId": 25020,
+      "title": "東京神話(L)",
+      "infinitasTitle": "東京神話",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 598
+    },
+    {
+      "songId": 26086,
+      "title": "お菓子の王国(L)",
+      "infinitasTitle": "お菓子の王国",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 599
+    },
+    {
+      "songId": 27009,
+      "title": "27th style(L)",
+      "infinitasTitle": "27th style",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 600
+    },
+    {
+      "songId": 27013,
+      "title": "Like+it!(L)",
+      "infinitasTitle": "Like+it!",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 601
+    },
+    {
+      "songId": 27031,
+      "title": "セピアの軌跡 ft. 天宮みや(少女フラクタル)(L)",
+      "infinitasTitle": "セピアの軌跡 ft. 天宮みや(少女フラクタル)",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 602
+    },
+    {
+      "songId": 27096,
+      "title": "If(L)",
+      "infinitasTitle": "If",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 603
+    },
+    {
+      "songId": 29030,
+      "title": "Skreaming for Salvation",
+      "infinitasTitle": "Skreaming for Salvation",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 604
+    },
+    {
+      "songId": 30099,
+      "title": "ちょえちょえまぎか(L)",
+      "infinitasTitle": "ちょえちょえまぎか",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 605
+    },
+    {
+      "songId": 32050,
+      "title": "God Mind",
+      "infinitasTitle": "God Mind",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 606
+    },
+    {
+      "songId": 32066,
+      "title": "SμG@R RU$#",
+      "infinitasTitle": "SμG@R RU$#",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 607
+    },
+    {
+      "songId": 33078,
+      "title": "3y3s(Long ver.)",
+      "infinitasTitle": "3y3s(Long ver.)",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 608
+    },
+    {
+      "songId": 80006,
+      "title": "Remain",
+      "infinitasTitle": "Remain",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 609
+    },
+    {
+      "songId": 80011,
+      "title": "TSAR BOMBA",
+      "infinitasTitle": "TSAR BOMBA",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 610
+    },
+    {
+      "songId": 80014,
+      "title": "1116",
+      "infinitasTitle": "1116",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 611
+    },
+    {
+      "songId": 80016,
+      "title": "concon(L)",
+      "infinitasTitle": "concon",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 612
+    },
+    {
+      "songId": 80028,
+      "title": "ALL OK!!",
+      "infinitasTitle": "ALL OK!!",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 613
+    },
+    {
+      "songId": 80035,
+      "title": "情熱タンデムRUNAWAY",
+      "infinitasTitle": "情熱タンデムRUNAWAY",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 614
+    },
+    {
+      "songId": 80037,
+      "title": "uən",
+      "infinitasTitle": "uən",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 615
+    },
+    {
+      "songId": 80039,
+      "title": "FEEDING FRENZY",
+      "infinitasTitle": "FEEDING FRENZY",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 616
+    },
+    {
+      "songId": 80044,
+      "title": "Cross Fire",
+      "infinitasTitle": "Cross Fire",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 617
+    },
+    {
+      "songId": 80047,
+      "title": "ジオメトリック∮ティーパーティー",
+      "infinitasTitle": "ジオメトリック∮ティーパーティー",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 618
+    },
+    {
+      "songId": 80050,
+      "title": "Cosy Catastrophe",
+      "infinitasTitle": "Cosy Catastrophe",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 619
+    },
+    {
+      "songId": 80053,
+      "title": "Spirit of the Beast",
+      "infinitasTitle": "Spirit of the Beast",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 620
+    },
+    {
+      "songId": 80057,
+      "title": "恋歌疾風！かるたクイーンいろは",
+      "infinitasTitle": "恋歌疾風！かるたクイーンいろは",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 621
+    },
+    {
+      "songId": 80059,
+      "title": "キヤロラ衛星の軌跡",
+      "infinitasTitle": "キヤロラ衛星の軌跡",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 622
+    },
+    {
+      "songId": 80063,
+      "title": "Inner Spirit -GIGA HiTECH MIX-",
+      "infinitasTitle": "Inner Spirit -GIGA HiTECH MIX-",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 623
+    },
+    {
+      "songId": 80064,
+      "title": "GHEL NAGARAJA",
+      "infinitasTitle": "GHEL NAGARAJA",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 624
+    },
+    {
+      "songId": 80067,
+      "title": "STAY GOLD",
+      "infinitasTitle": "STAY GOLD",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 625
+    },
+    {
+      "songId": 80072,
+      "title": "REFLEXES MANIPULATION",
+      "infinitasTitle": "REFLEXES MANIPULATION",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 626
+    },
+    {
+      "songId": 80073,
+      "title": "onslaught",
+      "infinitasTitle": "onslaught",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 627
+    },
+    {
+      "songId": 80081,
+      "title": "ドゥサンコオデッセイ!!",
+      "infinitasTitle": "ドゥサンコオデッセイ!!",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 628
+    },
+    {
+      "songId": 80082,
+      "title": "光風霽月",
+      "infinitasTitle": "光風霽月",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 629
+    },
+    {
+      "songId": 80088,
+      "title": "終末を追う者",
+      "infinitasTitle": "終末を追う者",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 630
+    },
+    {
+      "songId": 80090,
+      "title": "Welcome to the Mosh Pit",
+      "infinitasTitle": "Welcome to the Mosh Pit",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 631
+    },
+    {
+      "songId": 80097,
+      "title": "多極性ニューロンの崩壊による人間の末路",
+      "infinitasTitle": "多極性ニューロンの崩壊による人間の末路",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 632
+    },
+    {
+      "songId": 80098,
+      "title": "天泣",
+      "infinitasTitle": "天泣",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 633
+    },
+    {
+      "songId": 80099,
+      "title": "見習い天使と星降りの丘",
+      "infinitasTitle": "見習い天使と星降りの丘",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 634
+    },
+    {
+      "songId": 80100,
+      "title": "鬼華-修羅の舞-",
+      "infinitasTitle": "鬼華-修羅の舞-",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 635
+    },
+    {
+      "songId": 80104,
+      "title": "ポチコの幸せな日常",
+      "infinitasTitle": "ポチコの幸せな日常",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 636
+    },
+    {
+      "songId": 80105,
+      "title": "Chronoxia",
+      "infinitasTitle": "Chronoxia",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 637
+    },
+    {
+      "songId": 32007,
+      "title": "天使のカンタータ -Cantata of Angels-",
+      "infinitasTitle": "天使のカンタータ -Cantata of Angels-",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [
+        "CN",
+        "坂譜面",
+        "物量"
+      ],
+      "sortOrder": 638
+    },
+    {
+      "songId": 27045,
+      "title": "Override(L)",
+      "infinitasTitle": "Override",
+      "difficulty": "SPL",
+      "tier": "地力S",
+      "attributes": [
+        "物量",
+        "皿複合"
+      ],
+      "sortOrder": 639
+    },
+    {
+      "songId": 20088,
+      "title": "お米の美味しい炊き方、そしてお米を食べることによるその効果。(L)",
+      "infinitasTitle": "お米の美味しい炊き方、そしてお米を食べることによるその効果。",
+      "difficulty": "SPL",
+      "tier": "地力S",
+      "attributes": [
+        "トリル"
+      ],
+      "sortOrder": 640
+    },
+    {
+      "songId": 29000,
+      "title": "SOLID WYVERN(L)",
+      "infinitasTitle": "SOLID WYVERN",
+      "difficulty": "SPL",
+      "tier": "地力A+",
+      "attributes": [
+        "終盤難",
+        "皿絡み",
+        "BSS"
+      ],
+      "sortOrder": 641
+    },
+    {
+      "songId": 28095,
+      "title": "Level 3",
+      "infinitasTitle": "Level 3",
+      "difficulty": "SPA",
+      "tier": "個人差A+",
+      "attributes": [
+        "BSS",
+        "連皿"
+      ],
+      "sortOrder": 642
+    },
+    {
+      "songId": 25024,
+      "title": "O/D*20(L)",
+      "infinitasTitle": "O/D*20",
+      "difficulty": "SPL",
+      "tier": "地力B+",
+      "attributes": [
+        "CN",
+        "皿絡み",
+        "物量"
+      ],
+      "sortOrder": 643
+    },
+    {
+      "songId": 31081,
+      "title": "Xb10r",
+      "infinitasTitle": "Xb10r",
+      "difficulty": "SPA",
+      "tier": "地力B+",
+      "attributes": [
+        "CN",
+        "MSS"
+      ],
+      "sortOrder": 644
+    },
+    {
+      "songId": 22027,
+      "title": "GUILTY(L)",
+      "infinitasTitle": "GUILTY",
+      "difficulty": "SPL",
+      "tier": "地力B",
+      "attributes": [
+        "CN",
+        "高密度"
+      ],
+      "sortOrder": 645
+    },
+    {
+      "songId": 30100,
+      "title": "MAX 360",
+      "infinitasTitle": "MAX 360",
+      "difficulty": "SPA",
+      "tier": "地力B",
+      "attributes": [
+        "CN",
+        "同時押し"
+      ],
+      "sortOrder": 646
+    },
+    {
+      "songId": 15054,
+      "title": "ミラージュ・レジデンス(L)",
+      "infinitasTitle": "ミラージュ・レジデンス",
+      "difficulty": "SPL",
+      "tier": "個人差B",
+      "attributes": [
+        "CN",
+        "軸"
+      ],
+      "sortOrder": 647
+    },
+    {
+      "songId": 30078,
+      "title": "Chaotoxin",
+      "infinitasTitle": "Chaotoxin",
+      "difficulty": "SPA",
+      "tier": "地力C",
+      "attributes": [
+        "乱打",
+        "連皿"
+      ],
+      "sortOrder": 648
+    },
+    {
+      "songId": 32094,
+      "title": "COSMIC V3LOCITY",
+      "infinitasTitle": "COSMIC V3LOCITY",
+      "difficulty": "SPA",
+      "tier": "地力C",
+      "attributes": [
+        "CN"
+      ],
+      "sortOrder": 649
+    },
+    {
+      "songId": 28054,
+      "title": "Viridian",
+      "infinitasTitle": "Viridian",
+      "difficulty": "SPA",
+      "tier": "地力C",
+      "attributes": [
+        "乱打"
+      ],
+      "sortOrder": 650
+    },
+    {
+      "songId": 31116,
+      "title": "The Onlyonez",
+      "infinitasTitle": "The Onlyonez",
+      "difficulty": "SPA",
+      "tier": "地力E",
+      "attributes": [
+        "CN",
+        "皿絡み"
+      ],
+      "sortOrder": 651
+    },
+    {
+      "songId": 27065,
+      "title": "Crank It(L)",
+      "infinitasTitle": "Crank It",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 652
+    },
+    {
+      "songId": 30005,
+      "title": "[ ]DENTITY",
+      "infinitasTitle": "[ ]DENTITY",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 653
+    },
+    {
+      "songId": 32001,
+      "title": "スキッテイエェエエェ!!!!",
+      "infinitasTitle": "スキッテイエェエエェ!!!!",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 654
+    },
+    {
+      "songId": 32005,
+      "title": "SISYPHUS",
+      "infinitasTitle": "SISYPHUS",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 655
+    },
+    {
+      "songId": 32009,
+      "title": "Pinky Happy Crazy",
+      "infinitasTitle": "Pinky Happy Crazy",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 656
+    },
+    {
+      "songId": 32012,
+      "title": "Without Heaven",
+      "infinitasTitle": "Without Heaven",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 657
+    },
+    {
+      "songId": 32020,
+      "title": "hora de verdad",
+      "infinitasTitle": "hora de verdad",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 658
+    },
+    {
+      "songId": 32033,
+      "title": "Flämingo",
+      "infinitasTitle": "Flämingo",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 659
+    },
+    {
+      "songId": 32050,
+      "title": "MARLIN",
+      "infinitasTitle": "MARLIN",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 660
+    },
+    {
+      "songId": 32059,
+      "title": "FlyAway",
+      "infinitasTitle": "FlyAway",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 661
+    },
+    {
+      "songId": 32062,
+      "title": "アラビアン ハイパー ナイト",
+      "infinitasTitle": "アラビアン ハイパー ナイト",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 662
+    },
+    {
+      "songId": 32095,
+      "title": "Skratch Education Lv-1",
+      "infinitasTitle": "Skratch Education Lv-1",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 663
+    },
+    {
+      "songId": 32099,
+      "title": "Uaigh Gealaí",
+      "infinitasTitle": "Uaigh Gealaí",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 664
+    },
+    {
+      "songId": 32100,
+      "title": "XHRONOXAPSULΞ",
+      "infinitasTitle": "XHRONOXAPSULΞ",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 665
+    },
+    {
+      "songId": 32108,
+      "title": "EYE OF THE HEAVEN",
+      "infinitasTitle": "EYE OF THE HEAVEN",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 666
+    },
+    {
+      "songId": 33088,
+      "title": "RIZING-GAMERS.",
+      "infinitasTitle": "RIZING-GAMERS.",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 667
+    },
+    {
+      "songId": 33090,
+      "title": "Astra Blaze",
+      "infinitasTitle": "Astra Blaze",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 668
+    },
+    {
+      "songId": 33092,
+      "title": "King of Tribe",
+      "infinitasTitle": "King of Tribe",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 669
+    },
+    {
+      "songId": 33116,
+      "title": "THUNDERSTRIKE",
+      "infinitasTitle": "THUNDERSTRIKE",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 670
+    },
+    {
+      "songId": 33120,
+      "title": "Mighty Beat Monsterz",
+      "infinitasTitle": "Mighty Beat Monsterz",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 671
+    },
+    {
+      "songId": 80043,
+      "title": "Dynasty(L)",
+      "infinitasTitle": "Dynasty",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 672
+    },
+    {
+      "songId": 80109,
+      "title": "In Your EyEs",
+      "infinitasTitle": "In Your EyEs",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 673
+    },
+    {
+      "songId": 80113,
+      "title": "Lagrangian Point Ø",
+      "infinitasTitle": "Lagrangian Point Ø",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 674
+    },
+    {
+      "songId": 80115,
+      "title": "Euphoric Fragmentation",
+      "infinitasTitle": "Euphoric Fragmentation",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 675
+    },
+    {
+      "songId": 80117,
+      "title": "NEPHILIM DELTA",
+      "infinitasTitle": "NEPHILIM DELTA",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 676
+    },
+    {
+      "songId": 80119,
+      "title": "Come To m1dy",
+      "infinitasTitle": "Come To m1dy",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 677
+    },
+    {
+      "songId": 80122,
+      "title": "Deep tenDon Reflex",
+      "infinitasTitle": "Deep tenDon Reflex",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 678
     }
   ],
   "sp11-hard": [
@@ -18593,6 +20437,1119 @@
         "ラス殺し"
       ],
       "sortOrder": 607
+    },
+    {
+      "songId": 31011,
+      "title": "Speculation",
+      "infinitasTitle": "Speculation",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [
+        "CN",
+        "BSS",
+        "MSS",
+        "同時押し",
+        "二重トリル",
+        "二重階段"
+      ],
+      "sortOrder": 608
+    },
+    {
+      "songId": 28087,
+      "title": "ABSOLUTE (kors k Remix)",
+      "infinitasTitle": "ABSOLUTE (kors k Remix)",
+      "difficulty": "SPA",
+      "tier": "地力B",
+      "attributes": [
+        "CN"
+      ],
+      "sortOrder": 609
+    },
+    {
+      "songId": 30041,
+      "title": "Ruler or Loser",
+      "infinitasTitle": "Ruler or Loser",
+      "difficulty": "SPA",
+      "tier": "地力C",
+      "attributes": [
+        "CN",
+        "BSS",
+        "トリル",
+        "軸"
+      ],
+      "sortOrder": 610
+    },
+    {
+      "songId": 28102,
+      "title": "MA・TSU・RI",
+      "infinitasTitle": "MA・TSU・RI",
+      "difficulty": "SPA",
+      "tier": "地力D",
+      "attributes": [
+        "BSS"
+      ],
+      "sortOrder": 611
+    },
+    {
+      "songId": 9048,
+      "title": "Abyss -The Heavens Remix-(L)",
+      "infinitasTitle": "Abyss -The Heavens Remix-",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 612
+    },
+    {
+      "songId": 13018,
+      "title": "Heavenly Sun (IIDX VERSION)(L)",
+      "infinitasTitle": "Heavenly Sun (IIDX VERSION)",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 613
+    },
+    {
+      "songId": 15017,
+      "title": "マチ子の唄(L)",
+      "infinitasTitle": "マチ子の唄",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 614
+    },
+    {
+      "songId": 18017,
+      "title": "I FIGHT ME(L)",
+      "infinitasTitle": "I FIGHT ME",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 615
+    },
+    {
+      "songId": 18025,
+      "title": "New Castle Legions",
+      "infinitasTitle": "New Castle Legions",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 616
+    },
+    {
+      "songId": 19010,
+      "title": "CALL(L)",
+      "infinitasTitle": "CALL",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 617
+    },
+    {
+      "songId": 19011,
+      "title": "KYAMISAMA ONEGAI!(L)",
+      "infinitasTitle": "KYAMISAMA ONEGAI!",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 618
+    },
+    {
+      "songId": 20000,
+      "title": "Fractal",
+      "infinitasTitle": "Fractal",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 619
+    },
+    {
+      "songId": 20044,
+      "title": "Breaking Dawn feat. NO+CHIN, AYANO",
+      "infinitasTitle": "Breaking Dawn feat. NO+CHIN, AYANO",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 620
+    },
+    {
+      "songId": 20055,
+      "title": "Deceive Your Insight",
+      "infinitasTitle": "Deceive Your Insight",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 621
+    },
+    {
+      "songId": 20074,
+      "title": "YELLOW FROG from Steel Chronicle(L)",
+      "infinitasTitle": "YELLOW FROG from Steel Chronicle",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 622
+    },
+    {
+      "songId": 21016,
+      "title": "死神自爆中二妹アイドルももかりん(1歳)",
+      "infinitasTitle": "死神自爆中二妹アイドルももかりん(1歳)",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 623
+    },
+    {
+      "songId": 21027,
+      "title": "LA FESTA LA VITA!!",
+      "infinitasTitle": "LA FESTA LA VITA!!",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 624
+    },
+    {
+      "songId": 21045,
+      "title": "All is Wrecked",
+      "infinitasTitle": "All is Wrecked",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 625
+    },
+    {
+      "songId": 21056,
+      "title": "Smug Face -どうだ、オレの生き様は- (ONLY ONE EDITION)",
+      "infinitasTitle": "Smug Face -どうだ、オレの生き様は- (ONLY ONE EDITION)",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 626
+    },
+    {
+      "songId": 21069,
+      "title": "Votum stellarum -Hommarju Remix-",
+      "infinitasTitle": "Votum stellarum -Hommarju Remix-",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 627
+    },
+    {
+      "songId": 21070,
+      "title": "NEMESIS -gratitude remix- IIDX Edition",
+      "infinitasTitle": "NEMESIS -gratitude remix- IIDX Edition",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 628
+    },
+    {
+      "songId": 21073,
+      "title": "Stella Sinistra",
+      "infinitasTitle": "Stella Sinistra",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 629
+    },
+    {
+      "songId": 21074,
+      "title": "マインド・ゲーム",
+      "infinitasTitle": "マインド・ゲーム",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 630
+    },
+    {
+      "songId": 21085,
+      "title": "御千手メディテーション",
+      "infinitasTitle": "御千手メディテーション",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 631
+    },
+    {
+      "songId": 22044,
+      "title": "m1dy Festival",
+      "infinitasTitle": "m1dy Festival",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 632
+    },
+    {
+      "songId": 22048,
+      "title": "Amnolys",
+      "infinitasTitle": "Amnolys",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 633
+    },
+    {
+      "songId": 22081,
+      "title": "全力 SPECIAL VACATION!! ～限りある休日～",
+      "infinitasTitle": "全力 SPECIAL VACATION!! ～限りある休日～",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 634
+    },
+    {
+      "songId": 23019,
+      "title": "太陽SUNSUNボンジュールアバンチュール",
+      "infinitasTitle": "太陽SUNSUNボンジュールアバンチュール",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 635
+    },
+    {
+      "songId": 23023,
+      "title": "GET READY!!",
+      "infinitasTitle": "GET READY!!",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 636
+    },
+    {
+      "songId": 23039,
+      "title": "m1dy Dynamic",
+      "infinitasTitle": "m1dy Dynamic",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 637
+    },
+    {
+      "songId": 23041,
+      "title": "Ride To The Core",
+      "infinitasTitle": "Ride To The Core",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 638
+    },
+    {
+      "songId": 23063,
+      "title": "炸裂！イェーガー電光チョップ！！(JAEGER FINAL ATTACK)",
+      "infinitasTitle": "炸裂！イェーガー電光チョップ！！(JAEGER FINAL ATTACK)",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 639
+    },
+    {
+      "songId": 23085,
+      "title": "SEITEN NO TERIYAKI",
+      "infinitasTitle": "SEITEN NO TERIYAKI",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 640
+    },
+    {
+      "songId": 24001,
+      "title": "RISING FIRE HAWK",
+      "infinitasTitle": "RISING FIRE HAWK",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 641
+    },
+    {
+      "songId": 24034,
+      "title": "DISAPPEAR feat. koyomin",
+      "infinitasTitle": "DISAPPEAR feat. koyomin",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 642
+    },
+    {
+      "songId": 24047,
+      "title": "Shoot'Em All",
+      "infinitasTitle": "Shoot'Em All",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 643
+    },
+    {
+      "songId": 25019,
+      "title": "Mira",
+      "infinitasTitle": "Mira",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 644
+    },
+    {
+      "songId": 25021,
+      "title": "Beast mode",
+      "infinitasTitle": "Beast mode",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 645
+    },
+    {
+      "songId": 25022,
+      "title": "FIRE BALL",
+      "infinitasTitle": "FIRE BALL",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 646
+    },
+    {
+      "songId": 25059,
+      "title": "Rise Circuit",
+      "infinitasTitle": "Rise Circuit",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 647
+    },
+    {
+      "songId": 25069,
+      "title": "Only for now(L)",
+      "infinitasTitle": "Only for now",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 648
+    },
+    {
+      "songId": 26020,
+      "title": "A Tale Hidden In The Abyss",
+      "infinitasTitle": "A Tale Hidden In The Abyss",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 649
+    },
+    {
+      "songId": 26095,
+      "title": "ROZA DE ANDALUCIA",
+      "infinitasTitle": "ROZA DE ANDALUCIA",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 650
+    },
+    {
+      "songId": 26096,
+      "title": "ToyCube Pf.(RX-Ver.S.P.L.)(L)",
+      "infinitasTitle": "ToyCube Pf.(RX-Ver.S.P.L.)",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 651
+    },
+    {
+      "songId": 26110,
+      "title": "Six String Proof",
+      "infinitasTitle": "Six String Proof",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 652
+    },
+    {
+      "songId": 27041,
+      "title": "Drop It",
+      "infinitasTitle": "Drop It",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 653
+    },
+    {
+      "songId": 27067,
+      "title": "Rave lithosphere",
+      "infinitasTitle": "Rave lithosphere",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 654
+    },
+    {
+      "songId": 28011,
+      "title": "Breakin' Rules",
+      "infinitasTitle": "Breakin' Rules",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 655
+    },
+    {
+      "songId": 28062,
+      "title": "Brahma",
+      "infinitasTitle": "Brahma",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 656
+    },
+    {
+      "songId": 28092,
+      "title": "CONNECT-",
+      "infinitasTitle": "CONNECT-",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 657
+    },
+    {
+      "songId": 28094,
+      "title": "Scandal",
+      "infinitasTitle": "Scandal",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 658
+    },
+    {
+      "songId": 29022,
+      "title": "Legendary Treasures",
+      "infinitasTitle": "Legendary Treasures",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 659
+    },
+    {
+      "songId": 31072,
+      "title": "My Sweet Bird?(L)",
+      "infinitasTitle": "My Sweet Bird?",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 660
+    },
+    {
+      "songId": 33015,
+      "title": "Substance",
+      "infinitasTitle": "Substance",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 661
+    },
+    {
+      "songId": 80024,
+      "title": "Stleq",
+      "infinitasTitle": "Stleq",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 662
+    },
+    {
+      "songId": 80025,
+      "title": "DO-IT-AMA-SITE!!!",
+      "infinitasTitle": "DO-IT-AMA-SITE!!!",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 663
+    },
+    {
+      "songId": 80027,
+      "title": "Chocolate Planet(L)",
+      "infinitasTitle": "Chocolate Planet",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 664
+    },
+    {
+      "songId": 80033,
+      "title": "MANA",
+      "infinitasTitle": "MANA",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 665
+    },
+    {
+      "songId": 80034,
+      "title": "LIMIT TOPPA REVOLUTION",
+      "infinitasTitle": "LIMIT TOPPA REVOLUTION",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 666
+    },
+    {
+      "songId": 80040,
+      "title": "Plea Per Phase",
+      "infinitasTitle": "Plea Per Phase",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 667
+    },
+    {
+      "songId": 80043,
+      "title": "Dynasty",
+      "infinitasTitle": "Dynasty",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 668
+    },
+    {
+      "songId": 80045,
+      "title": "カラルの月",
+      "infinitasTitle": "カラルの月",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 669
+    },
+    {
+      "songId": 80046,
+      "title": "Ignited Night",
+      "infinitasTitle": "Ignited Night",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 670
+    },
+    {
+      "songId": 80052,
+      "title": "イグジスター",
+      "infinitasTitle": "イグジスター",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 671
+    },
+    {
+      "songId": 80055,
+      "title": "HAPPY☆LUCKY☆YEAPPY",
+      "infinitasTitle": "HAPPY☆LUCKY☆YEAPPY",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 672
+    },
+    {
+      "songId": 80060,
+      "title": "Cold Moon",
+      "infinitasTitle": "Cold Moon",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 673
+    },
+    {
+      "songId": 80062,
+      "title": "Poppin' Soda",
+      "infinitasTitle": "Poppin' Soda",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 674
+    },
+    {
+      "songId": 80066,
+      "title": "VIVID DEBUT!",
+      "infinitasTitle": "VIVID DEBUT!",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 675
+    },
+    {
+      "songId": 80070,
+      "title": "Inside Insight",
+      "infinitasTitle": "Inside Insight",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 676
+    },
+    {
+      "songId": 80071,
+      "title": "タンポポ",
+      "infinitasTitle": "タンポポ",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 677
+    },
+    {
+      "songId": 80074,
+      "title": "CALDERA",
+      "infinitasTitle": "CALDERA",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 678
+    },
+    {
+      "songId": 80075,
+      "title": "Astrogazer",
+      "infinitasTitle": "Astrogazer",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 679
+    },
+    {
+      "songId": 80078,
+      "title": "Metagame Matador",
+      "infinitasTitle": "Metagame Matador",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 680
+    },
+    {
+      "songId": 80079,
+      "title": "The setting sun(burst)",
+      "infinitasTitle": "The setting sun(burst)",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 681
+    },
+    {
+      "songId": 80085,
+      "title": "THE ANCIENT KING IS BACK",
+      "infinitasTitle": "THE ANCIENT KING IS BACK",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 682
+    },
+    {
+      "songId": 80086,
+      "title": "Black Apple",
+      "infinitasTitle": "Black Apple",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 683
+    },
+    {
+      "songId": 80087,
+      "title": "insist",
+      "infinitasTitle": "insist",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 684
+    },
+    {
+      "songId": 80093,
+      "title": "月光蝶",
+      "infinitasTitle": "月光蝶",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 685
+    },
+    {
+      "songId": 80095,
+      "title": "雷君",
+      "infinitasTitle": "雷君",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 686
+    },
+    {
+      "songId": 80096,
+      "title": "Hopeful Daybreak!!!",
+      "infinitasTitle": "Hopeful Daybreak!!!",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 687
+    },
+    {
+      "songId": 80101,
+      "title": "繚乱ヒットチャート",
+      "infinitasTitle": "繚乱ヒットチャート",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 688
+    },
+    {
+      "songId": 80103,
+      "title": "CARNIVOROUS",
+      "infinitasTitle": "CARNIVOROUS",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 689
+    },
+    {
+      "songId": 18026,
+      "title": "BLUST OF WIND(L)",
+      "infinitasTitle": "BLUST OF WIND",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [
+        "CN",
+        "ズレ",
+        "デニム",
+        "ラス殺し"
+      ],
+      "sortOrder": 690
+    },
+    {
+      "songId": 32047,
+      "title": "Fiery Stallion",
+      "infinitasTitle": "Fiery Stallion",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [
+        "HCN",
+        "HBSS",
+        "階段"
+      ],
+      "sortOrder": 691
+    },
+    {
+      "songId": 31083,
+      "title": "Monkey Business",
+      "infinitasTitle": "Monkey Business",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [
+        "ソフラン",
+        "CN",
+        "BSS"
+      ],
+      "sortOrder": 692
+    },
+    {
+      "songId": 32066,
+      "title": "RAVE SYNDROME",
+      "infinitasTitle": "RAVE SYNDROME",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [
+        "BSS",
+        "軸",
+        "同時押し",
+        "連皿"
+      ],
+      "sortOrder": 693
+    },
+    {
+      "songId": 31027,
+      "title": "See You Again",
+      "infinitasTitle": "See You Again",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [
+        "皿複合"
+      ],
+      "sortOrder": 694
+    },
+    {
+      "songId": 25080,
+      "title": "STARLIGHT JUNCTION(L)",
+      "infinitasTitle": "STARLIGHT JUNCTION",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [
+        "二重階段",
+        "皿絡み"
+      ],
+      "sortOrder": 695
+    },
+    {
+      "songId": 31054,
+      "title": "This Is Club Musik feat. 大久保紅葉",
+      "infinitasTitle": "This Is Club Musik feat. 大久保紅葉",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [
+        "連皿",
+        "連打"
+      ],
+      "sortOrder": 696
+    },
+    {
+      "songId": 32077,
+      "title": "ファイナルレター",
+      "infinitasTitle": "ファイナルレター",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [
+        "CN",
+        "BSS",
+        "階段",
+        "ズレ"
+      ],
+      "sortOrder": 697
+    },
+    {
+      "songId": 30107,
+      "title": "惑星☆ロリポップ",
+      "infinitasTitle": "惑星☆ロリポップ",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [
+        "皿同時",
+        "ラス殺し"
+      ],
+      "sortOrder": 698
+    },
+    {
+      "songId": 19016,
+      "title": "GIGANT(L)",
+      "infinitasTitle": "GIGANT",
+      "difficulty": "SPL",
+      "tier": "地力A",
+      "attributes": [
+        "CN"
+      ],
+      "sortOrder": 699
+    },
+    {
+      "songId": 19048,
+      "title": "Star Trail(L)",
+      "infinitasTitle": "Star Trail",
+      "difficulty": "SPL",
+      "tier": "地力A",
+      "attributes": [
+        "CN",
+        "BSS"
+      ],
+      "sortOrder": 700
+    },
+    {
+      "songId": 6003,
+      "title": "Buffalo(L)",
+      "infinitasTitle": "Buffalo",
+      "difficulty": "SPL",
+      "tier": "地力B",
+      "attributes": [
+        "皿複合"
+      ],
+      "sortOrder": 701
+    },
+    {
+      "songId": 32072,
+      "title": "PopなEDEN",
+      "infinitasTitle": "PopなEDEN",
+      "difficulty": "SPA",
+      "tier": "地力F",
+      "attributes": [
+        "同時押し",
+        "階段"
+      ],
+      "sortOrder": 702
+    },
+    {
+      "songId": 28049,
+      "title": "POLꞰAMAИIA",
+      "infinitasTitle": "POLꞰAMAИIA",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 703
+    },
+    {
+      "songId": 31052,
+      "title": "れとりば！(L)",
+      "infinitasTitle": "れとりば！",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 704
+    },
+    {
+      "songId": 32002,
+      "title": "IN BETWEEN",
+      "infinitasTitle": "IN BETWEEN",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 705
+    },
+    {
+      "songId": 32029,
+      "title": "everlastingeuphoria:",
+      "infinitasTitle": "everlastingeuphoria:",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 706
+    },
+    {
+      "songId": 32031,
+      "title": "Stargazing Trip ～星 探す旅～ ft. 小林マナ",
+      "infinitasTitle": "Stargazing Trip ～星 探す旅～ ft. 小林マナ",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 707
+    },
+    {
+      "songId": 32041,
+      "title": "Constellation",
+      "infinitasTitle": "Constellation",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 708
+    },
+    {
+      "songId": 32045,
+      "title": "きみのせかい",
+      "infinitasTitle": "きみのせかい",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 709
+    },
+    {
+      "songId": 32064,
+      "title": "Butterfly Twist",
+      "infinitasTitle": "Butterfly Twist",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 710
+    },
+    {
+      "songId": 32068,
+      "title": "TECHNO RUMBLE",
+      "infinitasTitle": "TECHNO RUMBLE",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 711
+    },
+    {
+      "songId": 32074,
+      "title": "Raspberry Potion (feat.あれたん♡ & ぎゃるのしん☆)",
+      "infinitasTitle": "Raspberry Potion (feat.あれたん♡ & ぎゃるのしん☆)",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 712
+    },
+    {
+      "songId": 33078,
+      "title": "GO!",
+      "infinitasTitle": "GO!",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 713
+    },
+    {
+      "songId": 33091,
+      "title": "Meteor☆Shower",
+      "infinitasTitle": "Meteor☆Shower",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 714
+    },
+    {
+      "songId": 33094,
+      "title": "メテオラ-meteor-",
+      "infinitasTitle": "メテオラ-meteor-",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 715
+    },
+    {
+      "songId": 33117,
+      "title": "blue anthem",
+      "infinitasTitle": "blue anthem",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 716
+    },
+    {
+      "songId": 33119,
+      "title": "ESPRIT ONE",
+      "infinitasTitle": "ESPRIT ONE",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 717
+    },
+    {
+      "songId": 80107,
+      "title": "Bleep Beep Bop",
+      "infinitasTitle": "Bleep Beep Bop",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 718
+    },
+    {
+      "songId": 80110,
+      "title": "檄",
+      "infinitasTitle": "檄",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 719
+    },
+    {
+      "songId": 80111,
+      "title": "Sakura Sunrise",
+      "infinitasTitle": "Sakura Sunrise",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 720
+    },
+    {
+      "songId": 80116,
+      "title": "Glitch Angel",
+      "infinitasTitle": "Glitch Angel",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 721
+    },
+    {
+      "songId": 80118,
+      "title": "Come to Life",
+      "infinitasTitle": "Come to Life",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 722
+    },
+    {
+      "songId": 80121,
+      "title": "Sector",
+      "infinitasTitle": "Sector",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 723
+    },
+    {
+      "songId": 80125,
+      "title": "The 88's Instigation",
+      "infinitasTitle": "The 88's Instigation",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 724
     }
   ],
   "sp11-normal": [
@@ -25027,6 +27984,1119 @@
         "皿複合"
       ],
       "sortOrder": 555
+    },
+    {
+      "songId": 31011,
+      "title": "Speculation",
+      "infinitasTitle": "Speculation",
+      "difficulty": "SPA",
+      "tier": "地力A",
+      "attributes": [
+        "CN",
+        "BSS",
+        "MSS",
+        "同時押し",
+        "二重トリル",
+        "二重階段"
+      ],
+      "sortOrder": 607
+    },
+    {
+      "songId": 28087,
+      "title": "ABSOLUTE (kors k Remix)",
+      "infinitasTitle": "ABSOLUTE (kors k Remix)",
+      "difficulty": "SPA",
+      "tier": "地力B",
+      "attributes": [
+        "CN"
+      ],
+      "sortOrder": 608
+    },
+    {
+      "songId": 30041,
+      "title": "Ruler or Loser",
+      "infinitasTitle": "Ruler or Loser",
+      "difficulty": "SPA",
+      "tier": "地力D",
+      "attributes": [
+        "CN",
+        "BSS",
+        "トリル",
+        "軸"
+      ],
+      "sortOrder": 609
+    },
+    {
+      "songId": 28102,
+      "title": "MA・TSU・RI",
+      "infinitasTitle": "MA・TSU・RI",
+      "difficulty": "SPA",
+      "tier": "地力E",
+      "attributes": [
+        "BSS"
+      ],
+      "sortOrder": 610
+    },
+    {
+      "songId": 9048,
+      "title": "Abyss -The Heavens Remix-(L)",
+      "infinitasTitle": "Abyss -The Heavens Remix-",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 611
+    },
+    {
+      "songId": 13018,
+      "title": "Heavenly Sun (IIDX VERSION)(L)",
+      "infinitasTitle": "Heavenly Sun (IIDX VERSION)",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 612
+    },
+    {
+      "songId": 15017,
+      "title": "マチ子の唄(L)",
+      "infinitasTitle": "マチ子の唄",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 613
+    },
+    {
+      "songId": 18017,
+      "title": "I FIGHT ME(L)",
+      "infinitasTitle": "I FIGHT ME",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 614
+    },
+    {
+      "songId": 18025,
+      "title": "New Castle Legions",
+      "infinitasTitle": "New Castle Legions",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 615
+    },
+    {
+      "songId": 19010,
+      "title": "CALL(L)",
+      "infinitasTitle": "CALL",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 616
+    },
+    {
+      "songId": 19011,
+      "title": "KYAMISAMA ONEGAI!(L)",
+      "infinitasTitle": "KYAMISAMA ONEGAI!",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 617
+    },
+    {
+      "songId": 20000,
+      "title": "Fractal",
+      "infinitasTitle": "Fractal",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 618
+    },
+    {
+      "songId": 20044,
+      "title": "Breaking Dawn feat. NO+CHIN, AYANO",
+      "infinitasTitle": "Breaking Dawn feat. NO+CHIN, AYANO",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 619
+    },
+    {
+      "songId": 20055,
+      "title": "Deceive Your Insight",
+      "infinitasTitle": "Deceive Your Insight",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 620
+    },
+    {
+      "songId": 20074,
+      "title": "YELLOW FROG from Steel Chronicle(L)",
+      "infinitasTitle": "YELLOW FROG from Steel Chronicle",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 621
+    },
+    {
+      "songId": 21016,
+      "title": "死神自爆中二妹アイドルももかりん(1歳)",
+      "infinitasTitle": "死神自爆中二妹アイドルももかりん(1歳)",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 622
+    },
+    {
+      "songId": 21027,
+      "title": "LA FESTA LA VITA!!",
+      "infinitasTitle": "LA FESTA LA VITA!!",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 623
+    },
+    {
+      "songId": 21045,
+      "title": "All is Wrecked",
+      "infinitasTitle": "All is Wrecked",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 624
+    },
+    {
+      "songId": 21056,
+      "title": "Smug Face -どうだ、オレの生き様は- (ONLY ONE EDITION)",
+      "infinitasTitle": "Smug Face -どうだ、オレの生き様は- (ONLY ONE EDITION)",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 625
+    },
+    {
+      "songId": 21069,
+      "title": "Votum stellarum -Hommarju Remix-",
+      "infinitasTitle": "Votum stellarum -Hommarju Remix-",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 626
+    },
+    {
+      "songId": 21070,
+      "title": "NEMESIS -gratitude remix- IIDX Edition",
+      "infinitasTitle": "NEMESIS -gratitude remix- IIDX Edition",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 627
+    },
+    {
+      "songId": 21073,
+      "title": "Stella Sinistra",
+      "infinitasTitle": "Stella Sinistra",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 628
+    },
+    {
+      "songId": 21074,
+      "title": "マインド・ゲーム",
+      "infinitasTitle": "マインド・ゲーム",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 629
+    },
+    {
+      "songId": 21085,
+      "title": "御千手メディテーション",
+      "infinitasTitle": "御千手メディテーション",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 630
+    },
+    {
+      "songId": 22044,
+      "title": "m1dy Festival",
+      "infinitasTitle": "m1dy Festival",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 631
+    },
+    {
+      "songId": 22048,
+      "title": "Amnolys",
+      "infinitasTitle": "Amnolys",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 632
+    },
+    {
+      "songId": 22081,
+      "title": "全力 SPECIAL VACATION!! ～限りある休日～",
+      "infinitasTitle": "全力 SPECIAL VACATION!! ～限りある休日～",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 633
+    },
+    {
+      "songId": 23019,
+      "title": "太陽SUNSUNボンジュールアバンチュール",
+      "infinitasTitle": "太陽SUNSUNボンジュールアバンチュール",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 634
+    },
+    {
+      "songId": 23023,
+      "title": "GET READY!!",
+      "infinitasTitle": "GET READY!!",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 635
+    },
+    {
+      "songId": 23039,
+      "title": "m1dy Dynamic",
+      "infinitasTitle": "m1dy Dynamic",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 636
+    },
+    {
+      "songId": 23041,
+      "title": "Ride To The Core",
+      "infinitasTitle": "Ride To The Core",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 637
+    },
+    {
+      "songId": 23063,
+      "title": "炸裂！イェーガー電光チョップ！！(JAEGER FINAL ATTACK)",
+      "infinitasTitle": "炸裂！イェーガー電光チョップ！！(JAEGER FINAL ATTACK)",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 638
+    },
+    {
+      "songId": 23085,
+      "title": "SEITEN NO TERIYAKI",
+      "infinitasTitle": "SEITEN NO TERIYAKI",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 639
+    },
+    {
+      "songId": 24001,
+      "title": "RISING FIRE HAWK",
+      "infinitasTitle": "RISING FIRE HAWK",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 640
+    },
+    {
+      "songId": 24034,
+      "title": "DISAPPEAR feat. koyomin",
+      "infinitasTitle": "DISAPPEAR feat. koyomin",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 641
+    },
+    {
+      "songId": 24047,
+      "title": "Shoot'Em All",
+      "infinitasTitle": "Shoot'Em All",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 642
+    },
+    {
+      "songId": 25019,
+      "title": "Mira",
+      "infinitasTitle": "Mira",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 643
+    },
+    {
+      "songId": 25021,
+      "title": "Beast mode",
+      "infinitasTitle": "Beast mode",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 644
+    },
+    {
+      "songId": 25022,
+      "title": "FIRE BALL",
+      "infinitasTitle": "FIRE BALL",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 645
+    },
+    {
+      "songId": 25059,
+      "title": "Rise Circuit",
+      "infinitasTitle": "Rise Circuit",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 646
+    },
+    {
+      "songId": 25069,
+      "title": "Only for now(L)",
+      "infinitasTitle": "Only for now",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 647
+    },
+    {
+      "songId": 26020,
+      "title": "A Tale Hidden In The Abyss",
+      "infinitasTitle": "A Tale Hidden In The Abyss",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 648
+    },
+    {
+      "songId": 26095,
+      "title": "ROZA DE ANDALUCIA",
+      "infinitasTitle": "ROZA DE ANDALUCIA",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 649
+    },
+    {
+      "songId": 26096,
+      "title": "ToyCube Pf.(RX-Ver.S.P.L.)(L)",
+      "infinitasTitle": "ToyCube Pf.(RX-Ver.S.P.L.)",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 650
+    },
+    {
+      "songId": 26110,
+      "title": "Six String Proof",
+      "infinitasTitle": "Six String Proof",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 651
+    },
+    {
+      "songId": 27041,
+      "title": "Drop It",
+      "infinitasTitle": "Drop It",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 652
+    },
+    {
+      "songId": 27067,
+      "title": "Rave lithosphere",
+      "infinitasTitle": "Rave lithosphere",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 653
+    },
+    {
+      "songId": 28011,
+      "title": "Breakin' Rules",
+      "infinitasTitle": "Breakin' Rules",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 654
+    },
+    {
+      "songId": 28062,
+      "title": "Brahma",
+      "infinitasTitle": "Brahma",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 655
+    },
+    {
+      "songId": 28092,
+      "title": "CONNECT-",
+      "infinitasTitle": "CONNECT-",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 656
+    },
+    {
+      "songId": 28094,
+      "title": "Scandal",
+      "infinitasTitle": "Scandal",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 657
+    },
+    {
+      "songId": 29022,
+      "title": "Legendary Treasures",
+      "infinitasTitle": "Legendary Treasures",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 658
+    },
+    {
+      "songId": 31072,
+      "title": "My Sweet Bird?(L)",
+      "infinitasTitle": "My Sweet Bird?",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 659
+    },
+    {
+      "songId": 33015,
+      "title": "Substance",
+      "infinitasTitle": "Substance",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 660
+    },
+    {
+      "songId": 80024,
+      "title": "Stleq",
+      "infinitasTitle": "Stleq",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 661
+    },
+    {
+      "songId": 80025,
+      "title": "DO-IT-AMA-SITE!!!",
+      "infinitasTitle": "DO-IT-AMA-SITE!!!",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 662
+    },
+    {
+      "songId": 80027,
+      "title": "Chocolate Planet(L)",
+      "infinitasTitle": "Chocolate Planet",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 663
+    },
+    {
+      "songId": 80033,
+      "title": "MANA",
+      "infinitasTitle": "MANA",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 664
+    },
+    {
+      "songId": 80034,
+      "title": "LIMIT TOPPA REVOLUTION",
+      "infinitasTitle": "LIMIT TOPPA REVOLUTION",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 665
+    },
+    {
+      "songId": 80040,
+      "title": "Plea Per Phase",
+      "infinitasTitle": "Plea Per Phase",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 666
+    },
+    {
+      "songId": 80043,
+      "title": "Dynasty",
+      "infinitasTitle": "Dynasty",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 667
+    },
+    {
+      "songId": 80045,
+      "title": "カラルの月",
+      "infinitasTitle": "カラルの月",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 668
+    },
+    {
+      "songId": 80046,
+      "title": "Ignited Night",
+      "infinitasTitle": "Ignited Night",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 669
+    },
+    {
+      "songId": 80052,
+      "title": "イグジスター",
+      "infinitasTitle": "イグジスター",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 670
+    },
+    {
+      "songId": 80055,
+      "title": "HAPPY☆LUCKY☆YEAPPY",
+      "infinitasTitle": "HAPPY☆LUCKY☆YEAPPY",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 671
+    },
+    {
+      "songId": 80060,
+      "title": "Cold Moon",
+      "infinitasTitle": "Cold Moon",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 672
+    },
+    {
+      "songId": 80062,
+      "title": "Poppin' Soda",
+      "infinitasTitle": "Poppin' Soda",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 673
+    },
+    {
+      "songId": 80066,
+      "title": "VIVID DEBUT!",
+      "infinitasTitle": "VIVID DEBUT!",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 674
+    },
+    {
+      "songId": 80070,
+      "title": "Inside Insight",
+      "infinitasTitle": "Inside Insight",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 675
+    },
+    {
+      "songId": 80071,
+      "title": "タンポポ",
+      "infinitasTitle": "タンポポ",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 676
+    },
+    {
+      "songId": 80074,
+      "title": "CALDERA",
+      "infinitasTitle": "CALDERA",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 677
+    },
+    {
+      "songId": 80075,
+      "title": "Astrogazer",
+      "infinitasTitle": "Astrogazer",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 678
+    },
+    {
+      "songId": 80078,
+      "title": "Metagame Matador",
+      "infinitasTitle": "Metagame Matador",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 679
+    },
+    {
+      "songId": 80079,
+      "title": "The setting sun(burst)",
+      "infinitasTitle": "The setting sun(burst)",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 680
+    },
+    {
+      "songId": 80085,
+      "title": "THE ANCIENT KING IS BACK",
+      "infinitasTitle": "THE ANCIENT KING IS BACK",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 681
+    },
+    {
+      "songId": 80086,
+      "title": "Black Apple",
+      "infinitasTitle": "Black Apple",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 682
+    },
+    {
+      "songId": 80087,
+      "title": "insist",
+      "infinitasTitle": "insist",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 683
+    },
+    {
+      "songId": 80093,
+      "title": "月光蝶",
+      "infinitasTitle": "月光蝶",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 684
+    },
+    {
+      "songId": 80095,
+      "title": "雷君",
+      "infinitasTitle": "雷君",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 685
+    },
+    {
+      "songId": 80096,
+      "title": "Hopeful Daybreak!!!",
+      "infinitasTitle": "Hopeful Daybreak!!!",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 686
+    },
+    {
+      "songId": 80101,
+      "title": "繚乱ヒットチャート",
+      "infinitasTitle": "繚乱ヒットチャート",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 687
+    },
+    {
+      "songId": 80103,
+      "title": "CARNIVOROUS",
+      "infinitasTitle": "CARNIVOROUS",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 688
+    },
+    {
+      "songId": 32047,
+      "title": "Fiery Stallion",
+      "infinitasTitle": "Fiery Stallion",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [
+        "HCN",
+        "HBSS",
+        "階段"
+      ],
+      "sortOrder": 689
+    },
+    {
+      "songId": 31083,
+      "title": "Monkey Business",
+      "infinitasTitle": "Monkey Business",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [
+        "ソフラン",
+        "CN",
+        "BSS"
+      ],
+      "sortOrder": 690
+    },
+    {
+      "songId": 32066,
+      "title": "RAVE SYNDROME",
+      "infinitasTitle": "RAVE SYNDROME",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [
+        "BSS",
+        "軸",
+        "同時押し",
+        "連皿"
+      ],
+      "sortOrder": 691
+    },
+    {
+      "songId": 31027,
+      "title": "See You Again",
+      "infinitasTitle": "See You Again",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [
+        "皿複合"
+      ],
+      "sortOrder": 692
+    },
+    {
+      "songId": 25080,
+      "title": "STARLIGHT JUNCTION(L)",
+      "infinitasTitle": "STARLIGHT JUNCTION",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [
+        "二重階段",
+        "皿絡み"
+      ],
+      "sortOrder": 693
+    },
+    {
+      "songId": 31054,
+      "title": "This Is Club Musik feat. 大久保紅葉",
+      "infinitasTitle": "This Is Club Musik feat. 大久保紅葉",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [
+        "連皿",
+        "連打"
+      ],
+      "sortOrder": 694
+    },
+    {
+      "songId": 32077,
+      "title": "ファイナルレター",
+      "infinitasTitle": "ファイナルレター",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [
+        "CN",
+        "BSS",
+        "階段",
+        "ズレ"
+      ],
+      "sortOrder": 695
+    },
+    {
+      "songId": 30107,
+      "title": "惑星☆ロリポップ",
+      "infinitasTitle": "惑星☆ロリポップ",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [
+        "皿同時",
+        "ラス殺し"
+      ],
+      "sortOrder": 696
+    },
+    {
+      "songId": 19016,
+      "title": "GIGANT(L)",
+      "infinitasTitle": "GIGANT",
+      "difficulty": "SPL",
+      "tier": "地力A",
+      "attributes": [
+        "CN"
+      ],
+      "sortOrder": 697
+    },
+    {
+      "songId": 19048,
+      "title": "Star Trail(L)",
+      "infinitasTitle": "Star Trail",
+      "difficulty": "SPL",
+      "tier": "地力A",
+      "attributes": [
+        "CN",
+        "BSS"
+      ],
+      "sortOrder": 698
+    },
+    {
+      "songId": 18026,
+      "title": "BLUST OF WIND(L)",
+      "infinitasTitle": "BLUST OF WIND",
+      "difficulty": "SPL",
+      "tier": "地力C",
+      "attributes": [
+        "CN",
+        "ズレ",
+        "デニム",
+        "ラス殺し"
+      ],
+      "sortOrder": 699
+    },
+    {
+      "songId": 6003,
+      "title": "Buffalo(L)",
+      "infinitasTitle": "Buffalo",
+      "difficulty": "SPL",
+      "tier": "地力C",
+      "attributes": [
+        "皿複合"
+      ],
+      "sortOrder": 700
+    },
+    {
+      "songId": 32072,
+      "title": "PopなEDEN",
+      "infinitasTitle": "PopなEDEN",
+      "difficulty": "SPA",
+      "tier": "地力F",
+      "attributes": [
+        "同時押し",
+        "階段"
+      ],
+      "sortOrder": 701
+    },
+    {
+      "songId": 28049,
+      "title": "POLꞰAMAИIA",
+      "infinitasTitle": "POLꞰAMAИIA",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 702
+    },
+    {
+      "songId": 31052,
+      "title": "れとりば！(L)",
+      "infinitasTitle": "れとりば！",
+      "difficulty": "SPL",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 703
+    },
+    {
+      "songId": 32002,
+      "title": "IN BETWEEN",
+      "infinitasTitle": "IN BETWEEN",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 704
+    },
+    {
+      "songId": 32029,
+      "title": "everlastingeuphoria:",
+      "infinitasTitle": "everlastingeuphoria:",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 705
+    },
+    {
+      "songId": 32031,
+      "title": "Stargazing Trip ～星 探す旅～ ft. 小林マナ",
+      "infinitasTitle": "Stargazing Trip ～星 探す旅～ ft. 小林マナ",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 706
+    },
+    {
+      "songId": 32041,
+      "title": "Constellation",
+      "infinitasTitle": "Constellation",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 707
+    },
+    {
+      "songId": 32045,
+      "title": "きみのせかい",
+      "infinitasTitle": "きみのせかい",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 708
+    },
+    {
+      "songId": 32064,
+      "title": "Butterfly Twist",
+      "infinitasTitle": "Butterfly Twist",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 709
+    },
+    {
+      "songId": 32068,
+      "title": "TECHNO RUMBLE",
+      "infinitasTitle": "TECHNO RUMBLE",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 710
+    },
+    {
+      "songId": 32074,
+      "title": "Raspberry Potion (feat.あれたん♡ & ぎゃるのしん☆)",
+      "infinitasTitle": "Raspberry Potion (feat.あれたん♡ & ぎゃるのしん☆)",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 711
+    },
+    {
+      "songId": 33078,
+      "title": "GO!",
+      "infinitasTitle": "GO!",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 712
+    },
+    {
+      "songId": 33091,
+      "title": "Meteor☆Shower",
+      "infinitasTitle": "Meteor☆Shower",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 713
+    },
+    {
+      "songId": 33094,
+      "title": "メテオラ-meteor-",
+      "infinitasTitle": "メテオラ-meteor-",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 714
+    },
+    {
+      "songId": 33117,
+      "title": "blue anthem",
+      "infinitasTitle": "blue anthem",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 715
+    },
+    {
+      "songId": 33119,
+      "title": "ESPRIT ONE",
+      "infinitasTitle": "ESPRIT ONE",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 716
+    },
+    {
+      "songId": 80107,
+      "title": "Bleep Beep Bop",
+      "infinitasTitle": "Bleep Beep Bop",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 717
+    },
+    {
+      "songId": 80110,
+      "title": "檄",
+      "infinitasTitle": "檄",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 718
+    },
+    {
+      "songId": 80111,
+      "title": "Sakura Sunrise",
+      "infinitasTitle": "Sakura Sunrise",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 719
+    },
+    {
+      "songId": 80116,
+      "title": "Glitch Angel",
+      "infinitasTitle": "Glitch Angel",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 720
+    },
+    {
+      "songId": 80118,
+      "title": "Come to Life",
+      "infinitasTitle": "Come to Life",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 721
+    },
+    {
+      "songId": 80121,
+      "title": "Sector",
+      "infinitasTitle": "Sector",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 722
+    },
+    {
+      "songId": 80125,
+      "title": "The 88's Instigation",
+      "infinitasTitle": "The 88's Instigation",
+      "difficulty": "SPA",
+      "tier": "未定",
+      "attributes": [],
+      "sortOrder": 723
     }
   ]
 }
