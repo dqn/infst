@@ -38,6 +38,30 @@ infst
 
 Your plays are automatically recorded while the tracker is running.
 
+### Automatic Startup (Windows)
+
+From a checkout of this repository, register the tracker for your Windows account:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\register-autostart.ps1 -TrackerPath "C:\Tools\infst\infst.exe"
+```
+
+This starts a background watcher now and at each logon. When INFINITAS starts, the
+tracker opens minimized without taking focus. Repeated starts keep one watcher
+and one tracker per desktop session.
+
+The working directory defaults to the executable's directory. Pass
+`-WorkingDirectory` to use another directory for tracker data. Re-run the same
+command after changing the executable's location or updating the watcher.
+The watcher and its log are installed in `%LOCALAPPDATA%\infst`.
+
+To remove automatic startup:
+
+```powershell
+Stop-ScheduledTask -TaskName 'Infst Auto Start'
+Unregister-ScheduledTask -TaskName 'Infst Auto Start' -Confirm:$false
+```
+
 ### Export Data
 
 Export all your play data (scores, lamps, miss counts, DJ points, etc.):
